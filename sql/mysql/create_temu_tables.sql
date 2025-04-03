@@ -1,4 +1,6 @@
 -- 订单列表
+-- `ruoyi-vue-pro`.temu_order definition
+
 CREATE TABLE `temu_order` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '订单ID',
   `order_no` varchar(64) NOT NULL COMMENT '订单编号',
@@ -16,13 +18,19 @@ CREATE TABLE `temu_order` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `custom_image_urls` varchar(2000) DEFAULT NULL COMMENT '定制图片列表URL',
   `custom_text_list` varchar(2000) DEFAULT NULL COMMENT '定制文字列表',
+  `product_img_url` varchar(1000) DEFAULT NULL COMMENT '商品图片URL',
+  `category_id` varchar(64) DEFAULT NULL COMMENT '类目ID',
+  `category_name` varchar(255) DEFAULT NULL COMMENT '类目名称',
+  `shipping_info` varchar(2000) DEFAULT NULL COMMENT '物流信息JSON字符串',
+  `original_info` varchar(2000) DEFAULT NULL COMMENT '接口接收的源信息',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_order_no` (`order_no`),
   KEY `idx_sku` (`sku`) COMMENT 'SKU查询索引',
   KEY `idx_shop_id` (`shop_id`) COMMENT '店铺ID查询索引',
   KEY `custom_sku` (`custom_sku`) COMMENT '定制SKU查询索引',
-  KEY `skc` (`skc`) COMMENT 'SKC查询索引'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+  KEY `skc` (`skc`) COMMENT 'SKC查询索引',
+  KEY `idx_category_id` (`category_id`) COMMENT '类目ID查询索引',
+  KEY `idx_order_no` (`order_no`) COMMENT '订单编号索引'
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- 商品品类表
 CREATE TABLE `temu_product_category` (
