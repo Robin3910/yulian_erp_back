@@ -49,6 +49,12 @@ nbdist/
 rebel.xml
 
 application-my.yaml
+application.yaml
+application-dev.yaml
+application-local.yaml
 
 /yudao-ui-app/unpackage/
 **/.DS_Store
+
+
+yudao-server/src/main/resources/application-local.yaml

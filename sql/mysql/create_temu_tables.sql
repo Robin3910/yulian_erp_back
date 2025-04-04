@@ -1,6 +1,5 @@
 -- 订单列表
 -- `ruoyi-vue-pro`.temu_order definition
-
 CREATE TABLE `temu_order` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '订单ID',
   `order_no` varchar(64) NOT NULL COMMENT '订单编号',
@@ -37,10 +36,16 @@ CREATE TABLE `temu_product_category` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `category_id` bigint(20) NOT NULL COMMENT '商品品类ID',
   `category_name` varchar(100) NOT NULL COMMENT '商品名称',
+  `length` decimal(10,2) DEFAULT NULL COMMENT '长度(cm)',
+  `width` decimal(10,2) DEFAULT NULL COMMENT '宽度(cm)',
+  `height` decimal(10,2) DEFAULT NULL COMMENT '高度(cm)',
+  `weight` decimal(10,2) DEFAULT NULL COMMENT '重量(g)',
+  `main_image_url` varchar(1000) DEFAULT NULL COMMENT '主图URL',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_id` (`category_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COMMENT='商品品类表';
-
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COMMENT='商品品类表';
 -- 商品品类SKU关系表
 CREATE TABLE `temu_product_category_sku` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
