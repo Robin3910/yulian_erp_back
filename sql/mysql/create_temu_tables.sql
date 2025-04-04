@@ -43,17 +43,23 @@ CREATE TABLE `temu_product_category` (
   `main_image_url` varchar(1000) DEFAULT NULL COMMENT '主图URL',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `tenant_id` bigint(20) NOT NULL DEFAULT 1 COMMENT '租户编号';
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_id` (`category_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COMMENT='商品品类表';
+
+
+
 -- 商品品类SKU关系表
 CREATE TABLE `temu_product_category_sku` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `category_id` bigint(20) NOT NULL COMMENT '商品品类ID',
+  `category_name` varchar(100) NOT NULL COMMENT '商品名称',
   `sku` varchar(64) NOT NULL COMMENT 'SKU',
   `shop_id` bigint(20) NOT NULL COMMENT '店铺ID',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `tenant_id` bigint(20) NOT NULL DEFAULT 1 COMMENT '租户编号';
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_sku` (`category_id`,`sku`),
   KEY `idx_sku` (`sku`) COMMENT 'SKU查询索引',
