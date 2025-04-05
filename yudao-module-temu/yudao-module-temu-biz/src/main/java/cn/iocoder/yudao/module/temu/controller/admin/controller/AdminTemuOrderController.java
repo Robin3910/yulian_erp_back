@@ -1,18 +1,20 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.module.temu.controller.admin.controller.vo.client.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.service.order.ITemuOrderService;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderSaveRequestVO;
+import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
+import java.util.List;
+import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -20,14 +22,34 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RestController
 @RequestMapping("/temu/order")
 @Validated
-
 public class AdminTemuOrderController {
 	@Resource private ITemuOrderService temuOrderService;
+	
 	@GetMapping("/page")
 	@Operation(summary = "获取订单管理信息")
 	@PermitAll
-	public CommonResult<?> list(@RequestBody TemuOrderRequestVO temuOrderRequestVO)  {
-	 return  CommonResult.success(temuOrderService.list(temuOrderRequestVO));
+	public CommonResult<?> list(@RequestBody TemuOrderRequestVO temuOrderRequestVO) {
+		return CommonResult.success(temuOrderService.list(temuOrderRequestVO));
 	}
 	
+	@PostMapping("/save")
+	@Operation(summary = "保存订单数据")
+	@PermitAll
+	public CommonResult<Integer> saveOrders(@RequestBody TemuOrderSaveRequestVO requestVO) {
+		// 记录请求内容到日志
+		String requestJson = JSONUtil.toJsonStr(requestVO);
+		
+		// 获取订单列表
+		List<Map<String, Object>> ordersList = requestVO.getOrders().getOrders();
+		
+		// 保存订单
+		int savedCount = temuOrderService.saveOrders(
+				requestVO.getShopId(), 
+				requestVO.getShopName(), 
+				ordersList,
+				requestJson
+		);
+		
+		return success(savedCount);
+	}
 }

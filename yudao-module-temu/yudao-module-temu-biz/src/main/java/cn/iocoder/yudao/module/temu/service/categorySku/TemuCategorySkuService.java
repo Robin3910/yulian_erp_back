@@ -1,10 +1,10 @@
 package cn.iocoder.yudao.module.temu.service.categorySku;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategorySkuCreateReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategorySkuPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategorySkuRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategorySkuUpdateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategorySkuCreateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategorySkuPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategorySkuRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategorySkuUpdateReqVO;
 
 import java.util.Collection;
 import java.util.List;

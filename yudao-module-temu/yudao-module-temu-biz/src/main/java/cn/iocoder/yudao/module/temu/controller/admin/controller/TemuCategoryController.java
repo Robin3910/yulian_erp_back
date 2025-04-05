@@ -2,9 +2,9 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryCreateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryCreateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryRespVO;
 import cn.iocoder.yudao.module.temu.service.category.TemuCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

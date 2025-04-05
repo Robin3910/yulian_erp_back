@@ -2,9 +2,9 @@ package cn.iocoder.yudao.module.temu.service.category;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategoryCreateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryCreateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
 import org.springframework.stereotype.Service;
@@ -37,7 +37,7 @@ public class TemuCategoryServiceImpl implements TemuCategoryService {
 
     @Override
     public PageResult<TemuCategoryRespVO> getCategoryPage(TemuCategoryPageReqVO pageReqVO) {
-        PageResult<TemuProductCategoryDO> pageResult = temuCategoryMapper.selectPage(pageReqVO);
+        PageResult<TemuProductCategoryDO> pageResult = temuCategoryMapper.selectPageByParams(pageReqVO);
         return BeanUtils.toBean(pageResult, TemuCategoryRespVO.class);
     }
 

@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.temu.controller.admin.controller.vo.client;
+package cn.iocoder.yudao.module.temu.controller.admin.vo.client;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import lombok.Data;

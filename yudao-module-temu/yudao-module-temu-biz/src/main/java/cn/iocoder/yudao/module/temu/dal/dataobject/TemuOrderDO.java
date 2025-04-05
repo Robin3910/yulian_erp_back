@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.temu.controller.admin.dal.dataobject;
+package cn.iocoder.yudao.module.temu.dal.dataobject;
 
 import lombok.*;
 

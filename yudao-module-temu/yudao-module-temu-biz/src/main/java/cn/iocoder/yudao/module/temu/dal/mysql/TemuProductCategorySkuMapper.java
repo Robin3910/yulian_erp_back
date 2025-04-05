@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.temu.dal.mysql;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.TemuCategorySkuPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategorySkuPageReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategorySkuDO;
 import org.apache.ibatis.annotations.Mapper;
 

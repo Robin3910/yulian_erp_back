@@ -1,21 +1,22 @@
-package cn.iocoder.yudao.module.temu.controller.admin.vo;
+package cn.iocoder.yudao.module.temu.controller.admin.vo.category;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
-@Schema(description = "管理后台 - 商品品类 Response VO")
+@Schema(description = "管理后台 - 商品品类创建 Request VO")
 @Data
-public class TemuCategoryRespVO {
-
-    @Schema(description = "品类编号", required = true, example = "1024")
-    private Long id;
+public class TemuCategoryCreateReqVO {
 
     @Schema(description = "商品品类ID", required = true, example = "2048")
+    @NotNull(message = "商品品类ID不能为空")
     private Long categoryId;
 
     @Schema(description = "商品名称", required = true, example = "定制木质商品")
+    @NotEmpty(message = "商品名称不能为空")
     private String categoryName;
     
     @Schema(description = "长度(cm)", example = "10.5")

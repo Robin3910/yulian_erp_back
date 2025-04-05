@@ -1,11 +1,11 @@
-package cn.iocoder.yudao.module.temu.controller.admin.dal.mysql;
+package cn.iocoder.yudao.module.temu.dal.mysql;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.temu.controller.admin.controller.vo.client.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.dal.dataobject.TemuOrderDO;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

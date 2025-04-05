@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.temu.controller.admin.vo;
+package cn.iocoder.yudao.module.temu.controller.admin.vo.category;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;

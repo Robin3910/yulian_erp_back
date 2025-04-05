@@ -1,7 +1,7 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.module.temu.controller.admin.service.order.impl.CommonService;
+import cn.iocoder.yudao.module.temu.service.order.impl.CommonService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
