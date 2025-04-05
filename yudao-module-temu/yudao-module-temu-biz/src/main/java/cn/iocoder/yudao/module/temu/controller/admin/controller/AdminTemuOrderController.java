@@ -5,7 +5,6 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.validation.annotation.Validated;
@@ -28,7 +27,7 @@ public class AdminTemuOrderController {
 	@GetMapping("/page")
 	@Operation(summary = "获取订单管理信息")
 	@PermitAll
-	public CommonResult<?> list(@RequestBody TemuOrderRequestVO temuOrderRequestVO) {
+	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return CommonResult.success(temuOrderService.list(temuOrderRequestVO));
 	}
 	
@@ -36,6 +35,7 @@ public class AdminTemuOrderController {
 	@Operation(summary = "保存订单数据")
 	@PermitAll
 	public CommonResult<Integer> saveOrders(@RequestBody TemuOrderSaveRequestVO requestVO) {
+		System.out.println("接收到的订单请求数据: " + requestVO);
 		// 记录请求内容到日志
 		String requestJson = JSONUtil.toJsonStr(requestVO);
 		

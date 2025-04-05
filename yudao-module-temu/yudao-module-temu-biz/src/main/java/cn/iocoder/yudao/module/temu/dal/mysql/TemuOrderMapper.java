@@ -21,4 +21,14 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		queryWrapper.likeIfPresent(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId());
 		return selectPage(temuOrderRequestVO,queryWrapper);
 	}
+	
+	/**
+     * 根据定制SKU查询订单
+     *
+     * @param customSku 定制SKU
+     * @return 订单信息
+     */
+    default TemuOrderDO selectByCustomSku(String customSku) {
+        return selectOne(TemuOrderDO::getCustomSku, customSku);
+    }
 }

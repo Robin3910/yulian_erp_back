@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -97,8 +98,16 @@ public class TemuOrderService implements ITemuOrderService {
 				// 保存原始信息
 				order.setOriginalInfo(JSONUtil.toJsonStr(orderMap));
 				
-				// 将订单保存到数据库
-				temuOrderMapper.insert(order);
+				// 检查订单是否已存在
+				TemuOrderDO existingOrder = temuOrderMapper.selectByCustomSku(order.getCustomSku());
+				if (existingOrder != null) {
+					// 更新现有订单
+					order.setId(existingOrder.getId());
+					temuOrderMapper.updateById(order);
+				} else {
+					// 插入新订单
+					temuOrderMapper.insert(order);
+				}
 				count++;
 				
 			} catch (Exception e) {
