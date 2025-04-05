@@ -357,3 +357,13 @@ debug: false
 # 插件配置 TODO 芋艿：【IOT】需要处理下
 pf4j:
   pluginsDir: /Users/anhaohao/code/gitee/ruoyi-vue-pro/plugins # 插件目录
+
+# 阿里云OSS配置
+temu:
+  oss:
+    endpoint:  # 替换为您的OSS endpoint
+    access-key-id:   # 替换为您的AccessKeyId
+    access-key-secret:   # 替换为您的AccessKeySecret
+    bucket-name:   # 替换为您的Bucket名称
+    domain:   # 替换为您的OSS访问域名
+    directory-prefix:   # 可根据需要修改
