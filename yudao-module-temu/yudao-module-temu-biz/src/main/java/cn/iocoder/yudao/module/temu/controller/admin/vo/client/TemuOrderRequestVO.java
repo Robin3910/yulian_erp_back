@@ -2,6 +2,11 @@ package cn.iocoder.yudao.module.temu.controller.admin.vo.client;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
+
+import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
 @Data
 public class TemuOrderRequestVO extends PageParam {
@@ -12,4 +17,6 @@ public class TemuOrderRequestVO extends PageParam {
 	private String customSku;
 	private String orderStatus;
 	private String categoryId;
+	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+	private LocalDateTime[] bookingTime;
 }

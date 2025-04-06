@@ -1,14 +1,17 @@
 package cn.iocoder.yudao.module.temu.service.order;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
 
 import java.util.List;
 import java.util.Map;
 
 public interface ITemuOrderService {
-	public PageResult<TemuOrderDO> list(TemuOrderRequestVO temuOrderRequestVO);
+	PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO);
+	Boolean beatchUpdateStatus (List<TemuOrderDO> requestVO);
 
 	/**
 	 * 保存订单数据

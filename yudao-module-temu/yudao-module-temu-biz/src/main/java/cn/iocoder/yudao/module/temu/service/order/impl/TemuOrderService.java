@@ -2,20 +2,24 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,10 +32,17 @@ public class TemuOrderService implements ITemuOrderService {
 	private TemuShopMapper temuShopMapper;
 
 	@Override
-	public PageResult<TemuOrderDO> list(TemuOrderRequestVO temuOrderRequestVO) {
+	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
 	}
-
+	
+	@Override
+	@Transactional
+	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
+		
+		return temuOrderMapper.updateBatch(requestVO);
+	}
+	
 	@Override
 	public int saveOrders(String shopId, String shopName, List<Map<String, Object>> ordersList, String originalJson) {
 		if (ordersList == null || ordersList.isEmpty()) {

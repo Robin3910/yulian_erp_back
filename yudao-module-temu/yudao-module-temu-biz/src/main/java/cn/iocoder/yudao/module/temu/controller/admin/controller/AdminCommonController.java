@@ -22,4 +22,9 @@ public class AdminCommonController {
 	public CommonResult<?> categoryList() {
 		return CommonResult.success(commonService.list());
 	}
+	@RequestMapping("/shop/list")
+	@PermitAll
+	public CommonResult<?> shopList() {
+		return CommonResult.success(commonService.listShop());
+	}
 }

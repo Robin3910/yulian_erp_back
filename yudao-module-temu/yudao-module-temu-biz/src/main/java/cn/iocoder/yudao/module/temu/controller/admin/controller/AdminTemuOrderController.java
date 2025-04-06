@@ -2,8 +2,10 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderSaveRequestVO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,12 @@ public class AdminTemuOrderController {
 	@PermitAll
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return CommonResult.success(temuOrderService.list(temuOrderRequestVO));
+	}
+	//批量修改订单状态
+	@PostMapping("/beatch_update_status")
+	@Operation(summary = "批量修改订单状态")
+	public CommonResult<Boolean> beatchUpdateStatus(@RequestBody List<TemuOrderDO> requestVO) {
+		return success(temuOrderService.beatchUpdateStatus(requestVO));
 	}
 	
 	@PostMapping("/save")
