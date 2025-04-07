@@ -45,7 +45,7 @@ public class TemuOrderService implements ITemuOrderService {
 	@Transactional
 	@LogRecord(
 			success = "id：{{#user.id}} 更新了{{#orderSize}}条数据,提交的数据是{{#orderString}}",
-			type = "订单", bizNo = "{{#user.id}}")
+			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
 		LogRecordContext.putVariable("user", SecurityFrameworkUtils.getLoginUser() );
