@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
@@ -10,6 +12,8 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
+import com.mzt.logapi.context.LogRecordContext;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,9 +43,20 @@ public class TemuOrderService implements ITemuOrderService {
 	
 	@Override
 	@Transactional
+	@LogRecord(
+			success = "id：{{#user.id}} 更新了{{#orderSize}}条数据,提交的数据是{{#orderString}}",
+			type = "订单", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
-		
-		return temuOrderMapper.updateBatch(requestVO);
+		Boolean result = temuOrderMapper.updateBatch(requestVO);
+		LogRecordContext.putVariable("user", SecurityFrameworkUtils.getLoginUser() );
+		LogRecordContext.putVariable("orderSize", requestVO.size());
+		HashMap<String, String> stringStringHashMap = new HashMap<>();
+		requestVO.iterator().forEachRemaining(temuOrderDO -> {
+			stringStringHashMap.put("id", String.valueOf(temuOrderDO.getId()));
+			stringStringHashMap.put("orderStatus", String.valueOf(temuOrderDO.getOrderStatus()));
+		});
+		LogRecordContext.putVariable("orderString", JsonUtils.toJsonString(stringStringHashMap));
+		return result;
 	}
 	
 	@Override
