@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.dal.dataobject;
 
+import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 @KeySequence("temu_product_category_seq") // 用于 Oracle、PostgreSQL、Kingbase、DB2、H2 数据库的主键自增。如果是 MySQL 等数据库，可不写。
 @Data
 @EqualsAndHashCode
-public class TemuProductCategoryDO {
+public class TemuProductCategoryDO extends BaseDO {
 
     /**
      * 品类编号
@@ -51,12 +52,5 @@ public class TemuProductCategoryDO {
      * 主图URL
      */
     private String mainImageUrl;
-    /**
-     * 创建时间
-     */
-    private LocalDateTime createTime;
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
+
 } 

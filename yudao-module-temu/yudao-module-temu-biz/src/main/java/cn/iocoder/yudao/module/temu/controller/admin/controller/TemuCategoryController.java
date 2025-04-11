@@ -21,9 +21,11 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 商品品类")
 @RestController
-@RequestMapping("/temu/category")
+@RequestMapping({
+		"/temu/category",
+		"/temu/product-category"
+})
 @Validated
-@PermitAll
 public class TemuCategoryController {
 
 	@Resource
@@ -50,4 +52,22 @@ public class TemuCategoryController {
 	public CommonResult<Long> createCategory(@Valid @RequestBody TemuCategoryCreateReqVO createReqVO) {
 		return success(temuCategoryService.createCategory(createReqVO));
 	}
+	
+	@PutMapping("/update")
+	@Operation(summary = "更新商品品类")
+	@PreAuthorize("@ss.hasPermission('temu:product-category:update')")
+	public CommonResult<Boolean> updateProductCategory(@Valid @RequestBody TemuCategoryCreateReqVO updateReqVO) {
+		temuCategoryService.updateProductCategory(updateReqVO);
+		return success(true);
+	}
+	
+	@DeleteMapping("/delete")
+	@Operation(summary = "删除商品品类")
+	@Parameter(name = "id", description = "编号", required = true)
+	@PreAuthorize("@ss.hasPermission('temu:product-category:delete')")
+	public CommonResult<Boolean> deleteProductCategory(@RequestParam("id") Long id) {
+		temuCategoryService.deleteProductCategory(id);
+		return success(true);
+	}
+	
 }

@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+
 
 import javax.annotation.Resource;
 
@@ -53,5 +55,28 @@ public class TemuCategoryServiceImpl implements TemuCategoryService {
         temuCategoryMapper.insert(category);
         // 返回
         return category.getId();
+    }
+    
+    @Override
+    public void updateProductCategory(TemuCategoryCreateReqVO updateReqVO) {
+        // 校验存在
+        validateProductCategoryExists(updateReqVO.getId());
+        // 更新
+        TemuProductCategoryDO updateObj = BeanUtils.toBean(updateReqVO, TemuProductCategoryDO.class);
+        temuCategoryMapper.updateById(updateObj);
+    }
+    
+    @Override
+    public void deleteProductCategory(Long id) {
+        // 校验存在
+        validateProductCategoryExists(id);
+        // 删除
+        temuCategoryMapper.deleteById(id);
+    }
+    
+    private void validateProductCategoryExists(Long id) {
+        if (temuCategoryMapper.selectById(id) == null) {
+            throw exception(CATEGORY_NOT_EXISTS);
+        }
     }
 } 

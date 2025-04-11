@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.dal.dataobject;
 
+import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -8,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("temu_shop")
-public class TemuShopDO {
+public class TemuShopDO extends BaseDO {
     
     /**
      * 主键ID
@@ -27,12 +28,8 @@ public class TemuShopDO {
     private String shopName;
     
     /**
-     * 创建时间
+     * 信息通知机器人webhook地址
      */
-    private LocalDateTime createTime;
-    
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
+    private String webhook;
+ 
 } 

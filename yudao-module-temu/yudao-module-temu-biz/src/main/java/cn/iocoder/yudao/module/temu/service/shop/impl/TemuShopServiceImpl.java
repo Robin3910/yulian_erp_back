@@ -71,7 +71,7 @@ public class TemuShopServiceImpl implements TemuShopService {
     @Override
     public PageResult<TemuShopRespVO> getShopPage(TemuShopPageReqVO pageReqVO) {
         PageResult<TemuShopDO> pageResult = temuShopMapper.selectPage(
-                pageReqVO.getShopId(), pageReqVO.getShopName());
+                pageReqVO.getShopId(), pageReqVO.getShopName(), pageReqVO.getCreateTime());
         return BeanUtils.toBean(pageResult, TemuShopRespVO.class);
     }
     

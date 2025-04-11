@@ -12,4 +12,5 @@ public interface ErrorCodeConstants {
     ErrorCode CATEGORY_SKU_NOT_EXISTS = new ErrorCode(1_001_001_002, "商品品类SKU关系不存在");
     
     // 可以根据需要添加更多错误码
+    
 } 

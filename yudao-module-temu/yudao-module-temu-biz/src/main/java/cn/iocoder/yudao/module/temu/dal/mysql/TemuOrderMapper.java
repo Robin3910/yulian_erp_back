@@ -30,6 +30,8 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		if (temuOrderRequestVO.getBookingTime() != null && temuOrderRequestVO.getBookingTime().length == 2) {
 			wrapper.between(TemuOrderDO::getBookingTime, temuOrderRequestVO.getBookingTime()[0], temuOrderRequestVO.getBookingTime()[1]);
 		}
+		//按照订单时间倒序排列
+		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}
 	

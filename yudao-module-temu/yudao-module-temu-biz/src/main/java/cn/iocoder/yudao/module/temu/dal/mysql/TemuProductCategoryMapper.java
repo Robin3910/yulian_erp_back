@@ -26,6 +26,7 @@ public interface TemuProductCategoryMapper extends BaseMapperX<TemuProductCatego
         return selectPage(reqVO, new LambdaQueryWrapperX<TemuProductCategoryDO>()
                 .likeIfPresent(TemuProductCategoryDO::getCategoryName, reqVO.getCategoryName())
                 .eqIfPresent(TemuProductCategoryDO::getCategoryId, reqVO.getCategoryId())
+		        .betweenIfPresent(TemuProductCategoryDO::getCreateTime, reqVO.getCreateTime())
                 .orderByDesc(TemuProductCategoryDO::getId));
     }
 

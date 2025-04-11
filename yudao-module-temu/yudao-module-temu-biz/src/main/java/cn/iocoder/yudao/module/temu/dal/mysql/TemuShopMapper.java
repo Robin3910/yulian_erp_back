@@ -4,9 +4,12 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 
 import org.apache.ibatis.annotations.Mapper;
+
+import java.time.LocalDateTime;
 
 @Mapper
 public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
@@ -28,11 +31,12 @@ public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
 	 * @param shopName 店铺名称
 	 * @return 分页结果
 	 */
-	default PageResult<TemuShopDO> selectPage(Long shopId, String shopName) {
+	default PageResult<TemuShopDO> selectPage(Long shopId, String shopName, LocalDateTime[] createTime) {
 		// 使用pageParam代表分页参数对象
 		return selectPage(new PageParam(), new LambdaQueryWrapperX<TemuShopDO>()
 				.eqIfPresent(TemuShopDO::getShopId, shopId)
 				.likeIfPresent(TemuShopDO::getShopName, shopName)
+				.betweenIfPresent(TemuShopDO::getCreateTime, createTime)
 				.orderByDesc(TemuShopDO::getId));
 	}
 	

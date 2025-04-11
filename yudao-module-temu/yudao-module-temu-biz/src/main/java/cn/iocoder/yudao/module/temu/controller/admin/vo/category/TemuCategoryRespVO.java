@@ -32,4 +32,9 @@ public class TemuCategoryRespVO {
     
     @Schema(description = "主图URL", example = "https://example.com/image.jpg")
     private String mainImageUrl;
+    
+    @Schema(description = "创建时间", required = true)
+    private LocalDateTime createTime;
+    @Schema(description = "更新时间", required = true)
+    private LocalDateTime updateTime;
 } 

@@ -18,6 +18,9 @@ public class TemuShopRespVO {
     @Schema(description = "店铺名称", required = true, example = "测试店铺")
     private String shopName;
     
+    @Schema(description = "信息通知机器人webhook地址")
+    private String webhook;
+    
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
     
