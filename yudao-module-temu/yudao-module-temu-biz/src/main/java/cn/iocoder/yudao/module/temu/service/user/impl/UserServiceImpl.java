@@ -11,6 +11,8 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
 
 import javax.annotation.Resource;
 import java.util.HashMap;
+import java.util.List;
+
 @Log
 @Service
 public class UserServiceImpl implements UserService {
@@ -19,13 +21,17 @@ public class UserServiceImpl implements UserService {
 	
 	@Override
 	@Transactional
-	public Boolean bindShop(UserBindShopReqVO reqVO) {
+	public Boolean bindShop(List<UserBindShopReqVO> reqVO) {
+		//删除当前关联的所有用户的记录
 		HashMap<String, Object> map = new HashMap<>();
-		map.put("userId", reqVO.getUserId());
-		map.put("shopIp", reqVO.getShopId());
+		map.put("userId", reqVO.get(0).getUserId());
 		temuUserShopMapper.deleteByCloumnMap(map);
-		TemuUserShopDO updateObj = BeanUtils.toBean(reqVO, TemuUserShopDO.class);
-		updateObj.setDeleted(false);
-		return temuUserShopMapper.insert(updateObj) > 1;
+		//批量插入
+		for (UserBindShopReqVO userBindShopReqVO : reqVO) {
+			TemuUserShopDO temuUserShopDO = BeanUtils.toBean(userBindShopReqVO, TemuUserShopDO.class);
+			temuUserShopDO.setDeleted(false);
+			temuUserShopMapper.insert(temuUserShopDO);
+		}
+		return true;
 	}
 }

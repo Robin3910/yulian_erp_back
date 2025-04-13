@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
+import java.util.List;
 
 @Tag(name = "Temu管理 - 用户管理")
 @RestController
@@ -23,7 +24,7 @@ public class TemuUserController {
 	private UserService userService;
 	
 	@RequestMapping("/bind-shop")
-	public CommonResult<?> bindShop(@RequestBody UserBindShopReqVO reqVO) {
+	public CommonResult<?> bindShop(@RequestBody List<UserBindShopReqVO> reqVO) {
 		return CommonResult.success(userService.bindShop(reqVO));
 	}
 	
