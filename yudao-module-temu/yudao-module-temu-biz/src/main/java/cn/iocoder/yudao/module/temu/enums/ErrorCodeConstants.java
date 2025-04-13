@@ -11,6 +11,7 @@ public interface ErrorCodeConstants {
     ErrorCode CATEGORY_NOT_EXISTS = new ErrorCode(1_001_000_000, "商品品类不存在");
     ErrorCode CATEGORY_SKU_NOT_EXISTS = new ErrorCode(1_001_001_002, "商品品类SKU关系不存在");
     
-    // 可以根据需要添加更多错误码
+    // 订单相关
+    ErrorCode ORDER_NOT_EXISTS = new ErrorCode(1_001_002_000, "订单不存在");
     
 } 

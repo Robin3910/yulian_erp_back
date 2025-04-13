@@ -1,7 +1,10 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.temu.service.order.impl.CommonService;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,15 +19,20 @@ import javax.annotation.security.PermitAll;
 @Validated
 public class AdminCommonController {
 	@Resource private CommonService commonService;
+	@Resource private PermissionService  permissionService;
 	//	分类列表
 	@RequestMapping("/category/list")
-	@PermitAll
 	public CommonResult<?> categoryList() {
 		return CommonResult.success(commonService.list());
 	}
 	@RequestMapping("/shop/list")
-	@PermitAll
 	public CommonResult<?> shopList() {
-		return CommonResult.success(commonService.listShop());
+		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin","crm_admin");
+		if(isAdmin){
+			return CommonResult.success(commonService.listShop());
+		}else {
+			return CommonResult.success(commonService.listShop(loginUserId));
+		}
 	}
 }

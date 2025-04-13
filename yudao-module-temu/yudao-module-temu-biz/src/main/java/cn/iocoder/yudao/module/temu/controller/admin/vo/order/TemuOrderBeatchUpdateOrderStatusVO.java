@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.temu.controller.admin.vo.client;
+package cn.iocoder.yudao.module.temu.controller.admin.vo.order;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 

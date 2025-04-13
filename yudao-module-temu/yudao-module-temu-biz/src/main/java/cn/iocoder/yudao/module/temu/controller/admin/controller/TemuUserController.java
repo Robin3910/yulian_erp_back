@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.user.UserBindShopReqVO;
 import cn.iocoder.yudao.module.temu.service.order.impl.CommonService;
 import cn.iocoder.yudao.module.temu.service.user.UserService;
@@ -25,4 +26,5 @@ public class TemuUserController {
 	public CommonResult<?> bindShop(@RequestBody UserBindShopReqVO reqVO) {
 		return CommonResult.success(userService.bindShop(reqVO));
 	}
+	
 }

@@ -4,16 +4,21 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+
+import cn.iocoder.yudao.module.system.service.permission.PermissionServiceImpl;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 
+import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
-
+import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 
 @Mapper
 public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
-	
+
+
 	/**
 	 * 根据店铺ID查询店铺
 	 *
@@ -52,12 +57,20 @@ public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
 	    // 初始化分页参数对象，并设置不分页（pageSize为-1）
 	    PageParam pageParam = new PageParam();
 	    pageParam.setPageSize(-1);
-	    
 	    // 使用LambdaQueryWrapperX构建查询条件
 	    LambdaQueryWrapperX<TemuShopDO> temuShopDOLambdaQueryWrapperX = new LambdaQueryWrapperX<>();
-	    
+	
 	    // 调用selectPage方法进行分页查询
 	    return selectPage(pageParam, temuShopDOLambdaQueryWrapperX);
+	}
+	default PageResult<TemuShopDO> selectPage(long userId) {
+		PageParam pageParam = new PageParam();
+		pageParam.setPageSize(-1);
+		MPJLambdaWrapper<TemuShopDO> temuShopDOMPJLambdaWrapper = new MPJLambdaWrapper<>();
+		temuShopDOMPJLambdaWrapper.selectAll(TemuShopDO.class)
+				.innerJoin(TemuUserShopDO.class, TemuUserShopDO::getShopId, TemuShopDO::getShopId)
+				.eq(TemuUserShopDO::getUserId, userId);
+		return selectJoinPage(pageParam, TemuShopDO.class,temuShopDOMPJLambdaWrapper);
 	}
 	
 } 

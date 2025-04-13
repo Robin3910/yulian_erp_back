@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 @Service
 public class CommonService implements ICommonService {
+	
 	@Resource private TemuProductCategoryMapper temuProductCategoryMapper;
 	@Resource private TemuShopMapper temuShopMapper;
 	@Override
@@ -22,5 +23,9 @@ public class CommonService implements ICommonService {
 	@Override
 	public PageResult<TemuShopDO> listShop() {
 		return temuShopMapper.selectPage();
+	}
+	@Override
+	public PageResult<TemuShopDO> listShop(Long loginUserId) {
+		return temuShopMapper.selectPage(loginUserId);
 	}
 }

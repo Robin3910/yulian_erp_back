@@ -8,4 +8,5 @@ public interface ICommonService {
 	 PageResult<TemuProductCategoryDO> list();
 	 PageResult<TemuShopDO> listShop();
 	
+	PageResult<TemuShopDO> listShop(Long loginUserId);
 }

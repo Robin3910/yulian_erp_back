@@ -2,9 +2,10 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderSaveRequestVO;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
+import javax.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
@@ -30,8 +32,17 @@ public class AdminTemuOrderController {
 	@Operation(summary = "获取订单管理信息")
 	@PermitAll
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
+		Long userId = SecurityFrameworkUtils.getLoginUserId();
+		return CommonResult.success(temuOrderService.list(temuOrderRequestVO,userId));
+	}
+	
+	@GetMapping("/admin-page")
+	@Operation(summary = "获取订单管理信息")
+	@PermitAll
+	public CommonResult<?> adminList(TemuOrderRequestVO temuOrderRequestVO) {
 		return CommonResult.success(temuOrderService.list(temuOrderRequestVO));
 	}
+	
 	//批量修改订单状态
 	@PostMapping("/beatch_update_status")
 	@Operation(summary = "批量修改订单状态")
@@ -59,5 +70,12 @@ public class AdminTemuOrderController {
 		);
 		
 		return success(savedCount);
+	}
+	
+	@PostMapping("/update-category")
+	@Operation(summary = "获取订单管理信息")
+	public CommonResult<?> updateCategory(@Valid @RequestBody TemuOrderUpdateCategoryReqVo requestVO) {
+		
+		return success(temuOrderService.updateCategory(requestVO));
 	}
 }

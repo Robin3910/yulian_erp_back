@@ -1,16 +1,25 @@
 package cn.iocoder.yudao.module.temu.service.order.impl;
 
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.json.JSONUtil;
+import cn.iocoder.yudao.framework.common.exception.ServerException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderBeatchUpdateOrderStatusVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.client.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuUserShopMapper;
+import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
@@ -33,12 +42,41 @@ import java.util.Map;
 public class TemuOrderService implements ITemuOrderService {
 	@Resource
 	private TemuOrderMapper temuOrderMapper;
-	@Resource 
+	@Resource
 	private TemuShopMapper temuShopMapper;
-
+	
+	@Resource
+	TemuUserShopMapper temuUserShopMapper;
+	
+	@Resource
+	TemuProductCategoryMapper temuProductCategoryMapper;
+	
+	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
+	}
+	
+	/**
+	 * 根据给定的查询条件和用户ID，分页查询Temu订单详情列表。
+	 *
+	 * @param temuOrderRequestVO 包含查询条件的请求对象，用于过滤订单详情数据。
+	 * @param userId             用户ID，用于标识当前操作的用户（尽管在此方法中未直接使用，但可能用于后续扩展或权限控制）。
+	 * @return 返回分页查询结果，包含符合条件的Temu订单详情数据列表。
+	 */
+	@Override
+	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
+		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
+		ArrayList<String> shopIdList = new ArrayList<>();
+		if (!list.isEmpty()) {
+			list.forEach(temuUserShopDO -> {
+				shopIdList.add(temuUserShopDO.getShopId().toString());
+			});
+			return temuOrderMapper.selectPage(temuOrderRequestVO, shopIdList);
+		}else {
+			return new PageResult<>();
+		}
+		
 	}
 	
 	@Override
@@ -48,7 +86,7 @@ public class TemuOrderService implements ITemuOrderService {
 			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
-		LogRecordContext.putVariable("user", SecurityFrameworkUtils.getLoginUser() );
+		LogRecordContext.putVariable("user", SecurityFrameworkUtils.getLoginUser());
 		LogRecordContext.putVariable("orderSize", requestVO.size());
 		HashMap<String, String> stringStringHashMap = new HashMap<>();
 		requestVO.iterator().forEachRemaining(temuOrderDO -> {
@@ -148,11 +186,26 @@ public class TemuOrderService implements ITemuOrderService {
 		
 		return count;
 	}
-
+	
+	@Override
+	public int updateCategory(TemuOrderUpdateCategoryReqVo requestVO) {
+		//根据查询订单是否存在
+		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getId());
+		if (temuOrderDO == null) {
+			throw new ServerException(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+		//检查分类id是否存在
+		List<TemuProductCategoryDO> list = temuProductCategoryMapper.selectByMap(MapUtil.of("category_id", requestVO.getCategoryId()));
+		if (list == null || list.isEmpty()) {
+			throw new ServerException(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+		}
+		return temuOrderMapper.updateById(BeanUtils.toBean(requestVO, TemuOrderDO.class));
+	}
+	
 	private String convertToString(Object obj) {
 		return obj == null ? "" : obj.toString();
 	}
-
+	
 	private LocalDateTime parseDateTime(String dateTimeStr) {
 		try {
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -161,7 +214,7 @@ public class TemuOrderService implements ITemuOrderService {
 			return null;
 		}
 	}
-
+	
 	private void saveShopInfo(Long shopId, String shopName) {
 		// 检查店铺是否已存在
 		TemuShopDO existingShop = temuShopMapper.selectByShopId(shopId);
