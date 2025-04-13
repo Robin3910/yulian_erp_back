@@ -22,8 +22,10 @@ import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqV
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.UserPostDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.temu.AdminTemuShopDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.dept.UserPostMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminTemuShopMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.dept.PostService;
@@ -78,12 +80,20 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Resource
     private UserPostMapper userPostMapper;
+    
+    @Resource
+    private AdminTemuShopMapper shopMapper;
 
     @Resource
     private FileApi fileApi;
     @Resource
     private ConfigApi configApi;
-
+    
+    @Override
+    public List<AdminTemuShopDO> getShopList(Long userId) {
+        return  shopMapper.getShopList(userId);
+    }
+    
     @Override
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = SYSTEM_USER_TYPE, subType = SYSTEM_USER_CREATE_SUB_TYPE, bizNo = "{{#user.id}}",

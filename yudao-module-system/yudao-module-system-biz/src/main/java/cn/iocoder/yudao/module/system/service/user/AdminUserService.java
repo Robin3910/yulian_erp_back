@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserImportEx
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserImportRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.temu.AdminTemuShopDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 
 import javax.validation.Valid;
@@ -25,7 +26,9 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface AdminUserService {
-
+    
+    List<AdminTemuShopDO> getShopList(Long userId);
+    
     /**
      * 创建用户
      *

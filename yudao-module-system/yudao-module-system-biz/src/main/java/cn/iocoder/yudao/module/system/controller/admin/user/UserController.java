@@ -96,10 +96,16 @@ public class UserController {
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(new PageResult<>(pageResult.getTotal()));
         }
-        // 拼接数据
+        // 拼接数据 获取部门id
         Map<Long, DeptDO> deptMap = deptService.getDeptMap(
                 convertList(pageResult.getList(), AdminUserDO::getDeptId));
-        return success(new PageResult<>(UserConvert.INSTANCE.convertList(pageResult.getList(), deptMap),
+        List<UserRespVO> userRespVOS = UserConvert.INSTANCE.convertList(pageResult.getList(), deptMap);
+        //获取关联绑定店铺的信息
+        userRespVOS.forEach(userRespVO -> {
+            userRespVO.setShopList(userService.getShopList(userRespVO.getId()));
+        });
+        return success(new PageResult<>(
+                userRespVOS,
                 pageResult.getTotal()));
     }
 

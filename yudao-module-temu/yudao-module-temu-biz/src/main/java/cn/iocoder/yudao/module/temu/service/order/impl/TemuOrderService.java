@@ -10,15 +10,9 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
-import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
-import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
-import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
-import cn.iocoder.yudao.module.temu.dal.mysql.TemuUserShopMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import com.mzt.logapi.context.LogRecordContext;
@@ -50,6 +44,8 @@ public class TemuOrderService implements ITemuOrderService {
 	
 	@Resource
 	TemuProductCategoryMapper temuProductCategoryMapper;
+	@Resource
+	private TemuProductCategorySkuMapper temuProductCategorySkuMapper;
 	
 	
 	@Override
@@ -198,6 +194,27 @@ public class TemuOrderService implements ITemuOrderService {
 		List<TemuProductCategoryDO> list = temuProductCategoryMapper.selectByMap(MapUtil.of("category_id", requestVO.getCategoryId()));
 		if (list == null || list.isEmpty()) {
 			throw new ServerException(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+		}
+		//检查temu_product_category_sku表是否选择记录
+		HashMap<String, Object> map = MapUtil.of("sku", temuOrderDO.getSku());
+		map.put("shop_id", temuOrderDO.getShopId());
+		List<TemuProductCategorySkuDO> temuProductCategorySkuDOList = temuProductCategorySkuMapper.selectByMap(map);
+		//如果存在记录 更新分类id
+		if(temuProductCategorySkuDOList!=null&&!temuProductCategorySkuDOList.isEmpty()){
+		//	更新类目id
+			temuProductCategorySkuDOList.forEach(temuProductCategorySkuDO -> {
+				temuProductCategorySkuDO.setCategoryId(Long.parseLong(requestVO.getCategoryId()));
+				temuProductCategorySkuDO.setCategoryName(list.get(0).getCategoryName());
+				temuProductCategorySkuMapper.updateById(temuProductCategorySkuDO);
+			});
+		}else{
+		//	插入新数据
+			TemuProductCategorySkuDO temuProductCategorySkuDO = new TemuProductCategorySkuDO();
+			temuProductCategorySkuDO.setCategoryId(Long.parseLong(requestVO.getCategoryId()));
+			temuProductCategorySkuDO.setCategoryName(list.get(0).getCategoryName());
+			temuProductCategorySkuDO.setSku(temuOrderDO.getSku());
+			temuProductCategorySkuDO.setShopId(temuOrderDO.getShopId());
+			temuProductCategorySkuMapper.insert(temuProductCategorySkuDO);
 		}
 		return temuOrderMapper.updateById(BeanUtils.toBean(requestVO, TemuOrderDO.class));
 	}
