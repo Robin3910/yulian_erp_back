@@ -11,7 +11,6 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
-import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
@@ -20,6 +19,7 @@ import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 
 
 import javax.annotation.Resource;
@@ -62,6 +62,7 @@ public class TemuOrderService implements ITemuOrderService {
 	 */
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
+		
 		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
 		ArrayList<String> shopIdList = new ArrayList<>();
 		if (!list.isEmpty()) {
