@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.temu.dal.dataobject.usershop;
+package cn.iocoder.yudao.module.temu.dal.dataobject;
 
 import lombok.*;
 import com.baomidou.mybatisplus.annotation.*;
