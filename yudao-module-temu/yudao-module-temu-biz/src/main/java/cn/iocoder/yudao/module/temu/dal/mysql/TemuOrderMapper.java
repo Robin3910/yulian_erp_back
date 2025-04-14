@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -19,6 +20,8 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
 		wrapper.selectAll(TemuOrderDO.class)
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
+				.leftJoin(TemuProductCategoryDO.class,TemuProductCategoryDO::getCategoryId,TemuOrderDO::getCategoryId)
+				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
 				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU
@@ -40,6 +43,8 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
 		wrapper.selectAll(TemuOrderDO.class)
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
+				.leftJoin(TemuProductCategoryDO.class,TemuProductCategoryDO::getCategoryId,TemuOrderDO::getCategoryId)
+				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
 				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU

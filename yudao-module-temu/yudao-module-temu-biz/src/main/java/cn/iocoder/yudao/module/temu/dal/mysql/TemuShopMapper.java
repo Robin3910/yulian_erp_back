@@ -7,9 +7,11 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
+
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 
 @Mapper
