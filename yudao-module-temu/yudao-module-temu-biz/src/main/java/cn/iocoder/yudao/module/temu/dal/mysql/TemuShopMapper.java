@@ -5,8 +5,6 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
-import cn.iocoder.yudao.module.system.service.permission.PermissionServiceImpl;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;

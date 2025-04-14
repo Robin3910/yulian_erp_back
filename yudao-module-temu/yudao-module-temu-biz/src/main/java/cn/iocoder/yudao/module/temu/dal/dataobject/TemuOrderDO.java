@@ -99,5 +99,19 @@ public class TemuOrderDO extends BaseDO {
 	 * 接口接收的源信息
 	 */
 	private String originalInfo;
-	
+
+	/**
+	 * 合成预览图
+	 */
+	private String effectiveImgUrl;
+
+	/**
+	 * 订单产品的单位成本
+	 */
+	private BigDecimal unitPrice;
+
+	/**
+	 * 该订单合计总价
+	 */
+	private BigDecimal totalPrice;
 }

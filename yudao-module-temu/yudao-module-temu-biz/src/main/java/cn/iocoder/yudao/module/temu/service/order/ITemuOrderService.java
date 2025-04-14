@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.temu.service.order;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;

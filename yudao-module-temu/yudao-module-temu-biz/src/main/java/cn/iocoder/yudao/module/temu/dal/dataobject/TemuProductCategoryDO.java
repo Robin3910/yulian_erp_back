@@ -6,9 +6,9 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import com.alibaba.fastjson.JSONObject;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 /**
  * 商品品类 DO
@@ -52,5 +52,9 @@ public class TemuProductCategoryDO extends BaseDO {
      * 主图URL
      */
     private String mainImageUrl;
-
+    
+    /**
+     * 单价(JSON格式)
+     */
+    private JSONObject unitPrice;
 } 

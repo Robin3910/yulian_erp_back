@@ -10,18 +10,26 @@ CREATE TABLE `temu_order` (
   `sale_price` decimal(10,2) NOT NULL COMMENT '申报价格',
   `custom_sku` varchar(64) DEFAULT NULL COMMENT '定制SKU',
   `quantity` int(11) NOT NULL COMMENT '数量',
-  `product_properties` varchar(500) DEFAULT NULL COMMENT '商品属性',
+  `product_properties` text COMMENT '商品属性',
   `booking_time` datetime DEFAULT NULL COMMENT '预定单创建时间',
   `shop_id` bigint(20) NOT NULL COMMENT '店铺ID',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `custom_image_urls` varchar(2000) DEFAULT NULL COMMENT '定制图片列表URL',
-  `custom_text_list` varchar(2000) DEFAULT NULL COMMENT '定制文字列表',
-  `product_img_url` varchar(1000) DEFAULT NULL COMMENT '商品图片URL',
+  `custom_image_urls` text COMMENT '定制图片列表URL',
+  `custom_text_list` text COMMENT '定制文字列表',
+  `product_img_url` text COMMENT '商品图片URL',
   `category_id` varchar(64) DEFAULT NULL COMMENT '类目ID',
   `category_name` varchar(255) DEFAULT NULL COMMENT '类目名称',
-  `shipping_info` varchar(2000) DEFAULT NULL COMMENT '物流信息JSON字符串',
-  `original_info` varchar(2000) DEFAULT NULL COMMENT '接口接收的源信息',
+  `shipping_info` text COMMENT '物流信息JSON字符串',
+  `original_info` text COMMENT '接口接收的源信息',
+  `deleted` tinyint(1) DEFAULT '0',
+  `creator` varchar(200) DEFAULT NULL,
+  `updater` varchar(200) DEFAULT NULL,
+  `tenant_id` int(11) unsigned DEFAULT '1',
+  `effective_img_url` varchar(2000) DEFAULT NULL COMMENT '合成预览图',
+  `unit_price` decimal(10,2) DEFAULT NULL COMMENT '单位价格',
+  `total_price` decimal(10,2) DEFAULT NULL COMMENT '总价',
+  `price_rule` text COMMENT '记录价格规则',
   PRIMARY KEY (`id`),
   KEY `idx_sku` (`sku`) COMMENT 'SKU查询索引',
   KEY `idx_shop_id` (`shop_id`) COMMENT '店铺ID查询索引',
@@ -29,7 +37,7 @@ CREATE TABLE `temu_order` (
   KEY `skc` (`skc`) COMMENT 'SKC查询索引',
   KEY `idx_category_id` (`category_id`) COMMENT '类目ID查询索引',
   KEY `idx_order_no` (`order_no`) COMMENT '订单编号索引'
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+) ENGINE=InnoDB AUTO_INCREMENT=202 DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- 商品品类表
 CREATE TABLE `temu_product_category` (
@@ -41,14 +49,13 @@ CREATE TABLE `temu_product_category` (
   `height` decimal(10,2) DEFAULT NULL COMMENT '高度(cm)',
   `weight` decimal(10,2) DEFAULT NULL COMMENT '重量(g)',
   `main_image_url` varchar(1000) DEFAULT NULL COMMENT '主图URL',
+  `unit_price` varchar(2000) DEFAULT NULL COMMENT '单价(JSON格式)',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `tenant_id` bigint(20) NOT NULL DEFAULT 1 COMMENT '租户编号';
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_id` (`category_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COMMENT='商品品类表';
-
-
 
 -- 商品品类SKU关系表
 CREATE TABLE `temu_product_category_sku` (
@@ -59,11 +66,12 @@ CREATE TABLE `temu_product_category_sku` (
   `shop_id` bigint(20) NOT NULL COMMENT '店铺ID',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `tenant_id` bigint(20) NOT NULL DEFAULT 1 COMMENT '租户编号';
+  `tenant_id` bigint(20) NOT NULL DEFAULT 1 COMMENT '租户编号',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_sku` (`category_id`,`sku`),
   KEY `idx_sku` (`sku`) COMMENT 'SKU查询索引',
-  KEY `idx_shop_id` (`shop_id`) COMMENT '店铺ID查询索引'
+  KEY `idx_shop_id` (`shop_id`) COMMENT '店铺ID查询索引',
+  KEY `idx_shop_sku` (`shop_id`,`sku`) COMMENT '店铺ID和SKU联合索引'
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='商品品类SKU关系表';
 
 -- 商品表
