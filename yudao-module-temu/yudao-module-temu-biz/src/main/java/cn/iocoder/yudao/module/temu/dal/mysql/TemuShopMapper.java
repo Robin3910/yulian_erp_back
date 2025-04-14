@@ -9,9 +9,10 @@ import cn.iocoder.yudao.module.system.service.permission.PermissionServiceImpl;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
-import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
+
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 
