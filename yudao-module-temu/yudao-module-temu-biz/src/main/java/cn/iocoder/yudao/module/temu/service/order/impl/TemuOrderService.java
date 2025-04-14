@@ -7,6 +7,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
@@ -218,6 +219,11 @@ public class TemuOrderService implements ITemuOrderService {
 			temuProductCategorySkuMapper.insert(temuProductCategorySkuDO);
 		}
 		return temuOrderMapper.updateById(BeanUtils.toBean(requestVO, TemuOrderDO.class));
+	}
+	
+	@Override
+	public int beatchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO) {
+		return 0;
 	}
 	
 	private String convertToString(Object obj) {
