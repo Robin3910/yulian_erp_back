@@ -111,7 +111,7 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setOrderNo(convertToString(orderMap.get("orderId")));
 				order.setProductTitle(convertToString(orderMap.get("title")));
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
-				order.setEffectiveImgUrl(convertToString(orderMap.get("effect_image_url"))); // 写入合成预览图url信息
+				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
 				// 设置SKU相关信息
 				order.setSkc(convertToString(orderMap.get("skc")));
@@ -134,7 +134,6 @@ public class TemuOrderService implements ITemuOrderService {
 						TemuProductCategorySkuDO categorySku = categorySkuList.get(0);
 						order.setCategoryId(String.valueOf(categorySku.getCategoryId()));
 						order.setCategoryName(categorySku.getCategoryName());
-						order.setUnitPrice(categorySku.getUnitPrice());
 					}
 				}
 				

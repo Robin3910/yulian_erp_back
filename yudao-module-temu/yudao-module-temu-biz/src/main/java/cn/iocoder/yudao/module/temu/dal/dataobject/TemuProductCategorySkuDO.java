@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -54,9 +53,4 @@ public class TemuProductCategorySkuDO {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
-    /**
-     * 单位价格
-     */
-    private BigDecimal unitPrice;
 } 
