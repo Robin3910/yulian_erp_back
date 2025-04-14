@@ -8,10 +8,8 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
-import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
@@ -111,15 +109,31 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setOrderNo(convertToString(orderMap.get("orderId")));
 				order.setProductTitle(convertToString(orderMap.get("title")));
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
+				order.setEffectiveImgUrl(convertToString(orderMap.get("effect_image_url"))); // 写入合成预览图url信息
 				
 				// 设置SKU相关信息
 				order.setSkc(convertToString(orderMap.get("skc")));
 				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
+				String sku = "";
 				if (skusMap != null) {
-					order.setSku(convertToString(skusMap.get("skuId")));
+					sku = convertToString(skusMap.get("skuId"));
+					order.setSku(sku);
 					order.setCustomSku(convertToString(skusMap.get("customSku")));
 					order.setProductProperties(convertToString(skusMap.get("property")));
+				}
+				
+				// 查询商品分类信息
+				if (!sku.isEmpty()) {
+					HashMap<String, Object> queryMap = MapUtil.of("sku", sku);
+					queryMap.put("shop_id", shopIdLong);
+					List<TemuProductCategorySkuDO> categorySkuList = temuProductCategorySkuMapper.selectByMap(queryMap);
+					if (categorySkuList != null && !categorySkuList.isEmpty()) {
+						TemuProductCategorySkuDO categorySku = categorySkuList.get(0);
+						order.setCategoryId(String.valueOf(categorySku.getCategoryId()));
+						order.setCategoryName(categorySku.getCategoryName());
+						order.setUnitPrice(categorySku.getUnitPrice());
+					}
 				}
 				
 				// 设置价格和数量
@@ -127,11 +141,12 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
 				
 				// 设置订单状态
+				// todo 前端上传上来使用枚举值，不要使用string
 				String status = convertToString(orderMap.get("status"));
 				if ("待发货".equals(status)) {
-					order.setOrderStatus(1); // 使用Integer而非byte
+					order.setOrderStatus(0);
 				} else {
-					order.setOrderStatus(0); // 使用Integer而非byte
+					order.setOrderStatus(1);
 				}
 				
 				// 设置时间

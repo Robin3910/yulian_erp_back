@@ -13,6 +13,6 @@ import java.util.Map;
  * @author 禹链科技
  */
 @Mapper
-public interface TemuUserShopMapper extends BaseMapperX<cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO> {
+public interface TemuUserShopMapper extends BaseMapperX<cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO> {
 	int deleteByCloumnMap(HashMap<String, Object> map);
 }

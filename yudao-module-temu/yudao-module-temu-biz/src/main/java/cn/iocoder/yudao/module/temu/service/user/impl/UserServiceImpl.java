@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.temu.service.user.UserService;
 import lombok.extern.java.Log;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import cn.iocoder.yudao.module.temu.dal.dataobject.usershop.TemuUserShopDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 
 import javax.annotation.Resource;
 import java.util.HashMap;
