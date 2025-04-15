@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.temu.service.order;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
@@ -32,4 +33,12 @@ public interface ITemuOrderService {
 	 * @return 更新的记录数
 	 */
 	int updateCategory(TemuOrderUpdateCategoryReqVo requestVO);
+	
+	/**
+	 * 批量下单
+	 *
+	 * @param requestVO 批量下单请求
+	 * @return 批量下单结果
+	 */
+	int batchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO);
 }

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
@@ -26,14 +27,15 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/temu/order")
 @Validated
 public class AdminTemuOrderController {
-	@Resource private ITemuOrderService temuOrderService;
+	@Resource
+	private ITemuOrderService temuOrderService;
 	
 	@GetMapping("/page")
 	@Operation(summary = "获取订单管理信息")
 	@PermitAll
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
 		Long userId = SecurityFrameworkUtils.getLoginUserId();
-		return CommonResult.success(temuOrderService.list(temuOrderRequestVO,userId));
+		return CommonResult.success(temuOrderService.list(temuOrderRequestVO, userId));
 	}
 	
 	@GetMapping("/admin-page")
@@ -63,8 +65,8 @@ public class AdminTemuOrderController {
 		
 		// 保存订单
 		int savedCount = temuOrderService.saveOrders(
-				requestVO.getShopId(), 
-				requestVO.getShopName(), 
+				requestVO.getShopId(),
+				requestVO.getShopName(),
 				ordersList,
 				requestJson
 		);
@@ -77,5 +79,12 @@ public class AdminTemuOrderController {
 	public CommonResult<?> updateCategory(@Valid @RequestBody TemuOrderUpdateCategoryReqVo requestVO) {
 		
 		return success(temuOrderService.updateCategory(requestVO));
+	}
+	
+	//	代下单状态批量下单
+	@PostMapping("/batch-save-order")
+	@Operation(summary = "批量下单")
+	public CommonResult<Integer> batchSave(@Valid @RequestBody List<TemuOrderBatchOrderReqVO> requestVO) {
+		return success(temuOrderService.batchSaveOrder(requestVO));
 	}
 }

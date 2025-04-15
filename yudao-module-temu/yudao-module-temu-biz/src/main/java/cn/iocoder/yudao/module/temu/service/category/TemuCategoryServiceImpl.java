@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryPag
 import cn.iocoder.yudao.module.temu.controller.admin.vo.category.TemuCategoryRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -21,6 +22,7 @@ import static cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants.CATEGORY_NOT
 /**
  * 商品品类 Service 实现类
  */
+@Slf4j
 @Service
 @Validated
 public class TemuCategoryServiceImpl implements TemuCategoryService {
@@ -31,6 +33,7 @@ public class TemuCategoryServiceImpl implements TemuCategoryService {
     @Override
     public TemuCategoryRespVO getCategory(Long id) {
         TemuProductCategoryDO category = temuCategoryMapper.selectById(id);
+        log.warn("getCategory:{}", category);
         if (category == null) {
             throw exception(CATEGORY_NOT_EXISTS);
         }

@@ -1,11 +1,13 @@
 package cn.iocoder.yudao.module.temu.controller.admin.vo.category;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Schema(description = "管理后台 - 商品品类创建 Request VO")
 @Data
@@ -34,4 +36,8 @@ public class TemuCategoryCreateReqVO {
     
     @Schema(description = "主图URL", example = "https://example.com/image.jpg")
     private String mainImageUrl;
+    @Schema(description = "价格规则", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private List<TemuProductCategoryDO.UnitPrice> unitPrice;
+    @Schema(description = "默认价格", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private BigDecimal defaultPrice;
 } 
