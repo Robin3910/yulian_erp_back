@@ -280,6 +280,8 @@ public class TemuOrderService implements ITemuOrderService {
 					break;
 				}
 			}
+			//更新数量
+			temuOrderDO.setQuantity(temuOrderBatchOrderReqVO.getQuantity());
 			//记录默认价格
 			temuOrderDO.setDefaultPrice(temuProductCategoryDO.getDefaultPrice());
 			//更新订单
