@@ -1,0 +1,61 @@
+package cn.iocoder.yudao.module.temu.dal.dataobject;
+
+import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@TableName("temu_order_shipping_info")
+public class TemuOrderShippingInfoDO extends BaseDO {
+
+    /**
+     * 主键ID
+     */
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
+    /**
+     * 订单ID
+     */
+    @TableField("order_no")
+    private String orderNo;
+    /**
+     * 物流单号
+     */
+    @TableField("tracking_number")
+    private String trackingNumber;
+    /**
+     * 快递面单图片URL
+     */
+    @TableField("express_image_url")
+    private String expressImageUrl;
+    /**
+     * 快递面单外单图片URL
+     */
+    @TableField("express_outside_image_url")
+    private String expressOutsideImageUrl;
+    /**
+     * 快递面单SKU图片URL
+     */
+    @TableField("express_sku_image_url")
+    private String expressSkuImageUrl;
+    /**
+     * 店铺ID
+     */
+    @TableField("shop_id")
+    private Long shopId;
+    /**
+     * 创建时间
+     */
+    @TableField("create_time")
+    private LocalDateTime createTime;
+    /**
+     * 更新时间
+     */
+    @TableField("update_time")
+    private LocalDateTime updateTime;
+}

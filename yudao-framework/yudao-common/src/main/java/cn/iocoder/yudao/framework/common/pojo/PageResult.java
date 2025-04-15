@@ -9,13 +9,19 @@ import java.util.List;
 
 @Schema(description = "分页结果")
 @Data
-public final class PageResult<T> implements Serializable {
+public class PageResult<T> implements Serializable {
 
     @Schema(description = "数据", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<T> list;
 
     @Schema(description = "总量", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long total;
+
+    @Schema(description = "页码", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Integer pageNo;
+
+    @Schema(description = "每页数量", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Integer pageSize;
 
     public PageResult() {
     }
@@ -28,6 +34,13 @@ public final class PageResult<T> implements Serializable {
     public PageResult(Long total) {
         this.list = new ArrayList<>();
         this.total = total;
+    }
+
+    public PageResult(List<T> list,Long total, Integer pageNo, Integer pageSize) {
+        this.list = list;
+        this.total = total;
+        this.pageNo = pageNo;
+        this.pageSize = pageSize;
     }
 
     public static <T> PageResult<T> empty() {
