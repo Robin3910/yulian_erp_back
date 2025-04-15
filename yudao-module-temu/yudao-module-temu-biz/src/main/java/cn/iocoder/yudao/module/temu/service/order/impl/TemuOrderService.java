@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 
-
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -118,12 +117,29 @@ public class TemuOrderService implements ITemuOrderService {
 				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
 				String sku = "";
+				String properties = "";
 				if (skusMap != null) {
 					sku = convertToString(skusMap.get("skuId"));
 					order.setSku(sku);
 					order.setCustomSku(convertToString(skusMap.get("customSku")));
-					order.setProductProperties(convertToString(skusMap.get("property")));
+					properties = convertToString(skusMap.get("property"));
+					order.setProductProperties(properties);
 				}
+				
+//				// 如果没有SKU信息，查询历史订单
+//				if (sku.isEmpty() && !properties.isEmpty()) {
+//					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
+//					queryWrapper.eq(TemuOrderDO::getShopId, shopIdLong)
+//							.eq(TemuOrderDO::getProductProperties, properties)
+//							.last("LIMIT 1"); // 只取一条记录
+//
+//					TemuOrderDO historicalOrder = temuOrderMapper.selectOne(queryWrapper);
+//					if (historicalOrder != null && historicalOrder.getSku() != null) {
+//						// 将历史订单的SKU信息赋值给当前订单
+//						order.setSku(historicalOrder.getSku());
+//						sku = historicalOrder.getSku(); // 更新sku变量，用于后续的分类查询
+//					}
+//				}
 				
 				// 查询商品分类信息
 				if (!sku.isEmpty()) {
@@ -178,8 +194,33 @@ public class TemuOrderService implements ITemuOrderService {
 				// 检查订单是否已存在
 				TemuOrderDO existingOrder = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				if (existingOrder != null) {
-					// 更新现有订单
+					// 更新现有订单，只更新非空字段
 					order.setId(existingOrder.getId());
+					// 订单的状态不能随意更新，保持原有状态
+					order.setOrderStatus(existingOrder.getOrderStatus());
+					
+					// 比对并填充字段
+					if (order.getOrderNo() == null) order.setOrderNo(existingOrder.getOrderNo());
+					if (order.getProductTitle() == null) order.setProductTitle(existingOrder.getProductTitle());
+					if (order.getSku() == null) order.setSku(existingOrder.getSku());
+					if (order.getSkc() == null) order.setSkc(existingOrder.getSkc());
+					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
+					if (order.getCustomSku() == null) order.setCustomSku(existingOrder.getCustomSku());
+					if (order.getQuantity() == null) order.setQuantity(existingOrder.getQuantity());
+					if (order.getProductProperties() == null) order.setProductProperties(existingOrder.getProductProperties());
+					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
+					if (order.getShopId() == null) order.setShopId(existingOrder.getShopId());
+					if (order.getCustomImageUrls() == null) order.setCustomImageUrls(existingOrder.getCustomImageUrls());
+					if (order.getCustomTextList() == null) order.setCustomTextList(existingOrder.getCustomTextList());
+					if (order.getProductImgUrl() == null) order.setProductImgUrl(existingOrder.getProductImgUrl());
+					if (order.getCategoryId() == null) order.setCategoryId(existingOrder.getCategoryId());
+					if (order.getCategoryName() == null) order.setCategoryName(existingOrder.getCategoryName());
+					if (order.getShippingInfo() == null) order.setShippingInfo(existingOrder.getShippingInfo());
+					if (order.getOriginalInfo() == null) order.setOriginalInfo(existingOrder.getOriginalInfo());
+					if (order.getEffectiveImgUrl() == null) order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
+					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
+					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
+					
 					temuOrderMapper.updateById(order);
 				} else {
 					// 插入新订单
