@@ -1,9 +1,11 @@
 package cn.iocoder.yudao.module.temu.dal.dataobject;
 
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.baomidou.mybatisplus.annotation.*;
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
@@ -21,6 +23,13 @@ import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 @AllArgsConstructor
 @Data
 public class TemuOrderDO extends BaseDO {
+	@Data
+	@AllArgsConstructor
+	@NoArgsConstructor
+	public static class UnitPrice {
+		private BigDecimal price;
+		private Integer max;
+	}
 	
 	/**
 	 * 订单ID
@@ -99,19 +108,27 @@ public class TemuOrderDO extends BaseDO {
 	 * 接口接收的源信息
 	 */
 	private String originalInfo;
-
+	
 	/**
 	 * 合成预览图
 	 */
 	private String effectiveImgUrl;
-
+	
 	/**
 	 * 订单产品的单位成本
 	 */
 	private BigDecimal unitPrice;
-
+	
 	/**
 	 * 该订单合计总价
 	 */
 	private BigDecimal totalPrice;
+	
+	/**
+	 * 单价(JSON格式)
+	 */
+	@TableField(typeHandler = JacksonTypeHandler.class)
+	private List<UnitPrice> priceRule;
+	
+	private BigDecimal defaultPrice;
 }

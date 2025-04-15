@@ -40,5 +40,5 @@ public interface ITemuOrderService {
 	 * @param requestVO 批量下单请求
 	 * @return 批量下单结果
 	 */
-	int beatchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO);
+	int batchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO);
 }

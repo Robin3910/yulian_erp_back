@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ServerException;
+import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCat
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
+import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
@@ -26,10 +28,7 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -70,7 +69,7 @@ public class TemuOrderService implements ITemuOrderService {
 				shopIdList.add(temuUserShopDO.getShopId().toString());
 			});
 			return temuOrderMapper.selectPage(temuOrderRequestVO, shopIdList);
-		}else {
+		} else {
 			return new PageResult<>();
 		}
 		
@@ -217,15 +216,15 @@ public class TemuOrderService implements ITemuOrderService {
 		map.put("shop_id", temuOrderDO.getShopId());
 		List<TemuProductCategorySkuDO> temuProductCategorySkuDOList = temuProductCategorySkuMapper.selectByMap(map);
 		//如果存在记录 更新分类id
-		if(temuProductCategorySkuDOList!=null&&!temuProductCategorySkuDOList.isEmpty()){
-		//	更新类目id
+		if (temuProductCategorySkuDOList != null && !temuProductCategorySkuDOList.isEmpty()) {
+			//	更新类目id
 			temuProductCategorySkuDOList.forEach(temuProductCategorySkuDO -> {
 				temuProductCategorySkuDO.setCategoryId(Long.parseLong(requestVO.getCategoryId()));
 				temuProductCategorySkuDO.setCategoryName(list.get(0).getCategoryName());
 				temuProductCategorySkuMapper.updateById(temuProductCategorySkuDO);
 			});
-		}else{
-		//	插入新数据
+		} else {
+			//	插入新数据
 			TemuProductCategorySkuDO temuProductCategorySkuDO = new TemuProductCategorySkuDO();
 			temuProductCategorySkuDO.setCategoryId(Long.parseLong(requestVO.getCategoryId()));
 			temuProductCategorySkuDO.setCategoryName(list.get(0).getCategoryName());
@@ -236,9 +235,73 @@ public class TemuOrderService implements ITemuOrderService {
 		return temuOrderMapper.updateById(BeanUtils.toBean(requestVO, TemuOrderDO.class));
 	}
 	
+	/**
+	 * 批量保存订单信息，并根据订单数量匹配相应的价格规则。
+	 * 该函数会遍历传入的订单列表，检查每个订单是否存在，并根据订单的分类信息获取价格规则。
+	 * 最终更新订单的价格信息并保存到数据库中。
+	 *
+	 * @param requestVO 包含多个订单信息的请求对象列表
+	 * @return 成功处理的订单数量
+	 * @throws ServerException 如果订单不存在、分类不存在或分类价格规则不存在时抛出异常
+	 */
 	@Override
-	public int beatchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO) {
-		return 0;
+	@Transactional
+	public int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO) {
+		int processCount = 0;
+		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
+			//检查订单是否存在
+			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchOrderReqVO.getId());
+			if (temuOrderDO == null) {
+				throw ServiceExceptionUtil.exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+			}
+			//根据订单的关联分类id查询分类信息
+			TemuProductCategoryDO temuProductCategoryDO = temuProductCategoryMapper.selectById(temuOrderDO.getCategoryId());
+			if (temuProductCategoryDO == null) {
+				throw ServiceExceptionUtil.exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+			}
+			//检查订单状态
+			if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.UNDELIVERED) {
+				throw ServiceExceptionUtil.exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
+			}
+			//检查是否存在价格规则
+			if (temuProductCategoryDO.getUnitPrice() == null || temuProductCategoryDO.getUnitPrice().isEmpty()) {
+				throw ServiceExceptionUtil.exception(ErrorCodeConstants.CATEGORY_PRICE_NOT_EXISTS);
+			}
+			//获取分类价格按照max 字段进行排序
+			List<TemuProductCategoryDO.UnitPrice> unitPriceList = temuProductCategoryDO.getUnitPrice();
+			unitPriceList.sort(Comparator.comparingInt(TemuProductCategoryDO.UnitPrice::getMax));
+			//设置默认价格
+			BigDecimal unitPrice = temuProductCategoryDO.getDefaultPrice();
+			
+			//匹配价格
+			for (TemuProductCategoryDO.UnitPrice price : unitPriceList) {
+				if (temuOrderBatchOrderReqVO.getQuantity() <= price.getMax()) {
+					unitPrice = price.getPrice();
+					break;
+				}
+			}
+			//记录默认价格
+			temuOrderDO.setDefaultPrice(temuProductCategoryDO.getDefaultPrice());
+			//更新订单
+			temuOrderDO.setUnitPrice(unitPrice);
+			//更新总价
+			temuOrderDO.setTotalPrice(unitPrice.multiply(new BigDecimal(temuOrderBatchOrderReqVO.getQuantity())));
+			//记录应用规则
+			ArrayList<TemuOrderDO.UnitPrice> arrayList = new ArrayList<>();
+			unitPriceList.iterator().forEachRemaining(categoryUnitPrice -> {
+				TemuOrderDO.UnitPrice orderPriceRule = new TemuOrderDO.UnitPrice();
+				orderPriceRule.setMax(categoryUnitPrice.getMax());
+				orderPriceRule.setPrice(categoryUnitPrice.getPrice());
+				arrayList.add(orderPriceRule);
+			});
+			temuOrderDO.setPriceRule(arrayList);
+			//修改订单状态
+			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
+			//更新订单信息
+			temuOrderMapper.updateById(temuOrderDO);
+			processCount++;
+		}
+		return processCount;
 	}
 	
 	private String convertToString(Object obj) {

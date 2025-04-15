@@ -85,6 +85,6 @@ public class AdminTemuOrderController {
 	@PostMapping("/batch-save-order")
 	@Operation(summary = "批量下单")
 	public CommonResult<Integer> batchSave(@Valid @RequestBody List<TemuOrderBatchOrderReqVO> requestVO) {
-		return success(temuOrderService.beatchSaveOrder(requestVO));
+		return success(temuOrderService.batchSaveOrder(requestVO));
 	}
 }
