@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -200,24 +201,24 @@ public class TemuOrderService implements ITemuOrderService {
 					order.setOrderStatus(existingOrder.getOrderStatus());
 					
 					// 比对并填充字段
-					if (order.getOrderNo() == null) order.setOrderNo(existingOrder.getOrderNo());
-					if (order.getProductTitle() == null) order.setProductTitle(existingOrder.getProductTitle());
-					if (order.getSku() == null) order.setSku(existingOrder.getSku());
-					if (order.getSkc() == null) order.setSkc(existingOrder.getSkc());
+					if (!StringUtils.hasText(order.getOrderNo())) order.setOrderNo(existingOrder.getOrderNo());
+					if (!StringUtils.hasText(order.getProductTitle())) order.setProductTitle(existingOrder.getProductTitle());
+					if (!StringUtils.hasText(order.getSku())) order.setSku(existingOrder.getSku());
+					if (!StringUtils.hasText(order.getSkc())) order.setSkc(existingOrder.getSkc());
 					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
-					if (order.getCustomSku() == null) order.setCustomSku(existingOrder.getCustomSku());
+					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
 					if (order.getQuantity() == null) order.setQuantity(existingOrder.getQuantity());
-					if (order.getProductProperties() == null) order.setProductProperties(existingOrder.getProductProperties());
+					if (!StringUtils.hasText(order.getProductProperties())) order.setProductProperties(existingOrder.getProductProperties());
 					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
 					if (order.getShopId() == null) order.setShopId(existingOrder.getShopId());
-					if (order.getCustomImageUrls() == null) order.setCustomImageUrls(existingOrder.getCustomImageUrls());
-					if (order.getCustomTextList() == null) order.setCustomTextList(existingOrder.getCustomTextList());
-					if (order.getProductImgUrl() == null) order.setProductImgUrl(existingOrder.getProductImgUrl());
-					if (order.getCategoryId() == null) order.setCategoryId(existingOrder.getCategoryId());
-					if (order.getCategoryName() == null) order.setCategoryName(existingOrder.getCategoryName());
-					if (order.getShippingInfo() == null) order.setShippingInfo(existingOrder.getShippingInfo());
-					if (order.getOriginalInfo() == null) order.setOriginalInfo(existingOrder.getOriginalInfo());
-					if (order.getEffectiveImgUrl() == null) order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
+					if (!StringUtils.hasText(order.getCustomImageUrls())) order.setCustomImageUrls(existingOrder.getCustomImageUrls());
+					if (!StringUtils.hasText(order.getCustomTextList())) order.setCustomTextList(existingOrder.getCustomTextList());
+					if (!StringUtils.hasText(order.getProductImgUrl())) order.setProductImgUrl(existingOrder.getProductImgUrl());
+					if (!StringUtils.hasText(order.getCategoryId())) order.setCategoryId(existingOrder.getCategoryId());
+					if (!StringUtils.hasText(order.getCategoryName())) order.setCategoryName(existingOrder.getCategoryName());
+					if (!StringUtils.hasText(order.getShippingInfo())) order.setShippingInfo(existingOrder.getShippingInfo());
+					if (!StringUtils.hasText(order.getOriginalInfo())) order.setOriginalInfo(existingOrder.getOriginalInfo());
+					if (!StringUtils.hasText(order.getEffectiveImgUrl())) order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
 					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					
