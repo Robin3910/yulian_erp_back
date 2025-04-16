@@ -67,8 +67,10 @@ public class TemuOrderService implements ITemuOrderService {
 			list.forEach(temuUserShopDO -> {
 				shopIdList.add(temuUserShopDO.getShopId().toString());
 			});
+			return temuOrderMapper.statistics(temuOrderRequestVO, shopIdList);
 		}
-		return temuOrderMapper.statistics(temuOrderRequestVO, shopIdList);
+		 return new TemuOrderStatisticsRespVO();
+		
 	}
 	/**
 	 * 根据给定的查询条件和用户ID，分页查询Temu订单详情列表。
