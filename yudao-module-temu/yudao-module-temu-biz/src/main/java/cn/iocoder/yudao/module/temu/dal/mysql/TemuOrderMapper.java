@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.dal.mysql;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
@@ -15,10 +16,16 @@ import java.util.List;
 
 @Mapper
 public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
+	/**
+	 * 构建查询条件
+	 *
+	 * @param temuOrderRequestVO 条件
+	 * @return 查询条件
+	 */
 	default MPJLambdaWrapper<TemuOrderDO> buliderOrderWapper(TemuOrderRequestVO temuOrderRequestVO) {
 		//连表分页查询
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
-		wrapper.selectAll(TemuOrderDO.class)
+		wrapper
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
 				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
 				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
@@ -47,11 +54,38 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * @return 订单信息
 	 */
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
-		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, buliderOrderWapper(temuOrderRequestVO));
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		wrapper.selectAll(TemuOrderDO.class);
+		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
+	}
+	
+	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
+		TemuOrderDO temuOrderDO = selectOne(wrapper);
+		
+		TemuOrderStatisticsRespVO temuOrderStatisticsRespVO = new TemuOrderStatisticsRespVO();
+		if (temuOrderDO != null) {
+			temuOrderStatisticsRespVO.setTotalPrice(temuOrderDO.getTotalPrice());
+		}
+		return temuOrderStatisticsRespVO;
+	}
+	
+	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
+		wrapper.in(TemuOrderDO::getShopId, shopIds);
+		TemuOrderDO temuOrderDO = selectOne(wrapper);
+		TemuOrderStatisticsRespVO temuOrderStatisticsRespVO = new TemuOrderStatisticsRespVO();
+		if (temuOrderDO != null) {
+			temuOrderStatisticsRespVO.setTotalPrice(temuOrderDO.getTotalPrice());
+		}
+		return temuOrderStatisticsRespVO;
 	}
 	
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
 		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		wrapper.selectAll(TemuOrderDO.class);
 		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}

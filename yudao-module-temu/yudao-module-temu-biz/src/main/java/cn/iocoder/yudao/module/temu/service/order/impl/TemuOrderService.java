@@ -10,6 +10,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
@@ -54,6 +55,21 @@ public class TemuOrderService implements ITemuOrderService {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
 	}
 	
+	@Override
+	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
+		return temuOrderMapper.statistics(temuOrderRequestVO);
+	}
+	@Override
+	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
+		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
+		ArrayList<String> shopIdList = new ArrayList<>();
+		if (!list.isEmpty()) {
+			list.forEach(temuUserShopDO -> {
+				shopIdList.add(temuUserShopDO.getShopId().toString());
+			});
+		}
+		return temuOrderMapper.statistics(temuOrderRequestVO, shopIdList);
+	}
 	/**
 	 * 根据给定的查询条件和用户ID，分页查询Temu订单详情列表。
 	 *
@@ -128,7 +144,7 @@ public class TemuOrderService implements ITemuOrderService {
 					properties = convertToString(skusMap.get("property"));
 					order.setProductProperties(properties);
 				}
-				
+
 //				// 如果没有SKU信息，查询历史订单
 //				if (sku.isEmpty() && !properties.isEmpty()) {
 //					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
@@ -204,23 +220,32 @@ public class TemuOrderService implements ITemuOrderService {
 					
 					// 比对并填充字段
 					if (!StringUtils.hasText(order.getOrderNo())) order.setOrderNo(existingOrder.getOrderNo());
-					if (!StringUtils.hasText(order.getProductTitle())) order.setProductTitle(existingOrder.getProductTitle());
+					if (!StringUtils.hasText(order.getProductTitle()))
+						order.setProductTitle(existingOrder.getProductTitle());
 					if (!StringUtils.hasText(order.getSku())) order.setSku(existingOrder.getSku());
 					if (!StringUtils.hasText(order.getSkc())) order.setSkc(existingOrder.getSkc());
 					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
 					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
 					if (order.getQuantity() == null) order.setQuantity(existingOrder.getQuantity());
-					if (!StringUtils.hasText(order.getProductProperties())) order.setProductProperties(existingOrder.getProductProperties());
+					if (!StringUtils.hasText(order.getProductProperties()))
+						order.setProductProperties(existingOrder.getProductProperties());
 					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
 					if (order.getShopId() == null) order.setShopId(existingOrder.getShopId());
-					if (!StringUtils.hasText(order.getCustomImageUrls())) order.setCustomImageUrls(existingOrder.getCustomImageUrls());
-					if (!StringUtils.hasText(order.getCustomTextList())) order.setCustomTextList(existingOrder.getCustomTextList());
-					if (!StringUtils.hasText(order.getProductImgUrl())) order.setProductImgUrl(existingOrder.getProductImgUrl());
+					if (!StringUtils.hasText(order.getCustomImageUrls()))
+						order.setCustomImageUrls(existingOrder.getCustomImageUrls());
+					if (!StringUtils.hasText(order.getCustomTextList()))
+						order.setCustomTextList(existingOrder.getCustomTextList());
+					if (!StringUtils.hasText(order.getProductImgUrl()))
+						order.setProductImgUrl(existingOrder.getProductImgUrl());
 					if (!StringUtils.hasText(order.getCategoryId())) order.setCategoryId(existingOrder.getCategoryId());
-					if (!StringUtils.hasText(order.getCategoryName())) order.setCategoryName(existingOrder.getCategoryName());
-					if (!StringUtils.hasText(order.getShippingInfo())) order.setShippingInfo(existingOrder.getShippingInfo());
-					if (!StringUtils.hasText(order.getOriginalInfo())) order.setOriginalInfo(existingOrder.getOriginalInfo());
-					if (!StringUtils.hasText(order.getEffectiveImgUrl())) order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
+					if (!StringUtils.hasText(order.getCategoryName()))
+						order.setCategoryName(existingOrder.getCategoryName());
+					if (!StringUtils.hasText(order.getShippingInfo()))
+						order.setShippingInfo(existingOrder.getShippingInfo());
+					if (!StringUtils.hasText(order.getOriginalInfo()))
+						order.setOriginalInfo(existingOrder.getOriginalInfo());
+					if (!StringUtils.hasText(order.getEffectiveImgUrl()))
+						order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
 					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					

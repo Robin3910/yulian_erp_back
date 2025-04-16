@@ -3,10 +3,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderSaveRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,14 +32,28 @@ public class AdminTemuOrderController {
 	@PermitAll
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
 		Long userId = SecurityFrameworkUtils.getLoginUserId();
-		return CommonResult.success(temuOrderService.list(temuOrderRequestVO, userId));
+		return success(temuOrderService.list(temuOrderRequestVO, userId));
+	}
+	
+	//统计订单总金额
+	@GetMapping("/statistics")
+	@Operation(summary = "统计订单总金额")
+	public CommonResult<TemuOrderStatisticsRespVO> statistics(TemuOrderRequestVO temuOrderRequestVO) {
+		Long userId = SecurityFrameworkUtils.getLoginUserId();
+		return success(temuOrderService.statistics( temuOrderRequestVO, userId));
 	}
 	
 	@GetMapping("/admin-page")
 	@Operation(summary = "获取订单管理信息")
 	@PermitAll
 	public CommonResult<?> adminList(TemuOrderRequestVO temuOrderRequestVO) {
-		return CommonResult.success(temuOrderService.list(temuOrderRequestVO));
+		return success(temuOrderService.list(temuOrderRequestVO));
+	}
+	//统计订单总金额
+	@GetMapping("/admin-statistics")
+	@Operation(summary = "统计订单总金额")
+	public CommonResult<TemuOrderStatisticsRespVO> adminStatistics(TemuOrderRequestVO temuOrderRequestVO) {
+		return success(temuOrderService.statistics( temuOrderRequestVO));
 	}
 	
 	//批量修改订单状态

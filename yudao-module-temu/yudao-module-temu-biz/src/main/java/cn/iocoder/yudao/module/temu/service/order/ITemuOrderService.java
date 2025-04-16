@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.service.order;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
@@ -11,8 +12,19 @@ import java.util.List;
 import java.util.Map;
 
 public interface ITemuOrderService {
+	
 	PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO);
-	PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO,Long userId);
+	
+	TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO);
+	
+	PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO, Long userId);
+	TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, Long userId);
+	/**
+	 * 批量修改订单状态
+	 *
+	 * @param requestVO 批量修改订单状态请求
+	 * @return Boolean
+	 */
 	Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO);
 	
 	/**
@@ -40,5 +52,5 @@ public interface ITemuOrderService {
 	 * @param requestVO 批量下单请求
 	 * @return 批量下单结果
 	 */
-	int batchSaveOrder( List<TemuOrderBatchOrderReqVO> requestVO);
+	int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO);
 }
