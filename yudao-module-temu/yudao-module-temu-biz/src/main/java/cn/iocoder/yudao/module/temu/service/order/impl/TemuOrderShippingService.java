@@ -83,7 +83,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         }
         // 3. 提取关联订单ID集合
         Set<String> orderIds = result.getList().parallelStream()
-                .map(TemuOrderShippingInfoDO::getOrderNo)
+                .map(TemuOrderShippingInfoDO::getOrderId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));  // 保持顺序依赖
         // 4. 批量获取订单主体信息
         Map<String, TemuOrderDO> orderMap = orderMapper.selectByIds(orderIds)
@@ -98,7 +98,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             // 5.1 基础信息拷贝
             TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
             // 5.2 补充订单主体信息
-            Optional.ofNullable(orderMap.get(shippingInfo.getOrderNo()))
+            Optional.ofNullable(orderMap.get(shippingInfo.getOrderId()))
                     .ifPresent(order -> {
                         vo.setOrderNo(order.getOrderNo());
                         vo.setProductImgUrl(order.getProductImgUrl());

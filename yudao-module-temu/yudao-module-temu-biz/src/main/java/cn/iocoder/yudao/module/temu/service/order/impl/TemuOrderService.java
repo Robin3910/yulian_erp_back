@@ -30,6 +30,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+
 @Service
 @Slf4j
 public class TemuOrderService implements ITemuOrderService {
@@ -246,12 +248,12 @@ public class TemuOrderService implements ITemuOrderService {
 		//根据查询订单是否存在
 		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getId());
 		if (temuOrderDO == null) {
-			throw new ServerException(ErrorCodeConstants.ORDER_NOT_EXISTS);
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
 		}
 		//检查分类id是否存在
 		List<TemuProductCategoryDO> list = temuProductCategoryMapper.selectByMap(MapUtil.of("category_id", requestVO.getCategoryId()));
 		if (list == null || list.isEmpty()) {
-			throw new ServerException(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+			throw exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
 		}
 		//检查temu_product_category_sku表是否选择记录
 		HashMap<String, Object> map = MapUtil.of("sku", temuOrderDO.getSku());
@@ -294,20 +296,20 @@ public class TemuOrderService implements ITemuOrderService {
 			//检查订单是否存在
 			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchOrderReqVO.getId());
 			if (temuOrderDO == null) {
-				throw ServiceExceptionUtil.exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+				throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
 			}
 			//根据订单的关联分类id查询分类信息
 			TemuProductCategoryDO temuProductCategoryDO = temuProductCategoryMapper.selectById(temuOrderDO.getCategoryId());
 			if (temuProductCategoryDO == null) {
-				throw ServiceExceptionUtil.exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+				throw exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
 			}
 			//检查订单状态
 			if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.UNDELIVERED) {
-				throw ServiceExceptionUtil.exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
+				throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
 			}
 			//检查是否存在价格规则
 			if (temuProductCategoryDO.getUnitPrice() == null || temuProductCategoryDO.getUnitPrice().isEmpty()) {
-				throw ServiceExceptionUtil.exception(ErrorCodeConstants.CATEGORY_PRICE_NOT_EXISTS);
+				throw exception(ErrorCodeConstants.CATEGORY_PRICE_NOT_EXISTS);
 			}
 			//获取分类价格按照max 字段进行排序
 			List<TemuProductCategoryDO.UnitPrice> unitPriceList = temuProductCategoryDO.getUnitPrice();

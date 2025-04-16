@@ -23,7 +23,7 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
         LambdaQueryWrapperX<TemuOrderShippingInfoDO> wrapper = new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
                 .eqIfPresent(TemuOrderShippingInfoDO::getShopId, pageReqVO.getShopId())
                 .likeIfPresent(TemuOrderShippingInfoDO::getTrackingNumber, pageReqVO.getTrackingNumber())
-                .eqIfPresent(TemuOrderShippingInfoDO::getOrderNo, pageReqVO.getOrderNo())
+                .eqIfPresent(TemuOrderShippingInfoDO::getOrderId, pageReqVO.getOrderNo())
                 .orderByDesc(TemuOrderShippingInfoDO::getCreateTime)
                 .orderByDesc(TemuOrderShippingInfoDO::getId);
 

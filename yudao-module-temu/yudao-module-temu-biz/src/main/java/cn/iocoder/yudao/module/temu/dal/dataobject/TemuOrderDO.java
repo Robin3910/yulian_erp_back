@@ -34,11 +34,12 @@ public class TemuOrderDO extends BaseDO {
 	/**
 	 * 订单ID
 	 */
+	@TableId
 	private Long id;
 	/**
 	 * 订单编号
 	 */
-	@TableId
+
 	private String orderNo;
 	/**
 	 * 商品标题

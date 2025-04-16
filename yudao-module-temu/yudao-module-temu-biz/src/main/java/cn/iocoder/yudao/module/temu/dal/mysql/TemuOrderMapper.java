@@ -15,12 +15,14 @@ import java.util.List;
 
 @Mapper
 public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
-	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
+	default MPJLambdaWrapper<TemuOrderDO> buliderOrderWapper(TemuOrderRequestVO temuOrderRequestVO) {
 		//连表分页查询
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
 		wrapper.selectAll(TemuOrderDO.class)
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
-				.leftJoin(TemuProductCategoryDO.class,TemuProductCategoryDO::getCategoryId,TemuOrderDO::getCategoryId)
+				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
+				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
+				.selectAs(TemuProductCategoryDO::getDefaultPrice, TemuOrderDetailDO::getDefaultPrice)
 				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
@@ -35,30 +37,22 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		}
 		//按照订单时间倒序排列
 		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
-		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
+		return wrapper;
+	}
+	
+	/**
+	 * 根据条件查询订单信息
+	 *
+	 * @param temuOrderRequestVO 条件
+	 * @return 订单信息
+	 */
+	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
+		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, buliderOrderWapper(temuOrderRequestVO));
 	}
 	
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
-		//连表分页查询
-		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
-		wrapper.selectAll(TemuOrderDO.class)
-				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
-				.leftJoin(TemuProductCategoryDO.class,TemuProductCategoryDO::getCategoryId,TemuOrderDO::getCategoryId)
-				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
-				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
-				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
-				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU
-				.likeIfExists(TemuOrderDO::getSkc, temuOrderRequestVO.getSkc())// SKC
-				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku())// 定制SKU
-				.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
-				.in(TemuOrderDO::getShopId, shopIds)
-				.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
-		//判断数组是否为空
-		if (temuOrderRequestVO.getBookingTime() != null && temuOrderRequestVO.getBookingTime().length == 2) {
-			wrapper.between(TemuOrderDO::getBookingTime, temuOrderRequestVO.getBookingTime()[0], temuOrderRequestVO.getBookingTime()[1]);
-		}
-		//按照订单时间倒序排列
-		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}
 	

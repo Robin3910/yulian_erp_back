@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -47,15 +48,13 @@ public class TemuCategoryServiceImpl implements TemuCategoryService {
     }
 
     @Override
+    @Transactional
     public Long createCategory(TemuCategoryCreateReqVO createReqVO) {
-        // 校验商品品类ID是否已存在
-        if (temuCategoryMapper.selectByCategoryId(createReqVO.getCategoryId()) != null) {
-            throw exception(new ErrorCode(1_001_000_001, "商品品类ID已存在"));
-        }
-        
         // 插入
         TemuProductCategoryDO category = BeanUtils.toBean(createReqVO, TemuProductCategoryDO.class);
         temuCategoryMapper.insert(category);
+        category.setCategoryId(category.getId());
+        temuCategoryMapper.updateById(category);
         // 返回
         return category.getId();
     }

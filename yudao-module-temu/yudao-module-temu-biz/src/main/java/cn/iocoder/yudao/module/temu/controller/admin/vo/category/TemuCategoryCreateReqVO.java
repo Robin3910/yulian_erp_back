@@ -14,9 +14,9 @@ import java.util.List;
 public class TemuCategoryCreateReqVO {
     @Schema(description = "ID", required = true, example = "2048")
     private Long id;
-    @Schema(description = "商品品类ID", required = true, example = "2048")
-    @NotNull(message = "商品品类ID不能为空")
-    private Long categoryId;
+    //@Schema(description = "商品品类ID", required = true, example = "2048")
+    //@NotNull(message = "商品品类ID不能为空")
+    //private Long categoryId;
 
     @Schema(description = "商品名称", required = true, example = "定制木质商品")
     @NotEmpty(message = "商品名称不能为空")
