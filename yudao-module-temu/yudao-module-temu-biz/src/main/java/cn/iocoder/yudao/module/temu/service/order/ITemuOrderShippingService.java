@@ -10,9 +10,10 @@ public interface ITemuOrderShippingService {
 
     /**
      * 获得待发货订单分页
-     *
      * @param pageVO 分页查询
      * @return 待发货订单分页
      */
     PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO);
+
+    Boolean updateOrderStatus(TemuOrderShippingPageReqVO reqVO);
 }

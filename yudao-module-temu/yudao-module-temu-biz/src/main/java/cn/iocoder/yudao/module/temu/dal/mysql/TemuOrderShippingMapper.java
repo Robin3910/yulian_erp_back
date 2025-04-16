@@ -7,32 +7,37 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collection;
+import java.util.List;
 
+/**
+ * 待发货列表 Mapper
+ */
 @Mapper
 public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingInfoDO> {
 
     /**
-     * 分页查询待发货订单
-     *
-     * @return
+     * 根据订单ID列表查询待发货订单
+     */
+    default List<TemuOrderShippingInfoDO> selectListByOrderIds(@Param("orderIds") Collection<Long> orderIds) {
+        return selectList(new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+                .in(TemuOrderShippingInfoDO::getOrderId, orderIds));
+    }
+
+    /**
+     * 根据shopId和trackingNumber查询待发货订单
      */
     default PageResult<TemuOrderShippingInfoDO> selectPage(TemuOrderShippingPageReqVO pageReqVO) {
-        LambdaQueryWrapperX<TemuOrderShippingInfoDO> wrapper = new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+        return selectPage(pageReqVO, new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
                 .eqIfPresent(TemuOrderShippingInfoDO::getShopId, pageReqVO.getShopId())
                 .likeIfPresent(TemuOrderShippingInfoDO::getTrackingNumber, pageReqVO.getTrackingNumber())
-                .eqIfPresent(TemuOrderShippingInfoDO::getOrderId, pageReqVO.getOrderNo())
                 .orderByDesc(TemuOrderShippingInfoDO::getCreateTime)
-                .orderByDesc(TemuOrderShippingInfoDO::getId);
-
-        if (pageReqVO.getCreateTime() != null && pageReqVO.getCreateTime().length == 2) {
-            wrapper.between(TemuOrderShippingInfoDO::getCreateTime,
-                    LocalDateTime.of(pageReqVO.getCreateTime()[0], LocalTime.MIN),
-                    LocalDateTime.of(pageReqVO.getCreateTime()[1], LocalTime.MAX));
-        }
-
-        return selectPage(pageReqVO, wrapper);
+                .orderByDesc(TemuOrderShippingInfoDO::getId));
     }
+
+
 }

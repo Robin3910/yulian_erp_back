@@ -9,6 +9,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 待发货列表 DO
+ */
 @Data
 @TableName("temu_order_shipping_info")
 public class TemuOrderShippingInfoDO extends BaseDO {

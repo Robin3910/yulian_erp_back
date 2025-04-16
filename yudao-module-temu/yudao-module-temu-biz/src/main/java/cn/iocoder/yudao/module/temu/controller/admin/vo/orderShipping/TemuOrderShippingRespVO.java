@@ -31,6 +31,8 @@ public class TemuOrderShippingRespVO {
     private Long shopId;
 
     //联表查询字段
+    @Schema(description = "订单id")
+    private Long orderId;
 
     @Schema(description = "商品图片URL")
     private String productImgUrl;
@@ -96,8 +98,8 @@ public class TemuOrderShippingRespVO {
     @Data
     public static class TemuOrderShippingSaveRequestVO {
 
-        @Schema(description = "订单编号", required = true)
-        private String orderNo;
+        @Schema(description = "订单Id", required = true)
+        private String orderId;
 
         @Schema(description = "物流单号")
         private String trackingNumber;

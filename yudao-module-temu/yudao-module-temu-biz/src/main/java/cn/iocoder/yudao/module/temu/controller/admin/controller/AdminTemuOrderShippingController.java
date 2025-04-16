@@ -38,10 +38,10 @@ public class AdminTemuOrderShippingController {
         return success(shippingService.getOrderShippingPage(pageVO));
     }
 
-
-
-
-
-
+    @PutMapping("/update")
+    @Operation(summary = "修改订单状态")
+    public CommonResult<Boolean> updateOrderStatus(@Valid @RequestBody TemuOrderShippingPageReqVO reqVO) {
+        return success(shippingService.updateOrderStatus(reqVO));
+    }
 
 }
