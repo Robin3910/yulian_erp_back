@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
+import java.util.Objects;
+
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
 @Service
@@ -27,10 +29,10 @@ public class TemuShopServiceImpl implements TemuShopService {
     @Override
     public Long createShop(TemuShopCreateReqVO createReqVO) {
         // 检查店铺ID是否已存在
-        if (temuShopMapper.selectByShopId(createReqVO.getShopId()) != null) {
+        TemuShopDO temuShopDO = temuShopMapper.selectByShopId(createReqVO.getShopId());
+        if (temuShopDO!= null) {
             throw exception(new ErrorCode(1_002_001_000, "店铺ID已存在"));
         }
-        
         // 插入
         TemuShopDO shop = BeanUtils.toBean(createReqVO, TemuShopDO.class);
         temuShopMapper.insert(shop);
@@ -41,11 +43,12 @@ public class TemuShopServiceImpl implements TemuShopService {
     
     @Override
     public void updateShop(TemuShopUpdateReqVO updateReqVO) {
-        // 校验存在
-        if (temuShopMapper.selectById(updateReqVO.getId()) == null) {
-            throw exception(new ErrorCode(1_002_001_001, "店铺不存在"));
-        }
+        TemuShopDO temuShopDO = temuShopMapper.selectByShopId(updateReqVO.getShopId());
         
+        // 校验存在
+        if (temuShopDO!=null&&!Objects.equals(temuShopDO.getId(), updateReqVO.getId())&&!temuShopDO.getDeleted()) {
+            throw exception(new ErrorCode(1_002_001_001, "店铺ID重复"));
+        }
         // 更新
         TemuShopDO updateObj = BeanUtils.toBean(updateReqVO, TemuShopDO.class);
         temuShopMapper.updateById(updateObj);

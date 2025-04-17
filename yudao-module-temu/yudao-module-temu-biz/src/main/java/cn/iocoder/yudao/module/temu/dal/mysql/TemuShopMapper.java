@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
@@ -27,7 +28,7 @@ public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
 	default TemuShopDO selectByShopId(Long shopId) {
 		return selectOne(TemuShopDO::getShopId, shopId);
 	}
-	
+
 	/**
 	 * 分页查询店铺
 	 *
