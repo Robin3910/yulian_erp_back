@@ -30,7 +30,7 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "店铺ID")
     private Long shopId;
 
-    //联表查询字段
+    // 联表查询字段
     @Schema(description = "订单id")
     private Long orderId;
 
@@ -52,7 +52,8 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "定制图片列表URL")
     private String customImageUrls;
 
-
+    @Schema(description = "店铺名称")
+    private String shopName;
 
     @Schema(description = "商品标题")
     private String productTitle;
@@ -71,28 +72,6 @@ public class TemuOrderShippingRespVO {
 
     @Schema(description = "合成预览图")
     private String effectiveImgUrl;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
@@ -115,9 +94,6 @@ public class TemuOrderShippingRespVO {
 
         @Schema(description = "店铺id", required = true)
         private Long shopId;
-
-
-
 
     }
 }

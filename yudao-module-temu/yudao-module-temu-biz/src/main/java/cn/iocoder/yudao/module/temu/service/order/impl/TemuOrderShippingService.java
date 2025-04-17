@@ -7,8 +7,10 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderS
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
 import com.aliyun.oss.ServiceException;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
@@ -34,8 +36,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
     private final TemuOrderShippingMapper shippingInfoMapper;
     private final TemuOrderMapper orderMapper;
+    private final TemuShopMapper shopMapper;
 
-    //保存待发货订单
+    // 保存待发货订单
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long saveOrderShipping(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
@@ -191,6 +194,17 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         if (order != null) {
             setOrderInfo(vo, order);
         }
+        // 设置店铺信息
+        vo.setShopId(shippingInfo.getShopId());
+        if (shippingInfo.getShopId() != null) {
+            // 使用shopId字段查询，而不是id
+            TemuShopDO shop = shopMapper.selectOne(new LambdaQueryWrapperX<TemuShopDO>()
+                    .eq(TemuShopDO::getShopId, shippingInfo.getShopId()));
+            if (shop != null) {
+                vo.setShopName(shop.getShopName());
+            }
+        }
+
         return vo;
     }
     //转换订单ID
@@ -217,5 +231,13 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         vo.setOrderStatus(order.getOrderStatus());
         vo.setCustomTextList(order.getCustomTextList());
         vo.setEffectiveImgUrl(order.getEffectiveImgUrl());
+        // 设置店铺ID和店铺名称
+        vo.setShopId(order.getShopId());
+        if (order.getShopId() != null) {
+            TemuShopDO shop = shopMapper.selectById(order.getShopId());
+            if (shop != null) {
+                vo.setShopName(shop.getShopName());
+            }
+        }
     }
 }
