@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Mapper
@@ -22,7 +23,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * @param temuOrderRequestVO 条件
 	 * @return 查询条件
 	 */
-	default MPJLambdaWrapper<TemuOrderDO> builderOrderWrapper(TemuOrderRequestVO temuOrderRequestVO) {
+	default MPJLambdaWrapper<TemuOrderDO> buliderOrderWapper(TemuOrderRequestVO temuOrderRequestVO) {
 		//连表分页查询
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
 		wrapper
@@ -47,6 +48,24 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		return wrapper;
 	}
 	
+	default List<TemuOrderDetailDO> selectListByOrderIds(List<Long> orderIds) {
+		//连表分页查询
+		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
+		wrapper
+				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
+				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
+				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
+				.selectAs(TemuProductCategoryDO::getDefaultPrice, TemuOrderDetailDO::getDefaultPrice)
+				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
+				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
+				.selectAll(TemuOrderDO.class);
+		if (orderIds == null || orderIds.isEmpty()) {
+			return new ArrayList<>();
+		}
+		wrapper.in(TemuOrderDO::getId, orderIds);
+		return selectJoinList(TemuOrderDetailDO.class, wrapper);
+	}
+	
 	/**
 	 * 根据条件查询订单信息
 	 *
@@ -54,13 +73,13 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * @return 订单信息
 	 */
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
 		wrapper.selectAll(TemuOrderDO.class);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}
 	
 	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
 		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
 		TemuOrderDO temuOrderDO = selectOne(wrapper);
 		
@@ -72,7 +91,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	}
 	
 	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
 		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
 		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		TemuOrderDO temuOrderDO = selectOne(wrapper);
@@ -84,7 +103,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	}
 	
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
 		wrapper.selectAll(TemuOrderDO.class);
 		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);

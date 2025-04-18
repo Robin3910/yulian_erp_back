@@ -29,7 +29,6 @@ public class AdminTemuOrderController {
 	
 	@GetMapping("/page")
 	@Operation(summary = "获取订单管理信息")
-	@PermitAll
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
 		Long userId = SecurityFrameworkUtils.getLoginUserId();
 		return success(temuOrderService.list(temuOrderRequestVO, userId));
@@ -45,7 +44,6 @@ public class AdminTemuOrderController {
 	
 	@GetMapping("/admin-page")
 	@Operation(summary = "获取订单管理信息")
-	@PermitAll
 	public CommonResult<?> adminList(TemuOrderRequestVO temuOrderRequestVO) {
 		return success(temuOrderService.list(temuOrderRequestVO));
 	}
@@ -65,7 +63,6 @@ public class AdminTemuOrderController {
 	
 	@PostMapping("/save")
 	@Operation(summary = "保存订单数据")
-	@PermitAll
 	public CommonResult<Integer> saveOrders(@RequestBody TemuOrderSaveRequestVO requestVO) {
 		System.out.println("接收到的订单请求数据: " + requestVO);
 		// 记录请求内容到日志

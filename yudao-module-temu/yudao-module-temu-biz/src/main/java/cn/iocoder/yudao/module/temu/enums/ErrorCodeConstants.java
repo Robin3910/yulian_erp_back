@@ -15,5 +15,7 @@ public interface ErrorCodeConstants {
 	// 订单相关
 	ErrorCode ORDER_NOT_EXISTS = new ErrorCode(1_001_002_000, "订单不存在");
 	ErrorCode ORDER_STATUS_ERROR = new ErrorCode(1_001_002_001, "当前订单状态下不允许操作");
-	
+	ErrorCode ORDER_BATCH_EXISTS = new ErrorCode(1_001_002_002, "当前订单已存在批次中");
+	ErrorCode ORDER_BATCH_CREATE_FAIL = new ErrorCode(1_001_002_003, "订单批次创建失败");
+
 } 
