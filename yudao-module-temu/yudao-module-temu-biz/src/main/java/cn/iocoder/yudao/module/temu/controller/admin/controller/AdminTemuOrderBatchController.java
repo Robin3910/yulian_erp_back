@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchCreateVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateFileVO;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,6 +50,12 @@ public class AdminTemuOrderBatchController {
 	@PermitAll
 	public CommonResult<?> page(@Valid  TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		return CommonResult.success(temuOrderBatchService.list(temuOrderBatchPageVO));
+	}
+	
+	@PutMapping("/update-file")
+	@Operation(summary = "更新批次")
+	public CommonResult<?> update(@Valid @RequestBody TemuOrderBatchUpdateFileVO temuOrderBatchUpdateFileVO) {
+		return CommonResult.success(temuOrderBatchService.updateBatchFile(temuOrderBatchUpdateFileVO));
 	}
 	
 }

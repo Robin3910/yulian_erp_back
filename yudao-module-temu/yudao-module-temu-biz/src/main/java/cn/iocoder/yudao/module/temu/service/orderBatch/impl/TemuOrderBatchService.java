@@ -3,8 +3,10 @@ package cn.iocoder.yudao.module.temu.service.orderBatch.impl;
 import cn.hutool.core.util.IdUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchCreateVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateFileVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchRelationMapper;
@@ -14,6 +16,7 @@ import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 
 import javax.annotation.Resource;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +74,17 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				throw exception(ORDER_BATCH_EXISTS);
 			}
 		});
+		//批量更新订单
+		QueryWrapper<TemuOrderDO> temuOrderDOQueryWrapper = new QueryWrapper<>();
+		temuOrderDOQueryWrapper.in("id", orderIds);
+		TemuOrderDO temuOrderDO = new TemuOrderDO();
+		//更新订单状态 已送产待生产
+		temuOrderDO.setOrderStatus(TemuOrderStatusEnum.IN_PRODUCTION);
+		int update = temuOrderMapper.update(temuOrderDO, temuOrderDOQueryWrapper);
+		if (update <= 0) {
+			throw exception(ORDER_BATCH_CREATE_FAIL);
+		}
+		//插入批次
 		//创建批次订单记录
 		TemuOrderBatchDO temuOrderBatchDO = new TemuOrderBatchDO();
 		//设置uuid
@@ -106,6 +120,18 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		});
 		
 		return temuOrderBatchDOPageResult;
+	}
+	
+	/**
+	 * 更新批次文件信息
+	 * 该方法通过接收一个 TemuOrderBatchUpdateFileVO 对象作为参数，将其转换为 TemuOrderBatchDO 对象，并调用 mapper 层的更新方法
+	 * 主要目的是为了更新数据库中批次文件的相关信息
+	 * @param temuOrderBatchUpdateFileVO 包含要更新的批次文件信息的视图对象
+	 * @return 返回更新操作影响的行数
+	 */
+	@Override
+	public int updateBatchFile(TemuOrderBatchUpdateFileVO temuOrderBatchUpdateFileVO) {
+	    return temuOrderBatchMapper.updateById(BeanUtils.toBean(temuOrderBatchUpdateFileVO, TemuOrderBatchDO.class));
 	}
 	
 }
