@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.orderBatch.impl;
 
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
@@ -7,10 +8,12 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchCreateVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateFileVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateStatusVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchRelationMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
+import cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 
@@ -126,12 +129,46 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	 * 更新批次文件信息
 	 * 该方法通过接收一个 TemuOrderBatchUpdateFileVO 对象作为参数，将其转换为 TemuOrderBatchDO 对象，并调用 mapper 层的更新方法
 	 * 主要目的是为了更新数据库中批次文件的相关信息
+	 *
 	 * @param temuOrderBatchUpdateFileVO 包含要更新的批次文件信息的视图对象
 	 * @return 返回更新操作影响的行数
 	 */
 	@Override
 	public int updateBatchFile(TemuOrderBatchUpdateFileVO temuOrderBatchUpdateFileVO) {
-	    return temuOrderBatchMapper.updateById(BeanUtils.toBean(temuOrderBatchUpdateFileVO, TemuOrderBatchDO.class));
+		return temuOrderBatchMapper.updateById(BeanUtils.toBean(temuOrderBatchUpdateFileVO, TemuOrderBatchDO.class));
+	}
+	
+	@Override
+	@Transactional
+	public int updateStatus(TemuOrderBatchUpdateStatusVO temuOrderBatchUpdateStatusVO) {
+		//检查批次订单是否存在
+		TemuOrderBatchDO temuOrderBatchDO = temuOrderBatchMapper.selectById(temuOrderBatchUpdateStatusVO.getId());
+		if (temuOrderBatchDO == null) {
+			throw exception(ORDER_BATCH_NOT_EXISTS);
+		}
+		if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+			throw exception(ORDER_BATCH_STATUS_ERROR);
+		}
+		List<TemuOrderBatchRelationDO> temuOrderBatchRelationDOList = temuOrderBatchRelationMapper.selectByMap(MapUtil.<String, Object>builder()
+				.put("batch_id", temuOrderBatchUpdateStatusVO.getId())
+				.build()
+		);
+		if (temuOrderBatchRelationDOList == null || temuOrderBatchRelationDOList.isEmpty()) {
+			throw exception(ORDER_BATCH_NOT_EXISTS);
+		}
+		//获取所有的订单id
+		List<Long> orderIds = temuOrderBatchRelationDOList.stream().map(TemuOrderBatchRelationDO::getOrderId).collect(Collectors.toList());
+		//批量更新订单状态
+		List<TemuOrderDO> temuOrderDOList = orderIds.stream().unordered().map(orderId -> {
+			TemuOrderDO temuOrderDO = new TemuOrderDO();
+			temuOrderDO.setId(orderId);
+			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.SHIPPED);
+			return temuOrderDO;
+		}).collect(Collectors.toList());
+		temuOrderMapper.updateBatch(temuOrderDOList);
+		//设置批次订单状态
+		temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
+		return temuOrderBatchMapper.updateById(temuOrderBatchDO);
 	}
 	
 }

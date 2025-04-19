@@ -17,6 +17,8 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 public class TemuOrderBatchPageVO extends PageParam {
 	@Schema(description = "批次编号")
 	private String batchNo;
+	@Schema(description = "订单状态")
+	private Integer status;
 	@Schema(description = "创建时间")
 	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
 	private LocalDateTime[] createTime;

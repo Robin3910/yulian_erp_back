@@ -19,7 +19,9 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				.leftJoin(TemuOrderBatchRelationDO.class, TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchDO::getId)
 				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
 				.selectCollection(TemuOrderDO.class, TemuOrderBatchDetailDO::getOrderList)
+				.eqIfExists(TemuOrderBatchDO::getStatus, temuOrderBatchPageVO.getStatus())
 				.likeIfExists(TemuOrderDO::getOrderNo, temuOrderBatchPageVO.getBatchNo());
+		  
 		
 		//判断数组是否为空
 		if (temuOrderBatchPageVO.getCreateTime() != null && temuOrderBatchPageVO.getCreateTime().length==2) {
