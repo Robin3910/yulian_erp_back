@@ -20,6 +20,7 @@ import org.apache.ibatis.exceptions.PersistenceException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -65,42 +66,58 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     //获得待发货订单分页
     @Override
     public PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO) {
-        // 1. 直接查询物流信息，并关联订单表
+        // 1. 先根据订单条件查询符合条件的订单ID
+        List<TemuOrderDO> matchedOrders = null;
+        if (pageVO.getOrderStatus() != null || StringUtils.hasText(pageVO.getOrderNo())) {
+            LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
+            orderWrapper.eqIfPresent(TemuOrderDO::getOrderStatus, pageVO.getOrderStatus())
+                    .eqIfPresent(TemuOrderDO::getOrderNo, pageVO.getOrderNo());
+            matchedOrders = orderMapper.selectList(orderWrapper);
+
+            if (CollectionUtils.isEmpty(matchedOrders)) {
+                return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
+            }
+        }
+        // 2. 构建物流信息查询条件
         LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = new LambdaQueryWrapperX<>();
-        // 添加物流信息表的查询条件
         queryWrapper.eqIfPresent(TemuOrderShippingInfoDO::getShopId, pageVO.getShopId())
                 .likeIfPresent(TemuOrderShippingInfoDO::getTrackingNumber, pageVO.getTrackingNumber());
 
-        // 2. 执行分页查询
-        PageResult<TemuOrderShippingInfoDO> pageResult = shippingInfoMapper.selectPage(pageVO, queryWrapper);
-        if (CollectionUtils.isEmpty(pageResult.getList())) {
-            return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageResult.getPageNo(),
-                    pageResult.getPageSize());
+        // 如果有匹配的订单，添加订单ID条件
+        if (matchedOrders != null) {
+            Set<String> orderIds = matchedOrders.stream()
+                    .map(order -> String.valueOf(order.getId()))
+                    .collect(Collectors.toSet());
+            queryWrapper.in(TemuOrderShippingInfoDO::getOrderId, orderIds);
         }
 
-        // 3. 获取所有需要的ID
-        Set<String> orderIds = pageResult.getList().stream()
+        // 3. 执行分页查询
+        PageResult<TemuOrderShippingInfoDO> pageResult = shippingInfoMapper.selectPage(pageVO, queryWrapper);
+        if (CollectionUtils.isEmpty(pageResult.getList())) {
+            return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
+        }
+
+        // 4. 获取所有需要的ID
+        Set<String> allOrderIds = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getOrderId)
                 .collect(Collectors.toSet());
         Set<Long> shopIds = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getShopId)
                 .collect(Collectors.toSet());
 
-        // 4. 批量查询订单信息
+        // 5. 批量查询订单信息
         List<TemuOrderDO> orders = orderMapper.selectList(new LambdaQueryWrapperX<TemuOrderDO>()
-                .in(TemuOrderDO::getId, orderIds)
-                .eqIfPresent(TemuOrderDO::getOrderStatus, pageVO.getOrderStatus())
-                .eqIfPresent(TemuOrderDO::getOrderNo, pageVO.getOrderNo()));
+                .in(TemuOrderDO::getId, allOrderIds));
         Map<Long, TemuOrderDO> orderMap = orders.stream()
                 .collect(Collectors.toMap(TemuOrderDO::getId, Function.identity(), (v1, v2) -> v1));
 
-        // 5. 批量查询店铺信息
+        // 6. 批量查询店铺信息
         List<TemuShopDO> shops = shopMapper.selectList(new LambdaQueryWrapperX<TemuShopDO>()
                 .in(TemuShopDO::getShopId, shopIds));
         Map<Long, TemuShopDO> shopMap = shops.stream()
                 .collect(Collectors.toMap(TemuShopDO::getShopId, Function.identity(), (v1, v2) -> v1));
 
-        // 6. 组装返回结果
+        // 7. 组装返回结果
         List<TemuOrderShippingRespVO> voList = new ArrayList<>();
         for (TemuOrderShippingInfoDO shippingInfo : pageResult.getList()) {
             TemuOrderShippingRespVO vo = convertToRespVO(shippingInfo, orderMap, shopMap);
@@ -109,7 +126,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             }
         }
 
-        return new PageResult<>(voList, pageResult.getTotal(), pageResult.getPageNo(), pageResult.getPageSize());
+        return new PageResult<>(voList, pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
     }
 
     // 修改待发货订单状态
