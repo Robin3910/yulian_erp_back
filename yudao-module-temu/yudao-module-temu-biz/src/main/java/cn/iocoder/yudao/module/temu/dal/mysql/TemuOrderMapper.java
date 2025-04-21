@@ -30,7 +30,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
 				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
 				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
-				.selectAs(TemuProductCategoryDO::getDefaultPrice, TemuOrderDetailDO::getDefaultPrice)
+				.selectAs(TemuProductCategoryDO::getRuleType, TemuOrderDetailDO::getCategoryRuleType)
 				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
@@ -55,7 +55,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.leftJoin(TemuShopDO.class, TemuShopDO::getShopId, TemuOrderDO::getShopId)
 				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
 				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
-				.selectAs(TemuProductCategoryDO::getDefaultPrice, TemuOrderDetailDO::getDefaultPrice)
+				//.selectAs(TemuProductCategoryDO::getDefaultPrice, TemuOrderDetailDO::getDefaultPrice)
 				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.selectAll(TemuOrderDO.class);

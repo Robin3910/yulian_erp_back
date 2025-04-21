@@ -8,6 +8,9 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
+import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByLayout;
+import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByNumber;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
@@ -59,6 +62,7 @@ public class TemuOrderService implements ITemuOrderService {
 	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.statistics(temuOrderRequestVO);
 	}
+	
 	@Override
 	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
 		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
@@ -69,9 +73,10 @@ public class TemuOrderService implements ITemuOrderService {
 			});
 			return temuOrderMapper.statistics(temuOrderRequestVO, shopIdList);
 		}
-		 return new TemuOrderStatisticsRespVO();
+		return new TemuOrderStatisticsRespVO();
 		
 	}
+	
 	/**
 	 * 根据给定的查询条件和用户ID，分页查询Temu订单详情列表。
 	 *
@@ -303,7 +308,9 @@ public class TemuOrderService implements ITemuOrderService {
 			temuProductCategorySkuDO.setShopId(temuOrderDO.getShopId());
 			temuProductCategorySkuMapper.insert(temuProductCategorySkuDO);
 		}
-		return temuOrderMapper.updateById(BeanUtils.toBean(requestVO, TemuOrderDO.class));
+		temuOrderDO.setCategoryId(requestVO.getCategoryId());
+		temuOrderDO.setCategoryName(list.get(0).getCategoryName());
+		return temuOrderMapper.updateById(temuOrderDO);
 	}
 	
 	/**
@@ -318,6 +325,7 @@ public class TemuOrderService implements ITemuOrderService {
 	@Override
 	@Transactional
 	public int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO) {
+		
 		int processCount = 0;
 		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
 			//检查订单是否存在
@@ -334,40 +342,31 @@ public class TemuOrderService implements ITemuOrderService {
 			if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.UNDELIVERED) {
 				throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
 			}
-			//检查是否存在价格规则
-			if (temuProductCategoryDO.getUnitPrice() == null || temuProductCategoryDO.getUnitPrice().isEmpty()) {
-				throw exception(ErrorCodeConstants.CATEGORY_PRICE_NOT_EXISTS);
-			}
-			//获取分类价格按照max 字段进行排序
-			List<TemuProductCategoryDO.UnitPrice> unitPriceList = temuProductCategoryDO.getUnitPrice();
-			unitPriceList.sort(Comparator.comparingInt(TemuProductCategoryDO.UnitPrice::getMax));
-			//设置默认价格
-			BigDecimal unitPrice = temuProductCategoryDO.getDefaultPrice();
-			
-			//匹配价格
-			for (TemuProductCategoryDO.UnitPrice price : unitPriceList) {
-				if (temuOrderBatchOrderReqVO.getQuantity() <= price.getMax()) {
-					unitPrice = price.getPrice();
+			//根据分类规则加载不同的对象
+			BigDecimal unitPrice = new BigDecimal(0);
+			IPriceRule rule=null;
+			switch (temuProductCategoryDO.getRuleType()) {
+				// 按照数量计算价格
+				case 1:
+					rule = BeanUtils.toBean(temuProductCategoryDO.getUnitPrice(), PriceRuleByNumber.class);
+					log.warn("规则是{}",rule);
+					unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
 					break;
-				}
+				// 按照版面规则计算
+				case 2:
+					rule = BeanUtils.toBean(temuProductCategoryDO.getUnitPrice(), PriceRuleByLayout.class);
+					log.warn("规则是{}",rule);
+					unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
+					break;
 			}
 			//更新数量
 			temuOrderDO.setQuantity(temuOrderBatchOrderReqVO.getQuantity());
-			//记录默认价格
-			temuOrderDO.setDefaultPrice(temuProductCategoryDO.getDefaultPrice());
-			//更新订单
+			//更新单价
 			temuOrderDO.setUnitPrice(unitPrice);
 			//更新总价
-			temuOrderDO.setTotalPrice(unitPrice.multiply(new BigDecimal(temuOrderBatchOrderReqVO.getQuantity())));
-			//记录应用规则
-			ArrayList<TemuOrderDO.UnitPrice> arrayList = new ArrayList<>();
-			unitPriceList.iterator().forEachRemaining(categoryUnitPrice -> {
-				TemuOrderDO.UnitPrice orderPriceRule = new TemuOrderDO.UnitPrice();
-				orderPriceRule.setMax(categoryUnitPrice.getMax());
-				orderPriceRule.setPrice(categoryUnitPrice.getPrice());
-				arrayList.add(orderPriceRule);
-			});
-			temuOrderDO.setPriceRule(arrayList);
+			temuOrderDO.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity())));
+			//设置订单规则
+			temuOrderDO.setPriceRule(rule);
 			//修改订单状态
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
 			//更新订单信息

@@ -42,10 +42,10 @@ public class TemuCategoryRespVO {
 	private LocalDateTime createTime;
 	@Schema(description = "更新时间", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
 	private LocalDateTime updateTime;
+	@Schema(description = "定价类型", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+	private Integer ruleType;
 	@Schema(description = "价格规则", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+	private Object unitPrice;
 	
-	private List<TemuProductCategoryDO.UnitPrice> unitPrice;
-	@Schema(description = "默认价格", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-	private BigDecimal defaultPrice;
 	
 } 

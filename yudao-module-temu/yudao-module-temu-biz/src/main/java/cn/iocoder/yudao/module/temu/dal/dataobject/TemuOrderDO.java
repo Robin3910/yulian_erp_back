@@ -23,14 +23,6 @@ import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 @AllArgsConstructor
 @Data
 public class TemuOrderDO extends BaseDO {
-	@Data
-	@AllArgsConstructor
-	@NoArgsConstructor
-	public static class UnitPrice {
-		private BigDecimal price;
-		private Integer max;
-	}
-	
 	/**
 	 * 订单ID
 	 */
@@ -129,7 +121,7 @@ public class TemuOrderDO extends BaseDO {
 	 * 单价(JSON格式)
 	 */
 	@TableField(typeHandler = JacksonTypeHandler.class)
-	private List<UnitPrice> priceRule;
+	private Object priceRule;
 	
 	private BigDecimal defaultPrice;
 }
