@@ -28,7 +28,7 @@ public class TemuProductCategoryDO extends BaseDO {
 		private BigDecimal price;
 		private Integer max;
 	}
-	
+
 	/**
 	 * 品类编号
 	 */
@@ -62,17 +62,18 @@ public class TemuProductCategoryDO extends BaseDO {
 	 * 主图URL
 	 */
 	private String mainImageUrl;
-	
+
 	/**
 	 * 定价类型
 	 */
 	private Integer ruleType;
-	
+
 	/**
 	 * 定价规则(JSON格式)
 	 */
 	@TableField(typeHandler = JacksonTypeHandler.class)
 	private Object unitPrice;
-	
-	
+
+	//合规单类型
+	private String oldType;
 } 
