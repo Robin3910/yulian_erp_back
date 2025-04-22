@@ -7,6 +7,9 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
+import java.util.List;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 @Schema(description = "Temu管理 - 待发货列表分页 Request VO")
 @Data
@@ -33,5 +36,17 @@ public class TemuOrderShippingPageReqVO extends PageParam {
     @Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
     private LocalDate[] createTime;
 
-}
+    @Data
+    @Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")
+    public static class BatchUpdateStatusReqVO {
 
+        @Schema(description = "订单ID列表", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotEmpty(message = "订单ID列表不能为空")
+        private List<Long> orderIds;
+
+        @Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "订单状态不能为空")
+        private Integer orderStatus;
+    }
+
+}
