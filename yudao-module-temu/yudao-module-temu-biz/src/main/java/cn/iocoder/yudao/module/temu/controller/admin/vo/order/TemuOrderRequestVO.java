@@ -16,7 +16,7 @@ public class TemuOrderRequestVO extends PageParam {
 	private String skc;
 	private String customSku;
 	private String orderStatus;
-	private String categoryId;
+	private Long[] categoryId;
 	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
 	private LocalDateTime[] bookingTime;
 }

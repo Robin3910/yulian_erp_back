@@ -25,7 +25,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/temu/category-sku")
 @Validated
 @PermitAll
-public class TemuCategorySkuController {
+public class AdminTemuCategorySkuController {
 
     @Resource
     private TemuCategorySkuService categorySkuService;

@@ -10,5 +10,6 @@ public class TemuOrderDetailDO extends TemuOrderDO {
 	private String shopName;
 	private Object categoryPriceRule;
 	private Integer categoryRuleType;
+	private String  productCategoryName;
 	private BigDecimal defaultPrice;
 }

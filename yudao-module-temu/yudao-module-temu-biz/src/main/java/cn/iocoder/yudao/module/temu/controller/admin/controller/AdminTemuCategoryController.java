@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.validation.Valid;
-import javax.annotation.security.PermitAll;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -26,7 +25,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 		"/temu/product-category"
 })
 @Validated
-public class TemuCategoryController {
+public class AdminTemuCategoryController {
 
 	@Resource
 	private TemuCategoryService temuCategoryService;

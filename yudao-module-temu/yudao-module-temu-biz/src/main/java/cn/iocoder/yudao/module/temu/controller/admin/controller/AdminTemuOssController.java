@@ -21,7 +21,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/temu/oss")
 @Validated
 @PermitAll
-public class TemuOssController {
+public class AdminTemuOssController {
 
     @Resource
     private TemuOssService ossService;

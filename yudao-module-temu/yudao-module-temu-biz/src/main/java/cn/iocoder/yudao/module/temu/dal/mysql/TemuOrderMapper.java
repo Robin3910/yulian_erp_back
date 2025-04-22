@@ -13,6 +13,7 @@ import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Mapper
@@ -31,13 +32,13 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.leftJoin(TemuProductCategoryDO.class, TemuProductCategoryDO::getCategoryId, TemuOrderDO::getCategoryId)
 				.selectAs(TemuProductCategoryDO::getUnitPrice, TemuOrderDetailDO::getCategoryPriceRule)
 				.selectAs(TemuProductCategoryDO::getRuleType, TemuOrderDetailDO::getCategoryRuleType)
-				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getCategoryName)
+				.selectAs(TemuProductCategoryDO::getCategoryName, TemuOrderDetailDO::getProductCategoryName)
 				.selectAs(TemuShopDO::getShopName, TemuOrderDetailDO::getShopName)
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
 				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU
 				.likeIfExists(TemuOrderDO::getSkc, temuOrderRequestVO.getSkc())// SKC
 				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku())// 定制SKU
-				.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
+				//.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
 				.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
 		//判断数组是否为空
 		if (temuOrderRequestVO.getBookingTime() != null && temuOrderRequestVO.getBookingTime().length == 2) {
@@ -45,6 +46,9 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		}
 		//按照订单时间倒序排列
 		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
+		if(temuOrderRequestVO.getCategoryId() != null&& temuOrderRequestVO.getCategoryId().length > 0){
+			wrapper.in(TemuOrderDO::getCategoryId, Arrays.asList(temuOrderRequestVO.getCategoryId()));
+		}
 		return wrapper;
 	}
 	

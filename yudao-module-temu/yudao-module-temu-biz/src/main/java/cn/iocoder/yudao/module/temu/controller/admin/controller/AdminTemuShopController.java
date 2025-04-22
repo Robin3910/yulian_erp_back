@@ -24,7 +24,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/temu/shop")
 @Validated
 @PermitAll
-public class TemuShopController {
+public class AdminTemuShopController {
     
     @Resource
     private TemuShopService temuShopService;
