@@ -151,6 +151,70 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             throw new ServiceException();
         }
     }
+
+    @Override
+    public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+        if (CollectionUtils.isEmpty(saveRequestVOs)) {
+            return 0;
+        }
+
+        // 1. 参数校验
+        for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+            if (saveRequestVO == null) {
+                throw new IllegalArgumentException("待发货订单信息不能为空");
+            }
+            if (saveRequestVO.getOrderId() == null) {
+                throw new IllegalArgumentException("订单ID不能为空");
+            }
+            if (saveRequestVO.getShopId() == null) {
+                throw new IllegalArgumentException("店铺ID不能为空");
+            }
+        }
+
+        // 2. 批量查询已存在的订单
+        Set<String> orderIds = saveRequestVOs.stream()
+                .map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getOrderId)
+                .collect(Collectors.toSet());
+        
+        List<TemuOrderShippingInfoDO> existingShippings = shippingInfoMapper.selectList(
+                new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+                        .in(TemuOrderShippingInfoDO::getOrderId, orderIds));
+        
+        Set<String> existingOrderIds = existingShippings.stream()
+                .map(TemuOrderShippingInfoDO::getOrderId)
+                .collect(Collectors.toSet());
+
+        // 3. 过滤出需要保存的订单
+        List<TemuOrderShippingInfoDO> toSaveList = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        
+        for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+            if (!existingOrderIds.contains(saveRequestVO.getOrderId())) {
+                TemuOrderShippingInfoDO shippingInfo = new TemuOrderShippingInfoDO();
+                BeanUtils.copyProperties(saveRequestVO, shippingInfo);
+                shippingInfo.setCreateTime(now);
+                shippingInfo.setUpdateTime(now);
+                toSaveList.add(shippingInfo);
+            } else {
+                log.info("订单物流信息已存在，忽略保存，订单ID：{}", saveRequestVO.getOrderId());
+            }
+        }
+
+        // 4. 批量保存
+        if (!toSaveList.isEmpty()) {
+            try {
+                int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
+                log.info("批量保存订单物流信息成功，数量：{}", affectedRows);
+                return affectedRows;
+            } catch (Exception e) {
+                log.error("批量保存订单物流信息失败：{}", e.getMessage(), e);
+                throw new ServiceException("批量保存订单物流信息失败：" + e.getMessage());
+            }
+        }
+
+        return 0;
+    }
+
     //校验保存请求参数
     private void validateSaveRequest(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
         if (saveRequestVO == null) {

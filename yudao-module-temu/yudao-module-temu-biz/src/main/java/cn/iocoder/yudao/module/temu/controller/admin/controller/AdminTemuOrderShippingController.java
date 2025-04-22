@@ -13,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -29,6 +30,15 @@ public class AdminTemuOrderShippingController {
     @Operation(summary = "保存待发货订单")
     public CommonResult<Long> saveOrderShipping(@Valid @RequestBody TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
         return success(shippingService.saveOrderShipping(saveRequestVO));
+    }
+
+    @PostMapping("/batch-save")
+    @Operation(summary = "批量保存待发货订单")
+    public CommonResult<Integer> batchSaveOrderShipping(@Valid @RequestBody List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+        if (saveRequestVOs == null || saveRequestVOs.isEmpty()) {
+            return success(0);
+        }
+        return success(shippingService.batchSaveOrderShipping(saveRequestVOs));
     }
 
     @GetMapping("/page")
