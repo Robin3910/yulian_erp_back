@@ -1,14 +1,17 @@
 package cn.iocoder.yudao.module.temu.dal.dataobject;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
-@TableName("temu_shop")
+@TableName(value = "temu_shop", autoResultMap = true)
 public class TemuShopDO extends BaseDO {
     
     /**
@@ -31,5 +34,11 @@ public class TemuShopDO extends BaseDO {
      * 信息通知机器人webhook地址
      */
     private String webhook;
+
+    /**
+     * 合规单类型url
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> oldTypeUrl;
  
 } 

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Schema(description = "管理后台 - 店铺 Response VO")
 @Data
@@ -26,4 +27,8 @@ public class TemuShopRespVO {
     
     @Schema(description = "更新时间")
     private LocalDateTime updateTime;
+
+    @Schema(description = "合规单类型配置", example = "{\"0\":\"http://example.com\"}")
+    private Map<String, Object> oldTypeUrl;
+
 } 

@@ -36,5 +36,6 @@ public class TemuCategoryCreateReqVO {
 	
 	@Schema(description = "价格规则", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
 	private Object unitPrice;
-	
+	@Schema(description = "合规单类型", example = "1")
+	private String oldType;
 } 
