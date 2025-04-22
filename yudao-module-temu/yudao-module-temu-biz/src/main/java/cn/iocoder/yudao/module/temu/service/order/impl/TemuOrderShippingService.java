@@ -7,10 +7,12 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderS
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
 import com.aliyun.oss.ServiceException;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
@@ -27,6 +29,8 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import cn.hutool.core.collection.CollUtil;
+
 /**
  * Temu订单物流 Service 实现类
  */
@@ -38,6 +42,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     private final TemuOrderShippingMapper shippingInfoMapper;
     private final TemuOrderMapper orderMapper;
     private final TemuShopMapper shopMapper;
+    private final TemuProductCategoryMapper categoryMapper;
 
     // 保存待发货订单
     @Override
@@ -63,7 +68,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         }
     }
 
-    //获得待发货订单分页
+    // 获得待发货订单分页
     @Override
     public PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO) {
         // 1. 先根据订单条件查询符合条件的订单ID
@@ -111,11 +116,14 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         Map<Long, TemuOrderDO> orderMap = orders.stream()
                 .collect(Collectors.toMap(TemuOrderDO::getId, Function.identity(), (v1, v2) -> v1));
 
-        // 6. 批量查询店铺信息
-        List<TemuShopDO> shops = shopMapper.selectList(new LambdaQueryWrapperX<TemuShopDO>()
-                .in(TemuShopDO::getShopId, shopIds));
-        Map<Long, TemuShopDO> shopMap = shops.stream()
-                .collect(Collectors.toMap(TemuShopDO::getShopId, Function.identity(), (v1, v2) -> v1));
+        // 6. 批量查询店铺信息（使用 shop_id 字段）
+        Map<Long, TemuShopDO> shopMap = new HashMap<>();
+        for (Long shopId : shopIds) {
+            TemuShopDO shop = shopMapper.selectByShopId(shopId);
+            if (shop != null) {
+                shopMap.put(shopId, shop);
+            }
+        }
 
         // 7. 组装返回结果
         List<TemuOrderShippingRespVO> voList = new ArrayList<>();
@@ -216,12 +224,33 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     }
 
     //校验保存请求参数
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean batchUpdateOrderStatus(List<Long> orderIds, Integer orderStatus) {
+        if (CollUtil.isEmpty(orderIds)) {
+            return false;
+        }
+
+        // 构建批量更新条件
+        List<TemuOrderDO> updateList = orderIds.stream().map(orderId -> {
+            TemuOrderDO order = new TemuOrderDO();
+            order.setId(orderId);
+            order.setOrderStatus(orderStatus);
+            return order;
+        }).collect(Collectors.toList());
+
+        // 执行批量更新
+        orderMapper.updateBatch(updateList);
+        return true;
+    }
+
+    // 校验保存请求参数
     private void validateSaveRequest(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
         if (saveRequestVO == null) {
             throw new IllegalArgumentException("订单物流保存请求参数不能为空");
         }
     }
-    //构建物流信息对象
+
+    // 构建物流信息对象
     private TemuOrderShippingInfoDO buildShippingInfo(
             TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
         TemuOrderShippingInfoDO shippingInfo = new TemuOrderShippingInfoDO();
@@ -231,7 +260,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         shippingInfo.setUpdateTime(now);
         return shippingInfo;
     }
-    //获取匹配的订单列表
+
+    // 获取匹配的订单列表
     private List<TemuOrderDO> getMatchedOrders(TemuOrderShippingPageReqVO pageVO) {
         LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<TemuOrderDO>();
         // 处理订单状态条件
@@ -246,7 +276,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         }
         return orderMapper.selectList(orderWrapper);
     }
-    //获取物流信息分页数据
+
+    // 获取物流信息分页数据
     private PageResult<TemuOrderShippingInfoDO> getShippingInfoPage(TemuOrderShippingPageReqVO pageVO,
             List<TemuOrderDO> matchedOrders) {
         // 1. 获取订单ID集合
@@ -258,7 +289,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         // 3. 执行分页查询
         return shippingInfoMapper.selectPage(pageVO, wrapper);
     }
-    //构建物流信息查询条件
+
+    // 构建物流信息查询条件
     private LambdaQueryWrapperX<TemuOrderShippingInfoDO> buildShippingInfoWrapper(TemuOrderShippingPageReqVO pageVO,
             Set<String> orderIds) {
         LambdaQueryWrapperX<TemuOrderShippingInfoDO> wrapper = new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
@@ -276,7 +308,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
                 .orderByDesc(TemuOrderShippingInfoDO::getId);
         return wrapper;
     }
-    //构建分页结果
+
+    // 构建分页结果
     private PageResult<TemuOrderShippingRespVO> buildPageResult(PageResult<TemuOrderShippingInfoDO> result,
             List<TemuOrderDO> matchedOrders,
             TemuOrderShippingPageReqVO pageVO) {
@@ -306,7 +339,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
         return new PageResult<>(voList, result.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
     }
-    //转换单个物流信息为响应VO
+
+    // 转换单个物流信息为响应VO
     private TemuOrderShippingRespVO convertToRespVO(TemuOrderShippingInfoDO shippingInfo,
             Map<Long, TemuOrderDO> orderMap, Map<Long, TemuShopDO> shopMap) {
         TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
@@ -317,8 +351,24 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             TemuOrderDO order = orderMap.get(orderId);
             if (order != null) {
                 setOrderInfo(vo, order);
+
+                // 处理 oldTypeUrl
+                if (order.getCategoryId() != null) {
+                    // 1. 通过 categoryId 查询分类获取 oldType
+                    TemuProductCategoryDO category = categoryMapper.selectById(order.getCategoryId());
+                    if (category != null && category.getOldType() != null) {
+                        // 2. 通过 shopId 获取店铺信息
+                        TemuShopDO shop = shopMapper.selectByShopId(order.getShopId());
+                        if (shop != null && shop.getOldTypeUrl() != null) {
+                            // 3. 从 oldTypeUrl 中获取对应的 URL
+                            Object url = shop.getOldTypeUrl().get(category.getOldType());
+                            vo.setOldTypeUrl(url != null ? url.toString() : null);
+                        }
+                    }
+                }
             }
         }
+
         // 设置店铺信息
         vo.setShopId(shippingInfo.getShopId());
         if (shippingInfo.getShopId() != null) {
@@ -330,7 +380,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
         return vo;
     }
-    //转换订单ID
+
+    // 转换订单ID
     private Long convertOrderId(String orderIdStr) {
         try {
             return Long.valueOf(orderIdStr);
@@ -339,7 +390,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             return null;
         }
     }
-    //设置订单信息到VO
+
+    // 设置订单信息到VO
     private void setOrderInfo(TemuOrderShippingRespVO vo, TemuOrderDO order) {
         vo.setOrderNo(order.getOrderNo());
         vo.setProductImgUrl(order.getProductImgUrl());
@@ -363,4 +415,5 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             }
         }
     }
+
 }

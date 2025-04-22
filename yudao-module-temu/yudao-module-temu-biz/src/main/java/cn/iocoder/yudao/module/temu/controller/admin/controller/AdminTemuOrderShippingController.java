@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
-
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
@@ -52,6 +51,13 @@ public class AdminTemuOrderShippingController {
     @Operation(summary = "修改订单状态")
     public CommonResult<Boolean> updateOrderStatus(@Valid @RequestBody TemuOrderShippingPageReqVO reqVO) {
         return success(shippingService.updateOrderStatus(reqVO));
+    }
+
+    @PutMapping("/batch-update-status")
+    @Operation(summary = "批量修改订单状态")
+    public CommonResult<Boolean> batchUpdateOrderStatus(
+            @Valid @RequestBody TemuOrderShippingPageReqVO.BatchUpdateStatusReqVO reqVO) {
+        return success(shippingService.batchUpdateOrderStatus(reqVO.getOrderIds(), reqVO.getOrderStatus()));
     }
 
 }

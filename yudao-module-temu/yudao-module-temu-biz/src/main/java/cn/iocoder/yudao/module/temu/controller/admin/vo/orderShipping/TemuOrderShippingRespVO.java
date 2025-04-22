@@ -73,6 +73,9 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "合成预览图")
     private String effectiveImgUrl;
 
+    @Schema(description = "合规单URL")
+    private String oldTypeUrl;
+
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
     public static class TemuOrderShippingSaveRequestVO {
