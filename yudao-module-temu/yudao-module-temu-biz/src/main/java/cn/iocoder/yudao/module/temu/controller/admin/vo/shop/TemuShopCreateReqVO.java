@@ -5,6 +5,7 @@ import lombok.Data;
 
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import java.util.Map;
 
 @Schema(description = "管理后台 - 店铺创建 Request VO")
 @Data
@@ -21,4 +22,7 @@ public class TemuShopCreateReqVO {
     
     @Schema(description = "信息通知机器人webhook地址")
     private String webhook;
+
+    @Schema(description = "合规单类型配置", example = "{\"0\":\"http://example.com\"}")
+    private Map<String, Object> oldTypeUrl;
 } 
