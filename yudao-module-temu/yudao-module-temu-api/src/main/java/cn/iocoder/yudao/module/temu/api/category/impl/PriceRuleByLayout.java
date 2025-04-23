@@ -69,7 +69,7 @@ public class PriceRuleByLayout implements IPriceRule {
 	        }
 		}
 		log.warn("最后总价是{}数量是{}单价是{}",minPrice,new BigDecimal(quantity),minPrice.divide(new BigDecimal(quantity), 2, RoundingMode.HALF_UP));
-		return minPrice.divide(new BigDecimal(quantity), 2, RoundingMode.HALF_UP);
+		return minPrice.divide(new BigDecimal(quantity), 6, RoundingMode.HALF_UP);
 	}
 	
 	private BigDecimal calcLayoutUnitPrice(Integer quantity) {
