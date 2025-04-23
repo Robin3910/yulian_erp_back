@@ -25,12 +25,6 @@ public class AdminTemuOrderShippingController {
 
     private final ITemuOrderShippingService shippingService;
 
-    @PostMapping("/save")
-    @Operation(summary = "保存待发货订单")
-    public CommonResult<Long> saveOrderShipping(@Valid @RequestBody TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO) {
-        return success(shippingService.saveOrderShipping(saveRequestVO));
-    }
-
     @PostMapping("/batch-save")
     @Operation(summary = "批量保存待发货订单")
     public CommonResult<Integer> batchSaveOrderShipping(@Valid @RequestBody List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
@@ -45,12 +39,6 @@ public class AdminTemuOrderShippingController {
     public CommonResult<PageResult<TemuOrderShippingRespVO>> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO) {
 
         return success(shippingService.getOrderShippingPage(pageVO));
-    }
-
-    @PutMapping("/update")
-    @Operation(summary = "修改订单状态")
-    public CommonResult<Boolean> updateOrderStatus(@Valid @RequestBody TemuOrderShippingPageReqVO reqVO) {
-        return success(shippingService.updateOrderStatus(reqVO));
     }
 
     @PutMapping("/batch-update-status")
