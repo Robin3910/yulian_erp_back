@@ -7,10 +7,6 @@ import java.util.List;
 
 public interface ITemuOrderShippingService {
 
-    Long saveOrderShipping(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO);
-
-    Boolean updateOrderStatus(TemuOrderShippingPageReqVO reqVO);
-
     /**
      * 批量更新订单状态
      *
