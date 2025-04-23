@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderS
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.springframework.data.repository.query.Param;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -39,5 +40,16 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
                 .orderByDesc(TemuOrderShippingInfoDO::getId));
     }
 
+    /**
+     * 批量插入待发货订单
+     * @param list 待发货订单列表
+     * @return 影响行数
+     */
+    default int insertBatch(List<TemuOrderShippingInfoDO> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return 0;
+        }
+        return insertBatch(list);
+    }
 
 }
