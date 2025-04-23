@@ -39,21 +39,21 @@ public class PriceRuleByLayout implements IPriceRule {
 		//最小价格
 		BigDecimal minPrice;
 		//假设单品总价格最小
-		BigDecimal singleTotalPrice = singlePrice.multiply(new BigDecimal(quantity));
+		BigDecimal singleTotalPrice = singlePrice.multiply(BigDecimal.valueOf(quantity));
 		log.warn("单品数量{},单品价格{}\n",quantity,singleTotalPrice);
 		minPrice=singleTotalPrice;
 		//获取单品最大需要几个版面
-		BigDecimal maxLayoutCount = new BigDecimal(quantity).divide(new BigDecimal(singleLayoutCount), RoundingMode.UP);
+		BigDecimal maxLayoutCount = BigDecimal.valueOf(quantity).divide(BigDecimal.valueOf(singleLayoutCount), RoundingMode.UP);
 		log.warn("最大需要{}个版面\n",maxLayoutCount);
 		for (int i = 1; i <= maxLayoutCount.intValue(); i++) {
 			BigDecimal currentTotalPrice;
 			BigDecimal remainPrice;
 			// 当前整版的价格
-			BigDecimal layoutTotalPrice = calcLayoutUnitPrice(i).multiply(new BigDecimal(i));
+			BigDecimal layoutTotalPrice = calcLayoutUnitPrice(i).multiply(BigDecimal.valueOf(i));
 			log.warn("{}个整版价格是{}\n",new BigDecimal(i),layoutTotalPrice);
 			
 			//检查是是否存在剩余的单个产品 没有就是0  有就加上单个产品*价格
-			BigDecimal remainder = new BigDecimal(quantity).subtract(new BigDecimal(i).multiply(new BigDecimal(singleLayoutCount)));
+			BigDecimal remainder = BigDecimal.valueOf(quantity).subtract(BigDecimal.valueOf(i).multiply(BigDecimal.valueOf(singleLayoutCount)));
 			if (remainder.floatValue() > 0) {
 				remainPrice = singlePrice.multiply(remainder);
 				log.warn("存在剩余产品数量是{},总的价格是{}\n",remainder,remainPrice);
@@ -69,7 +69,7 @@ public class PriceRuleByLayout implements IPriceRule {
 	        }
 		}
 		log.warn("最后总价是{}数量是{}单价是{}",minPrice,new BigDecimal(quantity),minPrice.divide(new BigDecimal(quantity), 2, RoundingMode.HALF_UP));
-		return minPrice.divide(new BigDecimal(quantity), 6, RoundingMode.HALF_UP);
+		return minPrice.divide( BigDecimal.valueOf(quantity), 6, RoundingMode.HALF_UP);
 	}
 	
 	private BigDecimal calcLayoutUnitPrice(Integer quantity) {
