@@ -1,9 +1,12 @@
 package cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+import com.baomidou.mybatisplus.annotation.TableField;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "temu管理 - 待发货列表 Response VO")
 @Data
@@ -30,58 +33,22 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "店铺ID")
     private Long shopId;
 
+    @Schema(description = "发货单创建时间")
+    private LocalDateTime createTime;
+
     // 联表查询字段
-    @Schema(description = "订单id")
-    private Long orderId;
-
-    @Schema(description = "商品图片URL")
-    private String productImgUrl;
-
-    @Schema(description = "SKU编号")
-    private String sku;
-
-    @Schema(description = "SKC编号")
-    private String skc;
-
-    @Schema(description = "定制SKU")
-    private String customSku;
-
-    @Schema(description = "数量")
-    private Integer quantity;
-
-    @Schema(description = "定制图片列表URL")
-    private String customImageUrls;
+    @Schema(description = "订单集合")
+    private List<TemuOrderListRespVO> orderList;
 
     @Schema(description = "店铺名称")
     private String shopName;
-
-    @Schema(description = "商品标题")
-    private String productTitle;
-
-    @Schema(description = "商品属性")
-    private String productProperties;
-
-    @Schema(description = "预定单创建时间")
-    private LocalDateTime createTime;
-
-    @Schema(description = "定制文字列表")
-    private String customTextList;
-
-    @Schema(description = "订单状态")
-    private Integer orderStatus;
-
-    @Schema(description = "合成预览图")
-    private String effectiveImgUrl;
-
-    @Schema(description = "合规单URL")
-    private String oldTypeUrl;
 
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
     public static class TemuOrderShippingSaveRequestVO {
 
-        @Schema(description = "订单Id", required = true)
-        private String orderId;
+        @Schema(description = "订单编号", required = true)
+        private String orderNo;
 
         @Schema(description = "物流单号")
         private String trackingNumber;

@@ -22,9 +22,9 @@ public class TemuOrderShippingInfoDO extends BaseDO {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
     /**
-     * 订单ID
+     * 订单编号
      */
-    @TableField("order_id")
+    @TableField("order_no")
     private String orderId;
     /**
      * 物流单号
