@@ -9,6 +9,7 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
+import cn.iocoder.yudao.module.temu.api.category.factory.PriceRuleFactory;
 import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByLayout;
 import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByNumber;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
@@ -344,22 +345,11 @@ public class TemuOrderService implements ITemuOrderService {
 				throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
 			}
 			//根据分类规则加载不同的对象
-			BigDecimal unitPrice = new BigDecimal(0);
-			IPriceRule rule=null;
-			switch (temuProductCategoryDO.getRuleType()) {
-				// 按照数量计算价格
-				case 1:
-					rule = BeanUtils.toBean(temuProductCategoryDO.getUnitPrice(), PriceRuleByNumber.class);
-					log.warn("规则是{}",rule);
-					unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
-					break;
-				// 按照版面规则计算
-				case 2:
-					rule = BeanUtils.toBean(temuProductCategoryDO.getUnitPrice(), PriceRuleByLayout.class);
-					log.warn("规则是{}",rule);
-					unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
-					break;
-			}
+			BigDecimal unitPrice;
+			IPriceRule rule;
+			//根据规则类型加载不同的对象
+			rule = PriceRuleFactory.createPriceRule(temuProductCategoryDO.getRuleType(), temuProductCategoryDO.getUnitPrice());
+			unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
 			//更新数量
 			temuOrderDO.setQuantity(temuOrderBatchOrderReqVO.getQuantity());
 			//更新单价
