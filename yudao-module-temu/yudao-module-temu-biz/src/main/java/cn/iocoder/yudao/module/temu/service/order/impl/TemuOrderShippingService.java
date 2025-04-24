@@ -89,42 +89,98 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
         }
 
-        // 4. 获取所有需要的订单编号和店铺ID
+        // 4. 收集所有需要的数据
         Set<String> allOrderNos = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getOrderNo)
                 .collect(Collectors.toSet());
+
         Set<Long> shopIds = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getShopId)
                 .collect(Collectors.toSet());
 
-        // 5. 批量查询订单信息
-        List<TemuOrderDO> orders = orderMapper.selectList(new LambdaQueryWrapperX<TemuOrderDO>()
+        // 5. 批量查询所有相关数据
+        // 5.1 批量查询订单信息
+        List<TemuOrderDO> allOrders = orderMapper.selectList(new LambdaQueryWrapperX<TemuOrderDO>()
                 .in(TemuOrderDO::getOrderNo, allOrderNos));
-        Map<String, TemuOrderDO> orderMap = orders.stream()
-                .collect(Collectors.toMap(TemuOrderDO::getOrderNo, Function.identity(), (v1, v2) -> v1));
 
-        // 6. 批量查询店铺信息
+        // 5.2 收集所有类目ID
+        Set<String> categoryIds = allOrders.stream()
+                .map(TemuOrderDO::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 5.3 批量查询类目信息
+        Map<String, TemuProductCategoryDO> categoryMap = new HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            List<TemuProductCategoryDO> categories = categoryMapper.selectBatchIds(categoryIds);
+            categoryMap = categories.stream()
+                    .collect(Collectors.toMap(
+                            category -> String.valueOf(category.getId()),
+                            category -> category,
+                            (v1, v2) -> v1));
+        }
+
+        // 5.4 批量查询店铺信息
         Map<Long, TemuShopDO> shopMap = new HashMap<>();
-        for (Long shopId : shopIds) {
-            TemuShopDO shop = shopMapper.selectByShopId(shopId);
-            if (shop != null) {
-                shopMap.put(shopId, shop);
+        if (!shopIds.isEmpty()) {
+            for (Long shopId : shopIds) {
+                TemuShopDO shop = shopMapper.selectByShopId(shopId);
+                if (shop != null) {
+                    shopMap.put(shopId, shop);
+                }
             }
         }
 
-        // 7. 组装返回结果
+        // 5.5 构建订单Map（按orderNo分组）
+        Map<String, List<TemuOrderDO>> orderMap = allOrders.stream()
+                .collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
+
+        // 6. 组装返回结果
         List<TemuOrderShippingRespVO> voList = new ArrayList<>();
         for (TemuOrderShippingInfoDO shippingInfo : pageResult.getList()) {
-            TemuOrderShippingRespVO vo = convertToRespVO(shippingInfo, orderMap, shopMap);
-            if (vo != null) {
-                voList.add(vo);
+            TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
+
+            // 设置订单相关信息
+            String orderNo = shippingInfo.getOrderNo();
+            vo.setOrderNo(orderNo);
+
+            // 设置订单列表
+            List<TemuOrderDO> orders = orderMap.get(orderNo);
+            if (!CollectionUtils.isEmpty(orders)) {
+                List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
+                TemuShopDO shop = shopMap.get(shippingInfo.getShopId());
+
+                for (TemuOrderDO order : orders) {
+                    TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
+                    if (order.getCategoryId() != null) {
+                        TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
+                        if (category != null && category.getOldType() != null &&
+                                shop != null && shop.getOldTypeUrl() != null) {
+                            Object url = shop.getOldTypeUrl().get(category.getOldType());
+                            if (url != null) {
+                                orderVO.setOldTypeUrl(url.toString());
+                            }
+                        }
+                    }
+                    orderListVOs.add(orderVO);
+                }
+                vo.setOrderList(orderListVOs);
             }
+
+            // 设置店铺信息
+            vo.setShopId(shippingInfo.getShopId());
+            TemuShopDO shop = shopMap.get(shippingInfo.getShopId());
+            if (shop != null) {
+                vo.setShopName(shop.getShopName());
+            }
+
+            voList.add(vo);
         }
 
         return new PageResult<>(voList, pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
     }
 
-    //批量保存待发货订单
+    // 批量保存待发货订单
     @Override
     @Transactional(rollbackFor = Exception.class) // 确保事务一致性
     public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
@@ -221,52 +277,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
         // 执行批量更新
         orderMapper.updateBatch(updateList);
         return true;
-    }
-
-    // 转换单个物流信息为响应VO
-    private TemuOrderShippingRespVO convertToRespVO(TemuOrderShippingInfoDO shippingInfo,
-            Map<String, TemuOrderDO> orderMap, Map<Long, TemuShopDO> shopMap) {
-        TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
-
-        // 设置订单相关信息
-        String orderNo = shippingInfo.getOrderNo();
-        vo.setOrderNo(orderNo);
-        if (orderNo != null) {
-            List<TemuOrderDO> matchedOrders = orderMapper.selectList(
-                    new LambdaQueryWrapperX<TemuOrderDO>()
-                            .eq(TemuOrderDO::getOrderNo, orderNo));
-            if (!CollectionUtils.isEmpty(matchedOrders)) {
-                List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
-                for (TemuOrderDO order : matchedOrders) {
-                    TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
-                    if (order.getCategoryId() != null) {
-                        TemuProductCategoryDO category = categoryMapper.selectById(order.getCategoryId());
-                        if (category != null && category.getOldType() != null) {
-                            TemuShopDO shop = shopMapper.selectByShopId(shippingInfo.getShopId());
-                            if (shop != null && shop.getOldTypeUrl() != null) {
-                                Object url = shop.getOldTypeUrl().get(category.getOldType());
-                                if (url != null) {
-                                    orderVO.setOldTypeUrl(url.toString());
-                                }
-                            }
-                        }
-                    }
-                    orderListVOs.add(orderVO);
-                }
-                vo.setOrderList(orderListVOs);
-            }
-        }
-
-        // 设置店铺信息
-        vo.setShopId(shippingInfo.getShopId());
-        if (shippingInfo.getShopId() != null) {
-            TemuShopDO shop = shopMap.get(shippingInfo.getShopId());
-            if (shop != null) {
-                vo.setShopName(shop.getShopName());
-            }
-        }
-
-        return vo;
     }
 
 }
