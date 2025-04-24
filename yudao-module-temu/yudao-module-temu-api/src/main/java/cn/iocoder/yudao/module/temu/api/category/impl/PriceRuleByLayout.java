@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.temu.api.category.impl;
 
 import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -26,7 +29,8 @@ public class PriceRuleByLayout implements IPriceRule {
 	private BigDecimal defaultPrice;
 	private List<Rule> unitPrice;
 	private String ruleType = "按版面计算价格";
-	private String remark;
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",shape = JsonFormat.Shape.STRING,timezone = "GMT+8")
+	private Date time= new Date();
 	
 	@Data
 	public static class Rule {
