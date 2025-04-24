@@ -31,6 +31,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.collection.CollUtil;
+import java.util.Objects;
 
 /**
  * Temu订单物流 Service 实现类
@@ -48,6 +49,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     // 获得待发货订单分页
     @Override
     public PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO) {
+        long startTime = System.currentTimeMillis();
+        log.info("[getOrderShippingPage] 开始执行分页查询");
+        
         // 1. 先根据订单条件查询符合条件的订单ID
         List<TemuOrderDO> matchedOrders = null;
         if (pageVO.getOrderStatus() != null || StringUtils.hasText(pageVO.getOrderNo())) {
@@ -55,11 +59,18 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             orderWrapper.eqIfPresent(TemuOrderDO::getOrderStatus, pageVO.getOrderStatus())
                     .eqIfPresent(TemuOrderDO::getOrderNo, pageVO.getOrderNo());
             matchedOrders = orderMapper.selectList(orderWrapper);
+            
+            log.info("[getOrderShippingPage] 步骤1：订单条件过滤耗时：{}ms, 匹配订单数：{}", 
+                    System.currentTimeMillis() - startTime, 
+                    matchedOrders == null ? 0 : matchedOrders.size());
 
             if (CollectionUtils.isEmpty(matchedOrders)) {
+                log.info("[getOrderShippingPage] 未找到匹配订单，总耗时：{}ms", System.currentTimeMillis() - startTime);
                 return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
             }
         }
+        
+        long step1Time = System.currentTimeMillis();
 
         // 2. 构建物流信息查询条件
         LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = new LambdaQueryWrapperX<>();
@@ -68,9 +79,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
         // 处理创建时间条件
         if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
-            LocalDateTime startTime = pageVO.getCreateTime()[0].atStartOfDay();
+            LocalDateTime beginTime = pageVO.getCreateTime()[0].atStartOfDay();
             LocalDateTime endTime = pageVO.getCreateTime()[1].atTime(23, 59, 59, 999999999);
-            queryWrapper.between(TemuOrderShippingInfoDO::getCreateTime, startTime, endTime);
+            queryWrapper.between(TemuOrderShippingInfoDO::getCreateTime, beginTime, endTime);
         }
 
         if (matchedOrders != null) {
@@ -82,44 +93,167 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
         queryWrapper.orderByDesc(TemuOrderShippingInfoDO::getCreateTime)
                 .orderByDesc(TemuOrderShippingInfoDO::getId);
+                
+        log.info("[getOrderShippingPage] 步骤2：构建查询条件耗时：{}ms", System.currentTimeMillis() - step1Time);
+        long step2Time = System.currentTimeMillis();
 
         // 3. 执行分页查询
         PageResult<TemuOrderShippingInfoDO> pageResult = shippingInfoMapper.selectPage(pageVO, queryWrapper);
+        log.info("[getOrderShippingPage] 步骤3：执行分页查询耗时：{}ms, 结果数量：{}", 
+                System.currentTimeMillis() - step2Time, 
+                pageResult.getList().size());
+                
         if (CollectionUtils.isEmpty(pageResult.getList())) {
+            log.info("[getOrderShippingPage] 分页查询无结果，总耗时：{}ms", System.currentTimeMillis() - startTime);
             return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
         }
+        
+        long step3Time = System.currentTimeMillis();
 
         // 4. 获取所有需要的订单编号和店铺ID
         Set<String> allOrderNos = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getOrderNo)
                 .collect(Collectors.toSet());
+        // 这里已经拿到店铺ID了
         Set<Long> shopIds = pageResult.getList().stream()
                 .map(TemuOrderShippingInfoDO::getShopId)
                 .collect(Collectors.toSet());
+                
+        log.info("[getOrderShippingPage] 步骤4：提取订单编号和店铺ID耗时：{}ms, 订单数：{}, 店铺数：{}", 
+                System.currentTimeMillis() - step3Time, 
+                allOrderNos.size(), 
+                shopIds.size());
+        long step4Time = System.currentTimeMillis();
 
         // 5. 批量查询订单信息
+        // 这里已经拿到订单信息了
         List<TemuOrderDO> orders = orderMapper.selectList(new LambdaQueryWrapperX<TemuOrderDO>()
                 .in(TemuOrderDO::getOrderNo, allOrderNos));
         Map<String, TemuOrderDO> orderMap = orders.stream()
                 .collect(Collectors.toMap(TemuOrderDO::getOrderNo, Function.identity(), (v1, v2) -> v1));
+                
+        log.info("[getOrderShippingPage] 步骤5：批量查询订单信息耗时：{}ms, 查询到订单数：{}", 
+                System.currentTimeMillis() - step4Time, 
+                orders.size());
+        long step5Time = System.currentTimeMillis();
 
         // 6. 批量查询店铺信息
         Map<Long, TemuShopDO> shopMap = new HashMap<>();
-        for (Long shopId : shopIds) {
-            TemuShopDO shop = shopMapper.selectByShopId(shopId);
-            if (shop != null) {
-                shopMap.put(shopId, shop);
+        if (!shopIds.isEmpty()) {
+            // 批量查询店铺信息，替代循环单个查询
+            List<TemuShopDO> shops = shopMapper.selectList(
+                    new LambdaQueryWrapperX<TemuShopDO>().in(TemuShopDO::getShopId, shopIds));
+            if (shops != null) {
+                shopMap = shops.stream()
+                        .collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop, (v1, v2) -> v1));
             }
         }
+        
+        log.info("[getOrderShippingPage] 步骤6：批量查询店铺信息耗时：{}ms, 查询到店铺数：{}", 
+                System.currentTimeMillis() - step5Time, 
+                shopMap.size());
+        long step6Time = System.currentTimeMillis();
 
         // 7. 组装返回结果
         List<TemuOrderShippingRespVO> voList = new ArrayList<>();
-        for (TemuOrderShippingInfoDO shippingInfo : pageResult.getList()) {
-            TemuOrderShippingRespVO vo = convertToRespVO(shippingInfo, orderMap, shopMap);
-            if (vo != null) {
-                voList.add(vo);
+        
+        // 预查询所有分类信息并缓存
+        Set<String> categoryIds = orders.stream()
+                .map(TemuOrderDO::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+                
+        Map<String, TemuProductCategoryDO> categoryMap = new HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            // 收集有效的分类ID（能够转换为Long类型的）
+            List<Long> validCategoryIds = new ArrayList<>();
+            Map<Long, String> catIdMapping = new HashMap<>(); // 用于保存Long和String类型ID的映射
+            
+            for (String categoryId : categoryIds) {
+                try {
+                    Long catId = Long.parseLong(categoryId);
+                    validCategoryIds.add(catId);
+                    catIdMapping.put(catId, categoryId);
+                } catch (NumberFormatException e) {
+                    log.warn("[getOrderShippingPage] 转换分类ID失败: {}", categoryId);
+                }
+            }
+            
+            // 一次性批量查询所有分类
+            if (!validCategoryIds.isEmpty()) {
+                long queryStart = System.currentTimeMillis();
+                
+                // 执行批量查询
+                List<TemuProductCategoryDO> categories = categoryMapper.selectList(
+                        new LambdaQueryWrapperX<TemuProductCategoryDO>()
+                                .in(TemuProductCategoryDO::getCategoryId, validCategoryIds));
+                
+                // 构建分类映射，使用String类型的categoryId作为键
+                if (categories != null) {
+                    for (TemuProductCategoryDO category : categories) {
+                        String originalCategoryId = catIdMapping.get(category.getCategoryId());
+                        if (originalCategoryId != null) {
+                            categoryMap.put(originalCategoryId, category);
+                        }
+                    }
+                }
+                
+                log.debug("[getOrderShippingPage] 批量查询分类信息耗时：{}ms, 查询数量：{}, 结果数量：{}", 
+                        System.currentTimeMillis() - queryStart, 
+                        validCategoryIds.size(),
+                        categories != null ? categories.size() : 0);
             }
         }
+        
+        // 批量处理所有订单物流信息
+        for (TemuOrderShippingInfoDO shippingInfo : pageResult.getList()) {
+            TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
+            
+            // 设置订单相关信息
+            String orderNo = shippingInfo.getOrderNo();
+            vo.setOrderNo(orderNo);
+            
+            // 设置店铺信息
+            Long shopId = shippingInfo.getShopId();
+            vo.setShopId(shopId);
+            
+            TemuShopDO shop = shopMap.get(shopId);
+            if (shop != null) {
+                vo.setShopName(shop.getShopName());
+            }
+            
+            // 设置订单列表
+            if (orderNo != null) {
+                List<TemuOrderDO> ordersList = orders.stream()
+                        .filter(order -> orderNo.equals(order.getOrderNo()))
+                        .collect(Collectors.toList());
+                
+                if (!CollectionUtils.isEmpty(ordersList)) {
+                    List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
+                    for (TemuOrderDO order : ordersList) {
+                        TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
+                        if (order.getCategoryId() != null) {
+                            TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
+                            if (category != null && category.getOldType() != null && shop != null && shop.getOldTypeUrl() != null) {
+                                Object url = shop.getOldTypeUrl().get(category.getOldType());
+                                if (url != null) {
+                                    orderVO.setOldTypeUrl(url.toString());
+                                }
+                            }
+                        }
+                        orderListVOs.add(orderVO);
+                    }
+                    vo.setOrderList(orderListVOs);
+                }
+            }
+            
+            voList.add(vo);
+        }
+        
+        log.info("[getOrderShippingPage] 步骤7：组装返回结果耗时：{}ms, 结果数量：{}", 
+                System.currentTimeMillis() - step6Time, 
+                voList.size());
+        log.info("[getOrderShippingPage] 分页查询完成，总耗时：{}ms", System.currentTimeMillis() - startTime);
 
         return new PageResult<>(voList, pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
     }
@@ -226,16 +360,24 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     // 转换单个物流信息为响应VO
     private TemuOrderShippingRespVO convertToRespVO(TemuOrderShippingInfoDO shippingInfo,
             Map<String, TemuOrderDO> orderMap, Map<Long, TemuShopDO> shopMap) {
+        long startTime = System.currentTimeMillis();
+        
         TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
 
         // 设置订单相关信息
         String orderNo = shippingInfo.getOrderNo();
         vo.setOrderNo(orderNo);
         if (orderNo != null) {
+            long queryStart = System.currentTimeMillis();
             List<TemuOrderDO> matchedOrders = orderMapper.selectList(
                     new LambdaQueryWrapperX<TemuOrderDO>()
                             .eq(TemuOrderDO::getOrderNo, orderNo));
+            long queryEnd = System.currentTimeMillis();
+            log.debug("[convertToRespVO] 查询订单信息耗时：{}ms, 订单号：{}, 匹配数量：{}", 
+                    queryEnd - queryStart, orderNo, matchedOrders.size());
+                    
             if (!CollectionUtils.isEmpty(matchedOrders)) {
+                long convertStart = System.currentTimeMillis();
                 List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
                 for (TemuOrderDO order : matchedOrders) {
                     TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
@@ -254,6 +396,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
                     orderListVOs.add(orderVO);
                 }
                 vo.setOrderList(orderListVOs);
+                log.debug("[convertToRespVO] 转换订单列表耗时：{}ms, 订单号：{}, 订单数量：{}", 
+                        System.currentTimeMillis() - convertStart, orderNo, orderListVOs.size());
             }
         }
 
@@ -266,6 +410,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             }
         }
 
+        log.debug("[convertToRespVO] 转换物流信息完成，总耗时：{}ms, 订单号：{}", 
+                System.currentTimeMillis() - startTime, orderNo);
         return vo;
     }
 
