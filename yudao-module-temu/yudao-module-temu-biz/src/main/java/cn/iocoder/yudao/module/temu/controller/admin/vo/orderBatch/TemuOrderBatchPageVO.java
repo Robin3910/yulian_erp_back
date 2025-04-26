@@ -24,4 +24,6 @@ public class TemuOrderBatchPageVO extends PageParam {
 	private LocalDateTime[] createTime;
 	@Schema(description = "是否按批次分组")
 	private Boolean groupByBatch;
+	@Schema(description = "定制SKU")
+	private String customSku;
 }

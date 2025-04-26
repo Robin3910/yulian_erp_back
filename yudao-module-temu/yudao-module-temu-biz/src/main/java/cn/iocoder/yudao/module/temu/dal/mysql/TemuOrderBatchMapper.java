@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.commons.lang3.StringUtils;
 
 @Mapper
 public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
@@ -21,7 +22,10 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
 				.selectCollection(TemuOrderDO.class, TemuOrderBatchDetailDO::getOrderList)
 				.eqIfExists(TemuOrderBatchDO::getStatus, temuOrderBatchPageVO.getStatus())
-				.likeIfExists(TemuOrderDO::getOrderNo, temuOrderBatchPageVO.getBatchNo());
+				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getBatchNo()), TemuOrderBatchDO::getBatchNo,
+						temuOrderBatchPageVO.getBatchNo())
+				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku,
+						temuOrderBatchPageVO.getCustomSku());
 
 		// 时间范围查询
 		if (temuOrderBatchPageVO.getCreateTime() != null && temuOrderBatchPageVO.getCreateTime().length == 2) {
