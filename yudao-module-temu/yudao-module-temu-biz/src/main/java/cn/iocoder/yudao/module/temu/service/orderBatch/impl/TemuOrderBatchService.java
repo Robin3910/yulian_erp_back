@@ -111,16 +111,6 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	@Override
 	public PageResult<TemuOrderBatchDetailDO> list(TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		PageResult<TemuOrderBatchDetailDO> temuOrderBatchDOPageResult = temuOrderBatchMapper.selectPage(temuOrderBatchPageVO);
-		temuOrderBatchDOPageResult.getList().forEach(temuOrderBatchDO -> {
-			//查询关联的订单详情
-			List<TemuOrderDetailDO> orderList = temuOrderBatchDO.getOrderList();
-			//查询所有关联的批次订单
-			List<TemuOrderDetailDO> temuOrderBatchRelationDOList = temuOrderMapper.selectListByOrderIds(
-					orderList.stream().map(TemuOrderDetailDO::getId)
-							.collect(Collectors.toList())
-			);
-			temuOrderBatchDO.setOrderList(temuOrderBatchRelationDOList);
-		});
 		
 		return temuOrderBatchDOPageResult;
 	}
