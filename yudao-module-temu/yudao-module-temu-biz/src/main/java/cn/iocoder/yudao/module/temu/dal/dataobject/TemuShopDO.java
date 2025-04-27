@@ -13,32 +13,37 @@ import java.util.Map;
 @Data
 @TableName(value = "temu_shop", autoResultMap = true)
 public class TemuShopDO extends BaseDO {
-    
-    /**
-     * 主键ID
-     */
-    @TableId
-    private Long id;
-    
-    /**
-     * 店铺ID
-     */
-    private Long shopId;
-    
-    /**
-     * 店铺名称
-     */
-    private String shopName;
-    
-    /**
-     * 信息通知机器人webhook地址
-     */
-    private String webhook;
-
-    /**
-     * 合规单类型url
-     */
-    @TableField(typeHandler = JacksonTypeHandler.class)
-    private Map<String, Object> oldTypeUrl;
- 
+	
+	/**
+	 * 主键ID
+	 */
+	@TableId
+	private Long id;
+	
+	/**
+	 * 店铺ID
+	 */
+	private Long shopId;
+	
+	/**
+	 * 店铺名称
+	 */
+	private String shopName;
+	
+	/**
+	 * 信息通知机器人webhook地址
+	 */
+	private String webhook;
+	
+	/**
+	 * 合规单类型url
+	 */
+	@TableField(typeHandler = JacksonTypeHandler.class)
+	private Map<String, Object> oldTypeUrl;
+	
+	/**
+	 * 店铺access_token
+	 */
+	private String accessToken;
+	
 } 

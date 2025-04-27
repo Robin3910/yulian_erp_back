@@ -19,6 +19,9 @@ public class TemuShopRespVO {
     @Schema(description = "店铺名称", required = true, example = "测试店铺")
     private String shopName;
     
+    @Schema(description = "授权Token", required = true, example = "token")
+    private String accessToken;
+    
     @Schema(description = "信息通知机器人webhook地址")
     private String webhook;
     

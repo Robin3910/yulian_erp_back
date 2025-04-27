@@ -18,21 +18,31 @@ import javax.annotation.security.PermitAll;
 @RequestMapping("/temu/common")
 @Validated
 public class AdminCommonController {
-	@Resource private CommonService commonService;
-	@Resource private PermissionService  permissionService;
+	@Resource
+	private CommonService commonService;
+	@Resource
+	private PermissionService permissionService;
+	
 	//	分类列表
 	@RequestMapping("/category/list")
 	public CommonResult<?> categoryList() {
 		return CommonResult.success(commonService.list());
 	}
+	
 	@RequestMapping("/shop/list")
 	public CommonResult<?> shopList() {
 		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
-		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin","crm_admin");
-		if(isAdmin){
+		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin");
+		if (isAdmin) {
 			return CommonResult.success(commonService.listShop());
-		}else {
+		} else {
 			return CommonResult.success(commonService.listShop(loginUserId));
 		}
+	}
+	
+	@RequestMapping("/test/temu-open-api")
+	@PermitAll
+	public CommonResult<?> testTemuOpenApi() {
+		return CommonResult.success(commonService.testTemuOpenApi());
 	}
 }

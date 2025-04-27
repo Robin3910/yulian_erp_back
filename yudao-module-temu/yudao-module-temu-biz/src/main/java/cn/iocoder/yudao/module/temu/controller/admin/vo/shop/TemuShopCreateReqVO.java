@@ -15,6 +15,9 @@ public class TemuShopCreateReqVO {
     @Schema(description = "店铺ID", required = true, example = "2048")
     @NotNull(message = "店铺ID不能为空")
     private Long shopId;
+    @Schema(description = "授权Token", required = true, example = "token")
+    @NotEmpty(message = "授权Token")
+    private String accessToken;
     
     @Schema(description = "店铺名称", required = true, example = "测试店铺")
     @NotEmpty(message = "店铺名称不能为空")
