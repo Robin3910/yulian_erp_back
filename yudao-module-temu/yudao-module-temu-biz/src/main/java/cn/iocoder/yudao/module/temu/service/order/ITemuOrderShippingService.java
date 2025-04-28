@@ -23,11 +23,21 @@ public interface ITemuOrderShippingService {
      * @return 待发货订单分页结果
      */
     PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO);
-    
+
     /**
      * 批量保存发货面单信息
+     * 
      * @param saveRequestVOs
      * @return
      */
     int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs);
+
+    /**
+     * 根据用户ID分页查询待发货列表
+     *
+     * @param pageVO 分页查询参数
+     * @param userId 用户ID
+     * @return 待发货订单分页结果
+     */
+    PageResult<TemuOrderShippingRespVO> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO, Long userId);
 }

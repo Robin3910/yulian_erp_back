@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
@@ -25,6 +26,15 @@ public class AdminTemuOrderShippingController {
 
     private final ITemuOrderShippingService shippingService;
 
+
+    @GetMapping("/user-page")
+    @Operation(summary = "分页查询用户店铺待发货订单")
+    public CommonResult<PageResult<TemuOrderShippingRespVO>> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO) {
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        return success(shippingService.getOrderShippingPageByUser(pageVO,userId));
+    }
+
+
     @PostMapping("/batch-save")
     @Operation(summary = "批量保存待发货订单")
     public CommonResult<Integer> batchSaveOrderShipping(@Valid @RequestBody List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
@@ -47,5 +57,7 @@ public class AdminTemuOrderShippingController {
             @Valid @RequestBody TemuOrderShippingPageReqVO.BatchUpdateStatusReqVO reqVO) {
         return success(shippingService.batchUpdateOrderStatus(reqVO.getOrderIds(), reqVO.getOrderStatus()));
     }
+
+
 
 }
