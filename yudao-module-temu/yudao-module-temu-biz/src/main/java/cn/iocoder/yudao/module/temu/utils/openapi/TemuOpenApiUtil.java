@@ -105,7 +105,7 @@ public class TemuOpenApiUtil {
 	}
 	
 	public Object getOrderInfo(TreeMap<String, Object> params) {
-		params.put("type", "bg.goods.salesv2.get");
+		params.put("type", "bg.purchaseorderv2.get");
 		//响应结果
 		JSONObject entries = JSONUtil.parseObj(request(params));
 		if (!(boolean) entries.get("success")) {
