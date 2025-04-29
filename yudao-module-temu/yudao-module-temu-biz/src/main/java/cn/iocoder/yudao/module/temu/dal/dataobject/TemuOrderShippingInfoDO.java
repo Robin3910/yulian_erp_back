@@ -52,6 +52,11 @@ public class TemuOrderShippingInfoDO extends BaseDO {
     @TableField("shop_id")
     private Long shopId;
     /**
+     * 物流订单发货状态（0未发货，1已发货）
+     */
+    @TableField("shipping_status")
+    private Integer shippingStatus;
+    /**
      * 创建时间
      */
     @TableField("create_time")

@@ -47,6 +47,9 @@ public class TemuOrderShippingPageReqVO extends PageParam {
         @Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "订单状态不能为空")
         private Integer orderStatus;
+
+        @Schema(description = "物流单号")
+        private String trackingNumber;
     }
 
 }
