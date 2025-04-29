@@ -26,18 +26,18 @@ public class AdminTemuOrderShippingController {
 
     private final ITemuOrderShippingService shippingService;
 
-
     @GetMapping("/user-page")
     @Operation(summary = "分页查询用户店铺待发货订单")
-    public CommonResult<PageResult<TemuOrderShippingRespVO>> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO) {
+    public CommonResult<PageResult<TemuOrderShippingRespVO>> getOrderShippingPageByUser(
+            TemuOrderShippingPageReqVO pageVO) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
-        return success(shippingService.getOrderShippingPageByUser(pageVO,userId));
+        return success(shippingService.getOrderShippingPageByUser(pageVO, userId));
     }
-
 
     @PostMapping("/batch-save")
     @Operation(summary = "批量保存待发货订单")
-    public CommonResult<Integer> batchSaveOrderShipping(@Valid @RequestBody List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+    public CommonResult<Integer> batchSaveOrderShipping(
+            @Valid @RequestBody List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
         if (saveRequestVOs == null || saveRequestVOs.isEmpty()) {
             return success(0);
         }
@@ -55,9 +55,8 @@ public class AdminTemuOrderShippingController {
     @Operation(summary = "批量修改订单状态")
     public CommonResult<Boolean> batchUpdateOrderStatus(
             @Valid @RequestBody TemuOrderShippingPageReqVO.BatchUpdateStatusReqVO reqVO) {
-        return success(shippingService.batchUpdateOrderStatus(reqVO.getOrderIds(), reqVO.getOrderStatus()));
+        return success(shippingService.batchUpdateOrderStatus(reqVO.getOrderIds(), reqVO.getOrderStatus(),
+                reqVO.getTrackingNumber()));
     }
-
-
 
 }

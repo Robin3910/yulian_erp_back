@@ -8,13 +8,14 @@ import java.util.List;
 public interface ITemuOrderShippingService {
 
     /**
-     * 批量更新订单状态
+     * 批量更新订单状态，同时更新对应的物流订单发货状态
      *
-     * @param orderIds    订单ID列表
-     * @param orderStatus 订单状态
+     * @param orderIds       订单ID列表
+     * @param orderStatus    订单状态
+     * @param trackingNumber 物流单号
      * @return 是否更新成功
      */
-    Boolean batchUpdateOrderStatus(List<Long> orderIds, Integer orderStatus);
+    Boolean batchUpdateOrderStatus(List<Long> orderIds, Integer orderStatus, String trackingNumber);
 
     /**
      * 获得待发货订单分页
