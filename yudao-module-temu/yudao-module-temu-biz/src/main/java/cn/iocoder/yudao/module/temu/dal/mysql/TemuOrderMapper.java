@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.temu.dal.mysql;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.mybatis.core.query.QueryWrapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
@@ -9,6 +11,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -46,7 +49,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		}
 		//按照订单时间倒序排列
 		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
-		if(temuOrderRequestVO.getCategoryId() != null&& temuOrderRequestVO.getCategoryId().length > 0){
+		if (temuOrderRequestVO.getCategoryId() != null && temuOrderRequestVO.getCategoryId().length > 0) {
 			wrapper.in(TemuOrderDO::getCategoryId, Arrays.asList(temuOrderRequestVO.getCategoryId()));
 		}
 		return wrapper;
@@ -121,5 +124,20 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 */
 	default TemuOrderDO selectByCustomSku(String customSku) {
 		return selectOne(TemuOrderDO::getCustomSku, customSku);
+	}
+	
+	/**
+	 * 根据定制SKU查询所有订单
+	 *
+	 * @param customSku 定制SKU
+	 * @return 订单信息
+	 */
+	default List<TemuOrderDO> selectListByCustomSku(List<String> customSku) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapperX = new LambdaQueryWrapperX<>();
+		if (customSku == null || customSku.isEmpty()) {
+			return new ArrayList<>();
+		}
+		queryWrapperX.in(TemuOrderDO::getCustomSku, customSku);
+		return selectList(queryWrapperX);
 	}
 }

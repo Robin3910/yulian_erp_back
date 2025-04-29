@@ -43,6 +43,7 @@ public class AdminCommonController {
 	@RequestMapping("/test/temu-open-api")
 	@PermitAll
 	public CommonResult<?> testTemuOpenApi() {
-		return CommonResult.success(commonService.testTemuOpenApi());
+		 return  null;
+		//return CommonResult.success(commonService.testTemuOpenApi());
 	}
 }

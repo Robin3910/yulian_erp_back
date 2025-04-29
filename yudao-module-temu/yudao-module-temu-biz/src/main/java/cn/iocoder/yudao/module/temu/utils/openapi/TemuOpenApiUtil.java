@@ -1,14 +1,19 @@
 package cn.iocoder.yudao.module.temu.utils.openapi;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
+import cn.iocoder.yudao.module.temu.api.openapi.dto.OrderInfoDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TreeMap;
 
 import lombok.NoArgsConstructor;
@@ -94,7 +99,7 @@ public class TemuOpenApiUtil {
 		return requestData;
 	}
 	
-	public Object request(TreeMap<String, Object> params) {
+	public String request(TreeMap<String, Object> params) {
 		//创建请求参数
 		TreeMap<String, Object> requestData = createRequest(params);
 		log.info("参数拼接的结果\n{}", JSONUtil.toJsonStr(requestData));
@@ -104,13 +109,36 @@ public class TemuOpenApiUtil {
 		return body;
 	}
 	
-	public Object getOrderInfo(TreeMap<String, Object> params) {
+	public List<OrderInfoDTO.SubOrderForSupplier> getFullOrderList(TreeMap<String, Object> params) {
+		ArrayList<OrderInfoDTO.SubOrderForSupplier> subOrderForSupplierList = new ArrayList<>();
 		params.put("type", "bg.purchaseorderv2.get");
-		//响应结果
-		JSONObject entries = JSONUtil.parseObj(request(params));
-		if (!(boolean) entries.get("success")) {
-			throw ServiceExceptionUtil.exception(new ErrorCode((int) entries.get("errorCode"), (String) entries.get("errorMsg")));
+		params.put("isCustomGoods", true);
+		Integer pageSize = 500;
+		Integer pageNo = 1;
+		Integer total;
+		params.put("pageSize", pageSize);
+		while (true) {
+			params.put("pageNo", pageNo);
+			//响应结果
+			OrderInfoDTO orderInfoDTO = BeanUtil.toBean(JSONUtil.parseObj(request(params)), OrderInfoDTO.class);
+			if (!orderInfoDTO.isSuccess()) {
+				throw ServiceExceptionUtil.exception(new ErrorCode(orderInfoDTO.getErrorCode(), orderInfoDTO.getErrorMsg()));
+			}
+			if (orderInfoDTO.getResult().getSubOrderForSupplierList() == null || orderInfoDTO.getResult().getSubOrderForSupplierList().isEmpty()) {
+				break;
+			}
+			//统计总数
+			total = orderInfoDTO.getResult().getTotal();
+			//获取当前页面的数据
+			subOrderForSupplierList.addAll(orderInfoDTO.getResult().getSubOrderForSupplierList());
+			//判断是否存在下一页
+			if (pageNo * pageSize < total) {
+				pageNo++;
+				continue;
+			}
+			break;
 		}
-		return entries;
+		
+		return subOrderForSupplierList;
 	}
 }
