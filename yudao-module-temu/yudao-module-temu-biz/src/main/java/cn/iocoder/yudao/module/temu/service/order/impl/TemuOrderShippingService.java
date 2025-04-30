@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderListRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
@@ -42,126 +43,156 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
     // 分页查询用户店铺待发货列表
     @Override
     public PageResult<TemuOrderShippingRespVO> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO,
-            Long userId) {
-        long startTime = System.currentTimeMillis();
-        log.info("[getOrderShippingPageByUser] 开始执行用户店铺待发货列表查询, userId: {}", userId);
-        // 1. 查询用户绑定的店铺列表
-        long step1StartTime = System.currentTimeMillis();
+                                                                          Long userId) {
+        // 1. 查询用户绑定的店铺ID集合
         List<TemuUserShopDO> userShops = userShopMapper.selectList(
                 new LambdaQueryWrapperX<TemuUserShopDO>()
                         .eq(TemuUserShopDO::getUserId, userId));
-        log.info("[getOrderShippingPageByUser] 步骤1：查询用户店铺列表耗时：{}ms, 店铺数量：{}",
-                System.currentTimeMillis() - step1StartTime,
-                userShops == null ? 0 : userShops.size());
-        if (CollectionUtils.isEmpty(userShops)) {
-            log.info("[getOrderShippingPageByUser] 用户未绑定店铺，直接返回空结果，总耗时：{}ms",
-                    System.currentTimeMillis() - startTime);
-            return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
+        
+        if (CollUtil.isEmpty(userShops)) {
+            log.info("[getOrderShippingPageByUser] 用户未绑定任何店铺, userId: {}", userId);
+            return new PageResult<>(new ArrayList<>(), 0L);
         }
-        // 2. 获取用户的所有店铺ID
-        Set<Long> userShopIds = userShops.stream()
+
+        // 提取店铺ID集合
+        Set<Long> shopIds = userShops.stream()
                 .map(TemuUserShopDO::getShopId)
                 .collect(Collectors.toSet());
-        // 3. 如果指定了shopId，验证权限
-        if (pageVO.getShopId() != null && !userShopIds.contains(pageVO.getShopId())) {
-            log.info("[getOrderShippingPageByUser] 指定的shopId不属于该用户，直接返回空结果，总耗时：{}ms, shopId: {}",
-                    System.currentTimeMillis() - startTime,
-                    pageVO.getShopId());
-            return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
-        }
-        // 4. 查询匹配的订单
-        List<TemuOrderDO> matchedOrders = getMatchedOrders(pageVO.getOrderStatus(), pageVO.getOrderNo());
-        if (matchedOrders != null && matchedOrders.isEmpty()) {
-            log.info("[getOrderShippingPageByUser] 未找到匹配订单，总耗时：{}ms", System.currentTimeMillis() - startTime);
-            return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
-        }
-        // 5. 构建查询条件并执行分页查询
-        LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = buildShippingQueryWrapper(pageVO, matchedOrders,
-                pageVO.getShopId() == null ? userShopIds : null);
-        PageResult<TemuOrderShippingInfoDO> pageResult = shippingInfoMapper.selectPage(pageVO, queryWrapper);
+        log.info("[getOrderShippingPageByUser] 用户绑定的店铺数量: {}, shopIds: {}", shopIds.size(), shopIds);
 
-        if (CollectionUtils.isEmpty(pageResult.getList())) {
-            log.info("[getOrderShippingPageByUser] 分页查询无结果，总耗时：{}ms", System.currentTimeMillis() - startTime);
-            return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
-        }
-        // 6. 批量查询相关数据
-        Set<String> allOrderNos = pageResult.getList().stream()
-                .map(TemuOrderShippingInfoDO::getOrderNo)
-                .collect(Collectors.toSet());
-        // 查询订单信息
-        List<TemuOrderDO> orders = orderMapper.selectList(
-                new LambdaQueryWrapperX<TemuOrderDO>()
-                        .in(TemuOrderDO::getOrderNo, allOrderNos));
-        Map<String, TemuOrderDO> orderMap = orders.stream()
-                .collect(Collectors.toMap(TemuOrderDO::getOrderNo, Function.identity(), (v1, v2) -> v1));
-        // 查询店铺信息
-        List<TemuShopDO> shops = shopMapper.selectList(
-                new LambdaQueryWrapperX<TemuShopDO>()
-                        .in(TemuShopDO::getShopId, userShopIds));
-        Map<Long, TemuShopDO> shopMap = shops.stream()
-                .collect(Collectors.toMap(TemuShopDO::getShopId, Function.identity(), (v1, v2) -> v1));
-        // 查询分类信息
-        Map<String, TemuProductCategoryDO> categoryMap = getCategoryMap(orders);
-        // 7. 组装返回结果
-        List<TemuOrderShippingRespVO> voList = buildOrderShippingRespList(pageResult.getList(), orderMap, shopMap,
-                categoryMap);
-        log.info("[getOrderShippingPageByUser] 查询完成 - 总记录数：{}, 当前页记录数：{}, 总耗时：{}ms",
-                pageResult.getTotal(),
-                voList.size(),
-                System.currentTimeMillis() - startTime);
-
-        return new PageResult<>(voList, pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
+        // 2. 调用通用的分页查询方法，传入限制的店铺ID集合
+        return getOrderShippingPage(pageVO, shopIds);
     }
 
     // 分页查询待发货列表
     @Override
     public PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO) {
-        long startTime = System.currentTimeMillis();
-        log.info("[getOrderShippingPage] 开始执行分页查询");
-        // 1. 查询匹配的订单
+        return getOrderShippingPage(pageVO, null);
+    }
+
+    // 内部方法：统一的分页查询实现
+    private PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO, Set<Long> limitShopIds) {
+        long totalStartTime = System.currentTimeMillis();
+        log.info("[getOrderShippingPage] ==================== 开始执行分页查询 ====================");
+        log.info("[getOrderShippingPage] 查询参数: pageVO={}, 限制店铺: {}", pageVO, limitShopIds);
+
+        // ==================== 步骤1：查询匹配订单 ====================
+        long step1StartTime = System.currentTimeMillis();
         List<TemuOrderDO> matchedOrders = getMatchedOrders(pageVO.getOrderStatus(), pageVO.getOrderNo());
+        log.info("[getOrderShippingPage] [步骤1] 查询匹配订单: 耗时={}ms, 匹配订单数={}", 
+                System.currentTimeMillis() - step1StartTime,
+                matchedOrders == null ? 0 : matchedOrders.size());
+
         if (matchedOrders != null && matchedOrders.isEmpty()) {
-            log.info("[getOrderShippingPage] 未找到匹配订单，总耗时：{}ms", System.currentTimeMillis() - startTime);
+            log.info("[getOrderShippingPage] ==================== 查询结束：未找到匹配订单 - 总耗时: {}ms ====================", 
+                    System.currentTimeMillis() - totalStartTime);
             return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
         }
-        // 2. 构建查询条件并执行分页查询
-        LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = buildShippingQueryWrapper(pageVO, matchedOrders,
-                null);
-        PageResult<TemuOrderShippingInfoDO> pageResult = shippingInfoMapper.selectPage(pageVO, queryWrapper);
 
-        if (CollectionUtils.isEmpty(pageResult.getList())) {
-            log.info("[getOrderShippingPage] 分页查询无结果，总耗时：{}ms", System.currentTimeMillis() - startTime);
-            return new PageResult<>(new ArrayList<>(), pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
+        // ==================== 步骤2：构建查询条件 ====================
+        long step2StartTime = System.currentTimeMillis();
+        LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = buildShippingQueryWrapper(pageVO, matchedOrders, limitShopIds);
+        log.info("[getOrderShippingPage] [步骤2] 构建查询条件: 耗时={}ms", System.currentTimeMillis() - step2StartTime);
+
+        // ==================== 步骤3：查询总数 ====================
+        long step3StartTime = System.currentTimeMillis();
+        Long total = shippingInfoMapper.selectCount(queryWrapper);
+        log.info("[getOrderShippingPage] [步骤3] 查询总数: 耗时={}ms, 总数={}", 
+                System.currentTimeMillis() - step3StartTime, total);
+
+        if (total == 0) {
+            log.info("[getOrderShippingPage] ==================== 查询结束：总数为0 - 总耗时: {}ms ====================", 
+                    System.currentTimeMillis() - totalStartTime);
+            return new PageResult<>(new ArrayList<>(), 0L, pageVO.getPageNo(), pageVO.getPageSize());
         }
-        // 3. 批量查询相关数据
-        Set<String> allOrderNos = pageResult.getList().stream()
+
+        // ==================== 步骤4：执行分页查询 ====================
+        long step4StartTime = System.currentTimeMillis();
+        List<TemuOrderShippingInfoDO> list = shippingInfoMapper.selectList(queryWrapper
+                .last("LIMIT " + (pageVO.getPageNo() - 1) * pageVO.getPageSize() + "," + pageVO.getPageSize()));
+        log.info("[getOrderShippingPage] [步骤4] 分页查询: 耗时={}ms, 结果数量={}", 
+                System.currentTimeMillis() - step4StartTime, list.size());
+
+        // ==================== 步骤5：查询关联数据 ====================
+        long step5StartTime = System.currentTimeMillis();
+        
+        // 5.1 获取所有物流单号
+        Set<String> trackingNumbers = list.stream()
+                .map(TemuOrderShippingInfoDO::getTrackingNumber)
+                .collect(Collectors.toSet());
+        log.info("[getOrderShippingPage] [步骤5.1] 获取物流单号: 数量={}", trackingNumbers.size());
+
+        // 5.2 查询这些物流单号关联的所有记录
+        long step5_2StartTime = System.currentTimeMillis();
+        List<TemuOrderShippingInfoDO> allRelatedShippings;
+        if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
+            allRelatedShippings = list;
+        } else {
+            allRelatedShippings = shippingInfoMapper.selectList(
+                    new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+                            .in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers));
+        }
+        log.info("[getOrderShippingPage] [步骤5.2] 查询关联物流记录: 耗时={}ms, 记录数量={}", 
+                System.currentTimeMillis() - step5_2StartTime, allRelatedShippings.size());
+
+        // 5.3 获取所有相关的订单号和店铺ID
+        Set<String> allOrderNos = allRelatedShippings.stream()
                 .map(TemuOrderShippingInfoDO::getOrderNo)
                 .collect(Collectors.toSet());
-        Set<Long> shopIds = pageResult.getList().stream()
+        Set<Long> shopIds = allRelatedShippings.stream()
                 .map(TemuOrderShippingInfoDO::getShopId)
                 .collect(Collectors.toSet());
-        // 查询订单信息
+        log.info("[getOrderShippingPage] [步骤5.3] 获取关联ID: 订单号数量={}, 店铺数量={}", 
+                allOrderNos.size(), shopIds.size());
+
+        // 5.4 批量查询订单信息
+        long orderQueryStartTime = System.currentTimeMillis();
         List<TemuOrderDO> orders = orderMapper.selectList(
                 new LambdaQueryWrapperX<TemuOrderDO>()
+                        .select(TemuOrderDO::getId, TemuOrderDO::getOrderNo, TemuOrderDO::getProductTitle,
+                               TemuOrderDO::getOrderStatus, TemuOrderDO::getSku, TemuOrderDO::getSkc,
+                               TemuOrderDO::getSalePrice, TemuOrderDO::getCustomSku, TemuOrderDO::getQuantity,
+                               TemuOrderDO::getProductProperties, TemuOrderDO::getShopId, TemuOrderDO::getCustomImageUrls,
+                               TemuOrderDO::getCustomTextList, TemuOrderDO::getProductImgUrl, TemuOrderDO::getCategoryId,
+                               TemuOrderDO::getEffectiveImgUrl)
                         .in(TemuOrderDO::getOrderNo, allOrderNos));
-        Map<String, TemuOrderDO> orderMap = orders.stream()
-                .collect(Collectors.toMap(TemuOrderDO::getOrderNo, Function.identity(), (v1, v2) -> v1));
-        // 查询店铺信息
+        Map<String, List<TemuOrderDO>> orderMap = orders.stream()
+                .collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
+        log.info("[getOrderShippingPage] [步骤5.4] 批量查询订单: 耗时={}ms, 订单数量={}, 查询字段数={}", 
+                System.currentTimeMillis() - orderQueryStartTime, orders.size(), 16);
+
+        // 5.5 批量查询店铺信息
+        long shopQueryStartTime = System.currentTimeMillis();
         List<TemuShopDO> shops = shopMapper.selectList(
                 new LambdaQueryWrapperX<TemuShopDO>()
                         .in(TemuShopDO::getShopId, shopIds));
         Map<Long, TemuShopDO> shopMap = shops.stream()
                 .collect(Collectors.toMap(TemuShopDO::getShopId, Function.identity(), (v1, v2) -> v1));
-        // 查询分类信息
+        log.info("[getOrderShippingPage] [步骤5.5] 批量查询店铺: 耗时={}ms, 店铺数量={}", 
+                System.currentTimeMillis() - shopQueryStartTime, shops.size());
+
+        // 5.6 查询分类信息
+        long categoryQueryStartTime = System.currentTimeMillis();
         Map<String, TemuProductCategoryDO> categoryMap = getCategoryMap(orders);
-        // 4. 组装返回结果
-        List<TemuOrderShippingRespVO> voList = buildOrderShippingRespList(pageResult.getList(), orderMap, shopMap,
-                categoryMap);
-        log.info("[getOrderShippingPage] 查询完成 - 总记录数：{}, 当前页记录数：{}, 总耗时：{}ms",
-                pageResult.getTotal(),
-                voList.size(),
-                System.currentTimeMillis() - startTime);
-        return new PageResult<>(voList, pageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
+        log.info("[getOrderShippingPage] [步骤5.6] 批量查询分类: 耗时={}ms, 分类数量={}", 
+                System.currentTimeMillis() - categoryQueryStartTime, categoryMap.size());
+        
+        log.info("[getOrderShippingPage] [步骤5] 查询关联数据完成: 总耗时={}ms", 
+                System.currentTimeMillis() - step5StartTime);
+
+        // ==================== 步骤6：组装返回结果 ====================
+        long step6StartTime = System.currentTimeMillis();
+        List<TemuOrderShippingRespVO> voList = buildOrderShippingRespList(allRelatedShippings, orderMap, shopMap, categoryMap);
+        log.info("[getOrderShippingPage] [步骤6] 组装结果: 耗时={}ms, 结果数量={}", 
+                System.currentTimeMillis() - step6StartTime, voList.size());
+
+        // ==================== 查询完成，输出统计信息 ====================
+        log.info("[getOrderShippingPage] ==================== 查询完成 ====================");
+        log.info("[getOrderShippingPage] 统计信息: 总耗时={}ms, 总记录数={}, 当前页记录数={}, 页码={}, 每页大小={}", 
+                System.currentTimeMillis() - totalStartTime, total, voList.size(), 
+                pageVO.getPageNo(), pageVO.getPageSize());
+
+        return new PageResult<>(voList, total, pageVO.getPageNo(), pageVO.getPageSize());
     }
 
     // 批量保存待发货订单
@@ -171,7 +202,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
      * 只有当物流单号、shopId和orderNo都匹配时，才会从 saveRequestVOs 中移除对应记录（避免重复保存）
      * 未发货状态的记录会被删除并重新保存
      * 新保存的记录默认为未发货状态
-     * 
+     *
      * @param saveRequestVOs
      * @return
      */
@@ -287,7 +318,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
     /**
      * 批量更新订单状态，同时更新对应的物流订单发货状态
-     * 
+     *
      * @param orderIds       订单ID列表
      * @param orderStatus    订单状态
      * @param trackingNumber 物流单号
@@ -371,8 +402,21 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
             return null;
         }
         LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
-        orderWrapper.eqIfPresent(TemuOrderDO::getOrderStatus, orderStatus)
-                .eqIfPresent(TemuOrderDO::getOrderNo, orderNo);
+        orderWrapper.select(TemuOrderDO::getId, TemuOrderDO::getOrderNo, TemuOrderDO::getProductTitle,
+                          TemuOrderDO::getOrderStatus, TemuOrderDO::getSku, TemuOrderDO::getSkc,
+                          TemuOrderDO::getSalePrice, TemuOrderDO::getCustomSku, TemuOrderDO::getQuantity,
+                          TemuOrderDO::getProductProperties, TemuOrderDO::getShopId, TemuOrderDO::getCustomImageUrls,
+                          TemuOrderDO::getCustomTextList, TemuOrderDO::getProductImgUrl, TemuOrderDO::getCategoryId,
+                          TemuOrderDO::getEffectiveImgUrl);
+        
+        // 添加条件查询
+        if (orderStatus != null) {
+            orderWrapper.eq(TemuOrderDO::getOrderStatus, orderStatus);
+        }
+        if (StringUtils.hasText(orderNo)) {
+            orderWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
+        }
+        
         return orderMapper.selectList(orderWrapper);
     }
 
@@ -380,37 +424,96 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
      * 构建物流信息查询条件
      */
     private LambdaQueryWrapperX<TemuOrderShippingInfoDO> buildShippingQueryWrapper(TemuOrderShippingPageReqVO pageVO,
-            List<TemuOrderDO> matchedOrders, Set<Long> limitShopIds) {
+                                                                                   List<TemuOrderDO> matchedOrders,
+                                                                                   Set<Long> limitShopIds) {
+        long startTime = System.currentTimeMillis();
         LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = new LambdaQueryWrapperX<>();
+
+        // 打印完整的请求参数
+        log.info("[buildShippingQueryWrapper] 开始处理查询, 请求参数: pageVO={}", pageVO);
+
+        // 构建基础查询条件
+        StringBuilder subQuery = new StringBuilder("SELECT MAX(id) as id FROM temu_order_shipping_info WHERE 1=1");
 
         // 处理店铺ID条件
         if (pageVO.getShopId() != null) {
-            queryWrapper.eq(TemuOrderShippingInfoDO::getShopId, pageVO.getShopId());
+            subQuery.append(" AND shop_id = ").append(pageVO.getShopId());
         } else if (limitShopIds != null && !limitShopIds.isEmpty()) {
-            queryWrapper.in(TemuOrderShippingInfoDO::getShopId, limitShopIds);
+            subQuery.append(" AND shop_id IN (")
+                    .append(String.join(",", limitShopIds.stream().map(String::valueOf).collect(Collectors.toList())))
+                    .append(")");
         }
 
         // 处理物流单号
-        queryWrapper.likeIfPresent(TemuOrderShippingInfoDO::getTrackingNumber, pageVO.getTrackingNumber());
+        if (StringUtils.hasText(pageVO.getTrackingNumber())) {
+            subQuery.append(" AND tracking_number LIKE '%").append(pageVO.getTrackingNumber()).append("%'");
+        }
 
         // 处理创建时间条件
+        LocalDateTime beginTime = null;
+        LocalDateTime endTime = null;
         if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
-            LocalDateTime beginTime = pageVO.getCreateTime()[0].atStartOfDay();
-            LocalDateTime endTime = pageVO.getCreateTime()[1].atTime(23, 59, 59, 999999999);
-            queryWrapper.between(TemuOrderShippingInfoDO::getCreateTime, beginTime, endTime);
+            // 打印原始时间参数
+            log.info("[buildShippingQueryWrapper] 原始时间参数 - createTime[0]: {}, createTime[1]: {}, 类型: {}", 
+                    pageVO.getCreateTime()[0],
+                    pageVO.getCreateTime()[1],
+                    pageVO.getCreateTime()[0].getClass().getName());
+
+            try {
+                // 转换为数据库时区
+                beginTime = pageVO.getCreateTime()[0].atStartOfDay();
+                endTime = pageVO.getCreateTime()[1].atTime(23, 59, 59);
+                
+                log.info("[buildShippingQueryWrapper] 处理创建时间条件 - 开始时间: {}, 结束时间: {}", beginTime, endTime);
+                
+                // 直接使用字符串格式化，确保时间格式正确
+                String startTimeStr = pageVO.getCreateTime()[0].toString() + " 00:00:00";
+                String endTimeStr = pageVO.getCreateTime()[1].toString() + " 23:59:59";
+                
+                // 在子查询中使用格式化后的时间字符串
+                subQuery.append(" AND create_time >= '").append(startTimeStr).append("'")
+                       .append(" AND create_time <= '").append(endTimeStr).append("'");
+
+                // 在主查询中使用LocalDateTime对象
+                queryWrapper.ge(TemuOrderShippingInfoDO::getCreateTime, beginTime)
+                          .le(TemuOrderShippingInfoDO::getCreateTime, endTime);
+
+                // 打印最终SQL中的时间条件
+                log.info("[buildShippingQueryWrapper] SQL时间条件 - startTimeStr: {}, endTimeStr: {}", 
+                        startTimeStr, endTimeStr);
+            } catch (Exception e) {
+                log.error("[buildShippingQueryWrapper] 时间参数处理异常", e);
+            }
+        } else {
+            log.info("[buildShippingQueryWrapper] 未提供时间参数或参数格式不正确: createTime={}", 
+                    pageVO.getCreateTime() != null ? pageVO.getCreateTime().length : null);
         }
 
         // 处理订单号条件
-        if (matchedOrders != null) {
+        if (matchedOrders != null && !matchedOrders.isEmpty()) {
             Set<String> orderNos = matchedOrders.stream()
                     .map(TemuOrderDO::getOrderNo)
                     .collect(Collectors.toSet());
-            queryWrapper.in(TemuOrderShippingInfoDO::getOrderNo, orderNos);
+            subQuery.append(" AND order_no IN ('")
+                    .append(String.join("','", orderNos))
+                    .append("')");
         }
 
-        // 排序
-        queryWrapper.orderByDesc(TemuOrderShippingInfoDO::getCreateTime)
-                .orderByDesc(TemuOrderShippingInfoDO::getId);
+        // 按物流单号分组，如果指定了订单号或订单状态，则同时按订单号分组
+        if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
+            subQuery.append(" GROUP BY tracking_number, order_no");
+        } else {
+            subQuery.append(" GROUP BY tracking_number");
+        }
+
+        // 使用子查询
+        queryWrapper.inSql(TemuOrderShippingInfoDO::getId, subQuery.toString());
+
+        // 按创建时间降序排序
+        queryWrapper.orderByDesc(TemuOrderShippingInfoDO::getCreateTime);
+
+        String finalSql = queryWrapper.getTargetSql();
+        log.info("[buildShippingQueryWrapper] 最终生成的SQL: {}", finalSql);
 
         return queryWrapper;
     }
@@ -459,45 +562,94 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
      * 组装订单物流返回结果
      */
     private List<TemuOrderShippingRespVO> buildOrderShippingRespList(List<TemuOrderShippingInfoDO> shippingList,
-            Map<String, TemuOrderDO> orderMap,
-            Map<Long, TemuShopDO> shopMap,
-            Map<String, TemuProductCategoryDO> categoryMap) {
-        List<TemuOrderShippingRespVO> voList = new ArrayList<>();
-        for (TemuOrderShippingInfoDO shippingInfo : shippingList) {
-            TemuOrderShippingRespVO vo = BeanUtils.toBean(shippingInfo, TemuOrderShippingRespVO.class);
+                                                                     Map<String, List<TemuOrderDO>> orderMap,
+                                                                     Map<Long, TemuShopDO> shopMap,
+                                                                     Map<String, TemuProductCategoryDO> categoryMap) {
+        // 按物流单号分组
+        Map<String, List<TemuOrderShippingInfoDO>> shippingGroupMap = shippingList.stream()
+                .collect(Collectors.groupingBy(TemuOrderShippingInfoDO::getTrackingNumber));
 
-            // 设置订单相关信息
-            String orderNo = shippingInfo.getOrderNo();
-            vo.setOrderNo(orderNo);
+        List<TemuOrderShippingRespVO> voList = new ArrayList<>();
+        
+        // 对分组后的Map按照每组最新创建时间降序排序
+        List<Map.Entry<String, List<TemuOrderShippingInfoDO>>> sortedEntries = new ArrayList<>(shippingGroupMap.entrySet());
+        sortedEntries.sort((e1, e2) -> {
+            LocalDateTime time1 = e1.getValue().stream()
+                    .map(TemuOrderShippingInfoDO::getCreateTime)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(LocalDateTime.MIN);
+            LocalDateTime time2 = e2.getValue().stream()
+                    .map(TemuOrderShippingInfoDO::getCreateTime)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(LocalDateTime.MIN);
+            return time2.compareTo(time1);
+        });
+
+        for (Map.Entry<String, List<TemuOrderShippingInfoDO>> entry : sortedEntries) {
+            String trackingNumber = entry.getKey();
+            List<TemuOrderShippingInfoDO> groupedShippings = entry.getValue();
+            
+            // 使用最新的记录作为基础信息
+            TemuOrderShippingInfoDO latestShipping = groupedShippings.stream()
+                    .max(Comparator.comparing(TemuOrderShippingInfoDO::getCreateTime))
+                    .orElse(groupedShippings.get(0));
+            
+            TemuOrderShippingRespVO vo = BeanUtils.toBean(latestShipping, TemuOrderShippingRespVO.class);
 
             // 设置店铺信息
-            Long shopId = shippingInfo.getShopId();
+            Long shopId = latestShipping.getShopId();
             vo.setShopId(shopId);
             TemuShopDO shop = shopMap.get(shopId);
             if (shop != null) {
                 vo.setShopName(shop.getShopName());
             }
 
-            // 设置订单列表
-            List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
-            TemuOrderDO order = orderMap.get(orderNo);
-            if (order != null) {
-                TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
-                if (order.getCategoryId() != null) {
-                    TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
-                    if (category != null && category.getOldType() != null && shop != null
-                            && shop.getOldTypeUrl() != null) {
-                        Object url = shop.getOldTypeUrl().get(category.getOldType());
-                        if (url != null) {
-                            orderVO.setOldTypeUrl(url.toString());
+            // 按订单号分组处理订单
+            Map<String, List<TemuOrderShippingInfoDO>> orderNoGroup = groupedShippings.stream()
+                    .collect(Collectors.groupingBy(TemuOrderShippingInfoDO::getOrderNo));
+
+            List<TemuOrderNoListRespVO> orderNoList = new ArrayList<>();
+            for (Map.Entry<String, List<TemuOrderShippingInfoDO>> orderEntry : orderNoGroup.entrySet()) {
+                String orderNo = orderEntry.getKey();
+                List<TemuOrderDO> orderList = orderMap.get(orderNo);
+                
+                // 如果orderList为null或为空，跳过这个订单号
+                if (CollectionUtils.isEmpty(orderList)) {
+                    continue;
+                }
+
+                TemuOrderNoListRespVO orderNoVO = new TemuOrderNoListRespVO();
+                orderNoVO.setOrderNo(orderNo);
+
+                // 设置该订单号下的所有订单
+                List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
+                for (TemuOrderDO order : orderList) {
+                    TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
+                    if (order.getCategoryId() != null) {
+                        TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
+                        if (category != null && category.getOldType() != null && shop != null
+                                && shop.getOldTypeUrl() != null) {
+                            Object url = shop.getOldTypeUrl().get(category.getOldType());
+                            if (url != null) {
+                                orderVO.setOldTypeUrl(url.toString());
+                            }
                         }
                     }
+                    orderListVOs.add(orderVO);
                 }
-                orderListVOs.add(orderVO);
+                orderNoVO.setOrderList(orderListVOs);
+                
+                // 只有当orderListVOs不为空时才添加到orderNoList
+                if (!orderListVOs.isEmpty()) {
+                    orderNoList.add(orderNoVO);
+                }
             }
-            vo.setOrderList(orderListVOs);
-
-            voList.add(vo);
+            
+            // 只有当orderNoList不为空时才添加到voList
+            if (!orderNoList.isEmpty()) {
+                vo.setOrderNoList(orderNoList);
+                voList.add(vo);
+            }
         }
         return voList;
     }
