@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchRelationMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -39,6 +41,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	private TemuOrderMapper temuOrderMapper;
 	@Resource
 	private TemuOrderBatchRelationMapper temuOrderBatchRelationMapper;
+	@Resource
+	private TemuShopMapper temuShopMapper;
 	
 	/*
 	 * 创建批次订单
@@ -111,6 +115,33 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	@Override
 	public PageResult<TemuOrderBatchDetailDO> list(TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		PageResult<TemuOrderBatchDetailDO> temuOrderBatchDOPageResult = temuOrderBatchMapper.selectPage(temuOrderBatchPageVO);
+		
+		// 获取所有订单的shopId
+		List<Long> shopIds = temuOrderBatchDOPageResult.getList().stream()
+				.flatMap(batch -> batch.getOrderList().stream())
+				.map(TemuOrderDetailDO::getShopId)
+				.distinct()
+				.collect(Collectors.toList());
+		
+		// 批量查询店铺信息
+		if (!shopIds.isEmpty()) {
+			Map<Long, TemuShopDO> shopMap = temuShopMapper.selectList(new QueryWrapper<TemuShopDO>()
+					.in("shop_id", shopIds))
+					.stream()
+					.collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop));
+			
+			// 为每个订单设置shopName
+			temuOrderBatchDOPageResult.getList().forEach(batch -> {
+				if (batch.getOrderList() != null) {
+					batch.getOrderList().forEach(order -> {
+						TemuShopDO shop = shopMap.get(order.getShopId());
+						if (shop != null) {
+							order.setShopName(shop.getShopName());
+						}
+					});
+				}
+			});
+		}
 		
 		return temuOrderBatchDOPageResult;
 	}
