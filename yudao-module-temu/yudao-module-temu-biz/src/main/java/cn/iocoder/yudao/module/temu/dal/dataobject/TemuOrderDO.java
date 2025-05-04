@@ -31,7 +31,7 @@ public class TemuOrderDO extends BaseDO {
 	/**
 	 * 订单编号
 	 */
-
+	
 	private String orderNo;
 	/**
 	 * 商品标题
@@ -124,4 +124,9 @@ public class TemuOrderDO extends BaseDO {
 	private Object priceRule;
 	
 	private BigDecimal defaultPrice;
+	
+	/**
+	 * 商品编号
+	 */
+	private String goodsSn;
 }

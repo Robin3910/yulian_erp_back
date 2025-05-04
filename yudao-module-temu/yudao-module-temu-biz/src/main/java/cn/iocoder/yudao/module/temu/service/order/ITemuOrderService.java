@@ -1,10 +1,7 @@
 package cn.iocoder.yudao.module.temu.service.order;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
 
@@ -53,4 +50,12 @@ public interface ITemuOrderService {
 	 * @return 批量下单结果
 	 */
 	int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO);
+	
+	/**
+	 * 根据订单ID获取合规单信息和商品码
+	 *
+	 * @param orderId 订单ID
+	 * @return 合规单信息和商品码
+	 */
+	TemuOrderExtraInfoRespVO getOrderExtraInfo(String orderId);
 }

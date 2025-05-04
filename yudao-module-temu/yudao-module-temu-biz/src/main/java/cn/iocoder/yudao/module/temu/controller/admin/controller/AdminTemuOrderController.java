@@ -95,4 +95,12 @@ public class AdminTemuOrderController {
 	public CommonResult<Integer> batchSave(@Valid @RequestBody List<TemuOrderBatchOrderReqVO> requestVO) {
 		return success(temuOrderService.batchSaveOrder(requestVO));
 	}
+	
+	//根据订单ID获取合规单信息和商品码
+	@GetMapping("/get-order-extra-info/{orderId}")
+	@Operation(summary = "根据订单ID获取合规单信息和商品码")
+	public CommonResult<TemuOrderExtraInfoRespVO> getOrderExtraInfo(@PathVariable("orderId") String orderId) {
+		return success(temuOrderService.getOrderExtraInfo(orderId));
+	}
+	
 }

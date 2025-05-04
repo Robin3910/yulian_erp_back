@@ -12,10 +12,7 @@ import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
 import cn.iocoder.yudao.module.temu.api.category.factory.PriceRuleFactory;
 import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByLayout;
 import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByNumber;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchOrderReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderRequestVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderStatisticsRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderUpdateCategoryReqVo;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
@@ -365,6 +362,27 @@ public class TemuOrderService implements ITemuOrderService {
 			processCount++;
 		}
 		return processCount;
+	}
+	
+	@Override
+	public TemuOrderExtraInfoRespVO getOrderExtraInfo(String orderId) {
+		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(orderId);
+		if (temuOrderDO == null) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+		// 根据订单的关联分类id查询分类信息
+		TemuProductCategoryDO temuProductCategoryDO = temuProductCategoryMapper.selectByCategoryId(Long.valueOf(temuOrderDO.getCategoryId()));
+		if (temuProductCategoryDO == null) {
+			throw exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+		}
+		//获取店铺信息
+		TemuShopDO temuShopDO = temuShopMapper.selectByShopId(temuOrderDO.getShopId());
+		if (temuShopDO == null) {
+			throw exception(ErrorCodeConstants.SHOP_NOT_EXISTS);
+		}
+	    //根据分类类型匹配合规单
+		Map<String, Object> oldTypeUrl = temuShopDO.getOldTypeUrl();
+		return  new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())));
 	}
 	
 	private String convertToString(Object obj) {
