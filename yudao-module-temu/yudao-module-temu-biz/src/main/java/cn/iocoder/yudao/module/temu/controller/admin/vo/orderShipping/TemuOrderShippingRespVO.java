@@ -27,15 +27,6 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "店铺名称")
     private String shopName;
 
-    @Schema(description = "快递面单图片")
-    private String expressImageUrl;
-
-    @Schema(description = "快递外包装图片")
-    private String expressOutsideImageUrl;
-
-    @Schema(description = "快递商品图片")
-    private String expressSkuImageUrl;
-
     @Schema(description = "发货状态（0：未发货；1：已发货）")
     private Integer shippingStatus;
 
