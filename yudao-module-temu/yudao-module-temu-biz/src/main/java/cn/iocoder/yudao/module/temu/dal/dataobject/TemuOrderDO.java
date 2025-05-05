@@ -129,4 +129,9 @@ public class TemuOrderDO extends BaseDO {
 	 * 商品编号
 	 */
 	private String goodsSn;
+
+	/**
+	 * 合规单URL
+	 */
+	private String complianceUrl;
 }

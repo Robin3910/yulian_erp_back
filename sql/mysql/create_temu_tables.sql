@@ -119,3 +119,21 @@ CREATE TABLE `temu_order_shipping_info` (
   KEY `idx_shop_id` (`shop_id`) COMMENT '店铺ID索引',
   KEY `sku` (`sku`) COMMENT 'SKU索引'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单发货表';
+
+
+-- 店铺SKC合规单URL表
+CREATE TABLE `temu_shop_old_type_skc` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint(20) DEFAULT NULL COMMENT '店铺ID',
+  `skc` varchar(255) NOT NULL COMMENT 'SKC编号',
+  `old_type_url` varchar(255) DEFAULT NULL COMMENT '合规单URL',
+  `old_type` varchar(64) DEFAULT NULL COMMENT '合规单年龄类型,\r\n0  0+,  1  3+,  3  14+',
+  `create_time` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '删除状态 0 未删除 1已删除',
+  `creator` varchar(255) DEFAULT NULL COMMENT '创建人',
+  `updater` varchar(255) DEFAULT NULL COMMENT '更新人',
+  `tenant_id` bigint(20) NOT NULL DEFAULT '1' COMMENT '租户编号',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_shop_id_skc` (`shop_id`,`skc`) USING BTREE COMMENT '店铺id和skc唯一索引'
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;

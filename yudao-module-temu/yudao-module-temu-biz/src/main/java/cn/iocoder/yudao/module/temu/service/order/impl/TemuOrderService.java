@@ -3,15 +3,11 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ServerException;
-import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
 import cn.iocoder.yudao.module.temu.api.category.factory.PriceRuleFactory;
-import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByLayout;
-import cn.iocoder.yudao.module.temu.api.category.impl.PriceRuleByNumber;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
@@ -25,10 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import org.springframework.util.StringUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -137,8 +133,13 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
+				// 设置商品条形码图片URL到goods_sn字段
+				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
+				
 				// 设置SKU相关信息
 				order.setSkc(convertToString(orderMap.get("skc")));
+
+				// TODO 通过skc和shopId查找对应的合规单URL，查询的是temu_shop_old_type_skc表
 				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
 				String sku = "";
@@ -151,20 +152,20 @@ public class TemuOrderService implements ITemuOrderService {
 					order.setProductProperties(properties);
 				}
 
-//				// 如果没有SKU信息，查询历史订单
-//				if (sku.isEmpty() && !properties.isEmpty()) {
-//					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
-//					queryWrapper.eq(TemuOrderDO::getShopId, shopIdLong)
-//							.eq(TemuOrderDO::getProductProperties, properties)
-//							.last("LIMIT 1"); // 只取一条记录
-//
-//					TemuOrderDO historicalOrder = temuOrderMapper.selectOne(queryWrapper);
-//					if (historicalOrder != null && historicalOrder.getSku() != null) {
-//						// 将历史订单的SKU信息赋值给当前订单
-//						order.setSku(historicalOrder.getSku());
-//						sku = historicalOrder.getSku(); // 更新sku变量，用于后续的分类查询
-//					}
-//				}
+				// 如果没有SKU信息，查询历史订单
+				if (sku.isEmpty() && !properties.isEmpty()) {
+					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
+					queryWrapper.eq(TemuOrderDO::getShopId, shopIdLong)
+							.eq(TemuOrderDO::getProductProperties, properties)
+							.last("LIMIT 1"); // 只取一条记录
+
+					TemuOrderDO historicalOrder = temuOrderMapper.selectOne(queryWrapper);
+					if (historicalOrder != null && historicalOrder.getSku() != null) {
+						// 将历史订单的SKU信息赋值给当前订单
+						order.setSku(historicalOrder.getSku());
+						sku = historicalOrder.getSku(); // 更新sku变量，用于后续的分类查询
+					}
+				}
 				
 				// 查询商品分类信息
 				if (!sku.isEmpty()) {
@@ -187,8 +188,6 @@ public class TemuOrderService implements ITemuOrderService {
 				String status = convertToString(orderMap.get("status"));
 				if ("待发货".equals(status)) {
 					order.setOrderStatus(0);
-				} else {
-					order.setOrderStatus(1);
 				}
 				
 				// 设置时间
@@ -254,6 +253,7 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
 					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
+					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					
 					temuOrderMapper.updateById(order);
 				} else {
