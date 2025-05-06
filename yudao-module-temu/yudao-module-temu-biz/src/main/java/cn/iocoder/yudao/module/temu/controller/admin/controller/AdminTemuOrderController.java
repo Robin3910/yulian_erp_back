@@ -102,5 +102,11 @@ public class AdminTemuOrderController {
 	public CommonResult<TemuOrderExtraInfoRespVO> getOrderExtraInfo(@PathVariable("orderId") String orderId) {
 		return success(temuOrderService.getOrderExtraInfo(orderId));
 	}
+	//保存订单备注
+	@PostMapping("/save-order-remark")
+	@Operation(summary = "保存订单备注")
+	public CommonResult<Boolean> saveOrderRemark(@Valid @RequestBody TemuOrderSaveOrderRemarkReqVO requestVO) {
+		return success(temuOrderService.saveOrderRemark(requestVO));
+	}
 	
 }

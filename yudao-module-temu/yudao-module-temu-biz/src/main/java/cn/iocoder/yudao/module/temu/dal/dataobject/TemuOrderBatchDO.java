@@ -21,4 +21,6 @@ public class TemuOrderBatchDO extends BaseDO {
 	private String fileUrl;
 	// 状态
 	private Integer status;
+	// 备注
+	private String remark;
 }

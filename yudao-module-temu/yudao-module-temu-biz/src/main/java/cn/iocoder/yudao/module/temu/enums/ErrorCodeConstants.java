@@ -8,6 +8,8 @@ import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 public interface ErrorCodeConstants {
 	//店铺相关
 	ErrorCode SHOP_NOT_EXISTS = new ErrorCode(1_001_003_000, "店铺不存在");
+	//合规单没有上传
+	ErrorCode COMPLIANCE_NOT_UPLOAD = new ErrorCode(1_001_004_000, "合规单没有上传");
 	// ========== 商品品类相关 1-001-000-000 ==========
 	ErrorCode CATEGORY_NOT_EXISTS = new ErrorCode(1_001_000_000, "商品品类不存在");
 	ErrorCode CATEGORY_SKU_NOT_EXISTS = new ErrorCode(1_001_001_002, "商品品类SKU关系不存在");

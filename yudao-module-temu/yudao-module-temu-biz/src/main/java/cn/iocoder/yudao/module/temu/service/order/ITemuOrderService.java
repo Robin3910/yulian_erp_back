@@ -58,4 +58,12 @@ public interface ITemuOrderService {
 	 * @return 合规单信息和商品码
 	 */
 	TemuOrderExtraInfoRespVO getOrderExtraInfo(String orderId);
+	
+	/**
+	 * 保存订单备注
+	 *
+	 * @param requestVO 订单备注保存请求
+	 * @return 是否保存成功
+	 */
+	Boolean saveOrderRemark(TemuOrderSaveOrderRemarkReqVO requestVO);
 }

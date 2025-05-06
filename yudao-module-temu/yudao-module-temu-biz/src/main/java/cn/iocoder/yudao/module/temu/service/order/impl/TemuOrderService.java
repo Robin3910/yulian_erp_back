@@ -138,7 +138,7 @@ public class TemuOrderService implements ITemuOrderService {
 				
 				// 设置SKU相关信息
 				order.setSkc(convertToString(orderMap.get("skc")));
-
+				
 				// TODO 通过skc和shopId查找对应的合规单URL，查询的是temu_shop_old_type_skc表
 				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
@@ -151,14 +151,14 @@ public class TemuOrderService implements ITemuOrderService {
 					properties = convertToString(skusMap.get("property"));
 					order.setProductProperties(properties);
 				}
-
+				
 				// 如果没有SKU信息，查询历史订单
 				if (sku.isEmpty() && !properties.isEmpty()) {
 					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
 					queryWrapper.eq(TemuOrderDO::getShopId, shopIdLong)
 							.eq(TemuOrderDO::getProductProperties, properties)
 							.last("LIMIT 1"); // 只取一条记录
-
+					
 					TemuOrderDO historicalOrder = temuOrderMapper.selectOne(queryWrapper);
 					if (historicalOrder != null && historicalOrder.getSku() != null) {
 						// 将历史订单的SKU信息赋值给当前订单
@@ -380,9 +380,20 @@ public class TemuOrderService implements ITemuOrderService {
 		if (temuShopDO == null) {
 			throw exception(ErrorCodeConstants.SHOP_NOT_EXISTS);
 		}
-	    //根据分类类型匹配合规单
+		//根据分类类型匹配合规单
 		Map<String, Object> oldTypeUrl = temuShopDO.getOldTypeUrl();
-		return  new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())));
+	
+		return new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), oldTypeUrl!=null?convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())):"");
+	}
+	
+	@Override
+	public Boolean saveOrderRemark(TemuOrderSaveOrderRemarkReqVO requestVO) {
+		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getOrderId());
+		if (temuOrderDO == null) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+		temuOrderDO.setRemark(requestVO.getRemark());
+		return temuOrderMapper.updateById(temuOrderDO) > 0;
 	}
 	
 	private String convertToString(Object obj) {

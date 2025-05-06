@@ -5,10 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchCreateVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateFileVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateStatusVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchRelationMapper;
@@ -95,7 +92,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		//创建批次订单记录
 		TemuOrderBatchDO temuOrderBatchDO = new TemuOrderBatchDO();
 		//设置uuid
-		temuOrderBatchDO.setBatchNo(IdUtil.randomUUID());
+		temuOrderBatchDO.setBatchNo(IdUtil.getSnowflakeNextIdStr());
 		int insert = temuOrderBatchMapper.insert(temuOrderBatchDO);
 		if (insert <= 0) {
 			throw exception(ORDER_BATCH_CREATE_FAIL);
@@ -190,6 +187,18 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		//设置批次订单状态
 		temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
 		return temuOrderBatchMapper.updateById(temuOrderBatchDO);
+	}
+	
+	@Override
+	public Boolean saveOrderRemark(TemuOrderBatchSaveOrderRemarkReqVO requestVO) {
+		//检查批次订单是否存在
+		TemuOrderBatchDO temuOrderBatchDO = temuOrderBatchMapper.selectById(requestVO.getOrderId());
+		if (temuOrderBatchDO == null) {
+			throw exception(ORDER_BATCH_NOT_EXISTS);
+		}
+		temuOrderBatchDO.setRemark(requestVO.getRemark());
+		
+		return temuOrderBatchMapper.updateById(temuOrderBatchDO) > 0;
 	}
 	
 }

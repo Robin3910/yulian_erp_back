@@ -1,10 +1,7 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchCreateVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateFileVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchUpdateStatusVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.*;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -81,4 +78,10 @@ public class AdminTemuOrderBatchController {
 		return CommonResult.success(temuOrderBatchService.updateStatus(temuOrderBatchUpdateStatusVO));
 	}
 	
+//	提交批次订单备注
+	@PostMapping("/save-order-remark")
+	@Operation(summary = "提交批次订单备注")
+	public CommonResult<?> saveOrderRemark(@Valid @RequestBody TemuOrderBatchSaveOrderRemarkReqVO requestVO) {
+		return CommonResult.success(temuOrderBatchService.saveOrderRemark(requestVO));
+	}
 }
