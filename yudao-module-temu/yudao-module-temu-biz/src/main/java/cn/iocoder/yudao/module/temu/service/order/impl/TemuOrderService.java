@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -46,6 +47,8 @@ public class TemuOrderService implements ITemuOrderService {
 	TemuProductCategoryMapper temuProductCategoryMapper;
 	@Resource
 	private TemuProductCategorySkuMapper temuProductCategorySkuMapper;
+	@Resource
+	private TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
 	
 	
 	@Override
@@ -122,6 +125,23 @@ public class TemuOrderService implements ITemuOrderService {
 		int count = 0;
 		Long shopIdLong = Long.parseLong(shopId);
 		
+		// 1. 收集所有的SKC
+		Set<String> skcSet = ordersList.stream()
+				.map(orderMap -> convertToString(orderMap.get("skc")))
+				.filter(skc -> !skc.isEmpty())
+				.collect(Collectors.toSet());
+		
+		// 2. 批量查询合规单URL
+		Map<String, TemuShopOldTypeSkcDO> skcToOldTypeMap = new HashMap<>();
+		if (!skcSet.isEmpty()) {
+			LambdaQueryWrapper<TemuShopOldTypeSkcDO> queryWrapper = new LambdaQueryWrapper<TemuShopOldTypeSkcDO>()
+					.eq(TemuShopOldTypeSkcDO::getShopId, shopIdLong)
+					.in(TemuShopOldTypeSkcDO::getSkc, skcSet);
+			List<TemuShopOldTypeSkcDO> oldTypeSkcList = temuShopOldTypeSkcMapper.selectList(queryWrapper);
+			skcToOldTypeMap = oldTypeSkcList.stream()
+					.collect(Collectors.toMap(TemuShopOldTypeSkcDO::getSkc, oldType -> oldType));
+		}
+		
 		for (Map<String, Object> orderMap : ordersList) {
 			try {
 				TemuOrderDO order = new TemuOrderDO();
@@ -137,9 +157,16 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				
 				// 设置SKU相关信息
-				order.setSkc(convertToString(orderMap.get("skc")));
+				String skc = convertToString(orderMap.get("skc"));
+				order.setSkc(skc);
 				
-				// TODO 通过skc和shopId查找对应的合规单URL，查询的是temu_shop_old_type_skc表
+				// 设置合规单URL
+				if (!skc.isEmpty()) {
+					TemuShopOldTypeSkcDO oldTypeSkcDO = skcToOldTypeMap.get(skc);
+					if (oldTypeSkcDO != null) {
+						order.setComplianceUrl(oldTypeSkcDO.getOldTypeUrl());
+					}
+				}
 				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
 				String sku = "";
@@ -254,6 +281,7 @@ public class TemuOrderService implements ITemuOrderService {
 					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
+					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
 					
 					temuOrderMapper.updateById(order);
 				} else {
