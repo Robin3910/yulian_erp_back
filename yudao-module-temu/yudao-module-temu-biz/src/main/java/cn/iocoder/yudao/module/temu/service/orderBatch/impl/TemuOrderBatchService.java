@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.orderBatch.impl;
 
+import cn.hutool.core.date.DateTime;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -21,9 +22,11 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -91,8 +94,9 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		//插入批次
 		//创建批次订单记录
 		TemuOrderBatchDO temuOrderBatchDO = new TemuOrderBatchDO();
-		//设置uuid
-		temuOrderBatchDO.setBatchNo(IdUtil.getSnowflakeNextIdStr());
+		//设置uuid年月日时分秒毫秒
+		DateTime dateTime = DateTime.now();
+		temuOrderBatchDO.setBatchNo(dateTime.toString("yyyyMMddHHmmssSSS")+(new Random().nextInt(10000)+10000));
 		int insert = temuOrderBatchMapper.insert(temuOrderBatchDO);
 		if (insert <= 0) {
 			throw exception(ORDER_BATCH_CREATE_FAIL);
