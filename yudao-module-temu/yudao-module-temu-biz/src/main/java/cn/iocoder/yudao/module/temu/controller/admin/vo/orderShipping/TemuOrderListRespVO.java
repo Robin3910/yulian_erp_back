@@ -43,6 +43,8 @@ public class TemuOrderListRespVO {
 
     private String effectiveImgUrl;
 
+    private String complianceUrl; // 合规单URL
+
     @Schema(description = "合规单URL")
     private String oldTypeUrl;
 

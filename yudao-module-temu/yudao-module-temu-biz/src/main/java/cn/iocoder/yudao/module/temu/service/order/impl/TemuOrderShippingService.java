@@ -158,7 +158,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
                                 TemuOrderDO::getCustomImageUrls,
                                 TemuOrderDO::getCustomTextList, TemuOrderDO::getProductImgUrl,
                                 TemuOrderDO::getCategoryId,
-                                TemuOrderDO::getEffectiveImgUrl)
+                                TemuOrderDO::getEffectiveImgUrl, TemuOrderDO::getComplianceUrl)
                         .in(TemuOrderDO::getOrderNo, allOrderNos));
         Map<String, List<TemuOrderDO>> orderMap = orders.stream()
                 .collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
@@ -648,6 +648,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
                             }
                         }
                     }
+                    orderVO.setComplianceUrl(order.getComplianceUrl());
                     orderListVOs.add(orderVO);
                 }
                 orderNoVO.setOrderList(orderListVOs);
