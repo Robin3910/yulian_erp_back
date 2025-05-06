@@ -79,7 +79,7 @@ public class AdminTemuOrderBatchController {
 	}
 	
 //	提交批次订单备注
-	@PostMapping("/save-order-remark")
+	@PutMapping("/update-order-remark")
 	@Operation(summary = "提交批次订单备注")
 	public CommonResult<?> saveOrderRemark(@Valid @RequestBody TemuOrderBatchSaveOrderRemarkReqVO requestVO) {
 		return CommonResult.success(temuOrderBatchService.saveOrderRemark(requestVO));
