@@ -23,15 +23,16 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 		MPJLambdaWrapperX<TemuOrderBatchDO> batchWrapper = new MPJLambdaWrapperX<>();
 		batchWrapper.selectAll(TemuOrderBatchDO.class)
 				.eqIfExists(TemuOrderBatchDO::getStatus, temuOrderBatchPageVO.getStatus())
+				.eqIfExists(TemuOrderBatchDO::getIsDispatchTask, temuOrderBatchPageVO.getIsDispatchTask())
 				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getBatchNo()), TemuOrderBatchDO::getBatchNo,
 						temuOrderBatchPageVO.getBatchNo());
-
+		
 		// 时间范围查询
 		if (temuOrderBatchPageVO.getCreateTime() != null && temuOrderBatchPageVO.getCreateTime().length == 2) {
 			batchWrapper.between(TemuOrderBatchDO::getCreateTime, temuOrderBatchPageVO.getCreateTime()[0],
 					temuOrderBatchPageVO.getCreateTime()[1]);
 		}
-
+		
 		// 按批次分组
 		batchWrapper.groupBy(TemuOrderBatchDO::getId);
 		
@@ -43,7 +44,7 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 		
 		// 如果没有批次数据，直接返回空结果
 		if (batchPageResult.getList().isEmpty()) {
-			return new PageResult<>(new ArrayList<>(), batchPageResult.getTotal(), 
+			return new PageResult<>(new ArrayList<>(), batchPageResult.getTotal(),
 					temuOrderBatchPageVO.getPageNo(), temuOrderBatchPageVO.getPageSize());
 		}
 		
@@ -89,7 +90,9 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 		}
 		
 		// 返回最终分页结果
-		return new PageResult<>(resultList, batchPageResult.getTotal(), 
+		return new PageResult<>(resultList, batchPageResult.getTotal(),
 				temuOrderBatchPageVO.getPageNo(), temuOrderBatchPageVO.getPageSize());
 	}
+	
+	
 }

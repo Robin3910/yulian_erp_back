@@ -8,10 +8,12 @@ import com.sun.org.apache.xpath.internal.operations.Bool;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
+import javax.validation.constraints.NotNull;
 
 @Tag(name = "Temu管理 - 公共参数列表")
 @RestController
@@ -40,10 +42,16 @@ public class AdminCommonController {
 		}
 	}
 	
+	//根据角色标识获取角色下所有用户
+	@RequestMapping("/role/get-user-by-role-code")
+	public CommonResult<?> getUserByRoleCode(@RequestParam("roleCode") @NotNull String roleCode) {
+		return CommonResult.success(commonService.getUserByRoleCode(roleCode));
+	}
+	
 	@RequestMapping("/test/temu-open-api")
 	@PermitAll
 	public CommonResult<?> testTemuOpenApi() {
-		 return  null;
+		return null;
 		//return CommonResult.success(commonService.testTemuOpenApi());
 	}
 }

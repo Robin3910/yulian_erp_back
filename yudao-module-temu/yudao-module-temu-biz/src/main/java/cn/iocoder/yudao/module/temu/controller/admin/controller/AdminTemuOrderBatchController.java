@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.*;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,9 +46,17 @@ public class AdminTemuOrderBatchController {
 	 */
 	@GetMapping("/page")
 	@Operation(summary = "分页查询批次")
-	@PermitAll
 	public CommonResult<?> page(@Valid TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		return CommonResult.success(temuOrderBatchService.list(temuOrderBatchPageVO));
+	}
+	
+	@GetMapping("/task-page")
+	@Operation(summary = "分页查询批次任务")
+	public CommonResult<?> task(@Valid TemuOrderBatchPageVO temuOrderBatchPageVO) {
+		//获取当前登陆的用户
+		Long userId = SecurityFrameworkUtils.getLoginUserId();
+		temuOrderBatchPageVO.setUserId(userId);
+		return CommonResult.success(temuOrderBatchService.taskList(temuOrderBatchPageVO));
 	}
 	
 	/**
@@ -60,12 +69,18 @@ public class AdminTemuOrderBatchController {
 	@PutMapping("/update-file")
 	@Operation(summary = "更新批次")
 	public CommonResult<?> updateFile(@Valid @RequestBody TemuOrderBatchUpdateFileVO temuOrderBatchUpdateFileVO) {
-	    return CommonResult.success(temuOrderBatchService.updateBatchFile(temuOrderBatchUpdateFileVO));
+		return CommonResult.success(temuOrderBatchService.updateBatchFile(temuOrderBatchUpdateFileVO));
+	}
+	
+	@PutMapping("/update-file-by-task")
+	@Operation(summary = "更新批次")
+	public CommonResult<?> updateFileByTask(@Valid @RequestBody TemuOrderBatchUpdateFileByTaskVO temuOrderBatchUpdateFileVO) {
+		return CommonResult.success(temuOrderBatchService.updateBatchFileByTask(temuOrderBatchUpdateFileVO));
 	}
 	
 	/**
 	 * 更新订单批次状态的接口方法
-	 *
+	 * <p>
 	 * 该方法通过POST请求接收客户端发送的订单批次状态更新信息，
 	 * 并调用服务层方法进行状态更新，返回更新结果
 	 *
@@ -78,10 +93,31 @@ public class AdminTemuOrderBatchController {
 		return CommonResult.success(temuOrderBatchService.updateStatus(temuOrderBatchUpdateStatusVO));
 	}
 	
-//	提交批次订单备注
+	@PutMapping("/update-status-by-task")
+	@Operation(summary = "更新订单批次状态")
+	public CommonResult<?> updateStatusByTask(@Valid @RequestBody TemuOrderBatchUpdateStatusByTaskVO temuOrderBatchUpdateStatusVO) {
+		return CommonResult.success(temuOrderBatchService.updateStatusByTask(temuOrderBatchUpdateStatusVO));
+	}
+	
+	/**
+	 * 提交批次订单备注的接口方法
+	 * <p>
+	 * 该方法通过POST请求接收客户端发送的订单批次备注信息，
+	 * 并调用服务层方法进行备注提交，返回提交结果
+	 *
+	 * @param requestVO 订单批次备注信息对象
+	 * @return 提交结果，封装在CommonResult对象中
+	 */
 	@PutMapping("/update-order-remark")
 	@Operation(summary = "提交批次订单备注")
 	public CommonResult<?> saveOrderRemark(@Valid @RequestBody TemuOrderBatchSaveOrderRemarkReqVO requestVO) {
 		return CommonResult.success(temuOrderBatchService.saveOrderRemark(requestVO));
+	}
+	
+	//批量分配批次订单任务
+	@PostMapping("/dispatch-task")
+	@Operation(summary = "批量分配批次订单任务")
+	public CommonResult<?> dispatchTask(@Valid @RequestBody TemuOrderBatchDispatchTaskVO requestVO) {
+		return CommonResult.success(temuOrderBatchService.dispatchTask(requestVO));
 	}
 }

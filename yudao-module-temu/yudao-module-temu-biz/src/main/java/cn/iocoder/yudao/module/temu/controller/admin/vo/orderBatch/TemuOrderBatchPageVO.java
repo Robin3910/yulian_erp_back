@@ -19,11 +19,17 @@ public class TemuOrderBatchPageVO extends PageParam {
 	private String batchNo;
 	@Schema(description = "订单状态")
 	private Integer status;
+	@Schema(description = "是否分配任务")
+	private Integer isDispatchTask;
 	@Schema(description = "创建时间")
 	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
 	private LocalDateTime[] createTime;
 	@Schema(description = "是否按批次分组")
 	private Boolean groupByBatch;
+	@Schema(description = "用户ID")
+	private Long userId;
+	@Schema(description = "任务状态")
+	private Integer taskStatus;
 	@Schema(description = "定制SKU")
 	private String customSku;
 }

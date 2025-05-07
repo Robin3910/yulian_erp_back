@@ -23,4 +23,6 @@ public class TemuOrderBatchDO extends BaseDO {
 	private Integer status;
 	// 备注
 	private String remark;
+	// 是否派单
+	private Integer isDispatchTask;
 }

@@ -4,7 +4,12 @@ import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.temu.api.openapi.dto.OrderInfoDTO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.user.UserSimpleRespVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
@@ -21,6 +26,7 @@ import cn.iocoder.yudao.module.temu.utils.openapi.TemuOpenApiBuilder;
 import cn.iocoder.yudao.module.temu.utils.openapi.TemuOpenApiUtil;
 import cn.iocoder.yudao.module.temu.utils.weixin.WeiXinWebHookNotifyUtil;
 import com.alibaba.fastjson.JSON;
+import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -47,6 +53,9 @@ public class CommonService implements ICommonService {
 	@Autowired
 	private TemuOrderMapper temuOrderMapper;
 	
+	@Resource
+	private AdminUserMapper adminUserMapper;
+	
 	@Override
 	public PageResult<TemuProductCategoryDO> list() {
 		return temuProductCategoryMapper.selectPage();
@@ -61,6 +70,38 @@ public class CommonService implements ICommonService {
 	public PageResult<TemuShopDO> listShop(Long loginUserId) {
 		return temuShopMapper.selectPage(loginUserId);
 	}
+	
+	/**
+	 * 根据角色代码获取用户列表
+	 * <p>
+	 * 此方法用于查询具有特定角色代码的所有用户它通过角色代码与用户关联，
+	 * 并返回包含这些用户基本信息的列表如果输入的角色代码为空，则返回一个空列表
+	 *
+	 * @param roleCode 角色代码，用于识别特定的角色
+	 * @return 包含UserSimpleRespVo对象的列表，每个对象代表一个具有指定角色的用户
+	 */
+	@Override
+	public List<UserSimpleRespVo> getUserByRoleCode(String roleCode) {
+		// 检查输入的角色代码是否为空，为空则返回空列表
+		if (roleCode == null) {
+			return ListUtil.empty();
+		}
+		
+		// 创建一个MPJLambdaWrapper对象，用于构建复杂的查询条件
+		MPJLambdaWrapper<AdminUserDO> adminUserDOMPJLambdaWrapper = new MPJLambdaWrapper<>();
+		
+		// 构建查询条件：选择所有AdminUserDO字段，与UserRoleDO和RoleDO进行连接
+		// 以获取具有指定角色代码的用户信息
+		adminUserDOMPJLambdaWrapper.selectAll(AdminUserDO.class)
+				.innerJoin(UserRoleDO.class, UserRoleDO::getUserId, AdminUserDO::getId)
+				.leftJoin(RoleDO.class, RoleDO::getId, UserRoleDO::getRoleId)
+				.eq(RoleDO::getCode, roleCode);
+		
+		// 执行查询并返回结果列表，结果映射为UserSimpleRespVo类型
+		return adminUserMapper.selectJoinList(UserSimpleRespVo.class, adminUserDOMPJLambdaWrapper);
+	}
+	
+	
 	/**
 	 * 测试对接TEMU开放平台API的功能，处理订单数据同步与状态更新逻辑。
 	 *
