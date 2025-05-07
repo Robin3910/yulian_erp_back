@@ -3,10 +3,13 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopBatchSaveSkcReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeReqVO;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopOldTypeSkcDO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeUpdateReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeDeleteReqVO;
 import cn.iocoder.yudao.module.temu.service.shop.TemuShopOldTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +24,10 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/temu/shop-oldType")
 @Validated
 @PermitAll
+@RequiredArgsConstructor
 public class AdminTemuShopOldTypeController {
 
-    @Resource
-    private TemuShopOldTypeService temuShopOldTypeService;
+    private final TemuShopOldTypeService temuShopOldTypeService;
 
     @PostMapping("/save")
     @Operation(summary = "批量保存合规单SKC")
@@ -32,9 +35,23 @@ public class AdminTemuShopOldTypeController {
         return success(temuShopOldTypeService.batchSaveOldTypeSkc(saveSkcReqVOList));
     }
 
-    @GetMapping("/get")
+    @GetMapping("/query")
     @Operation(summary = "获取合规单信息")
-    public CommonResult<List<TemuShopOldTypeSkcDO>> getOldTypeInfo(@Validated TemuShopOldTypeReqVO reqVO) {
+    public CommonResult<List<TemuShopOldTypeRespVO>> getOldTypeInfo(@Validated TemuShopOldTypeReqVO reqVO) {
         return success(temuShopOldTypeService.getOldTypeInfo(reqVO));
+    }
+
+    @PostMapping("/update")
+    @Operation(summary = "批量更新合规单信息")
+    public CommonResult<Boolean> batchUpdateOldTypeInfo(@RequestBody List<TemuShopOldTypeUpdateReqVO> updateReqList) {
+        temuShopOldTypeService.batchUpdateOldTypeInfo(updateReqList);
+        return success(true);
+    }
+
+    @PostMapping("/delete")
+    @Operation(summary = "批量删除合规单信息")
+    public CommonResult<Boolean> batchDeleteOldTypeInfo(@RequestBody @Validated TemuShopOldTypeDeleteReqVO deleteReqVO) {
+        temuShopOldTypeService.batchDeleteOldTypeInfo(deleteReqVO);
+        return success(true);
     }
 }
