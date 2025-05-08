@@ -153,6 +153,8 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
+
+				
 				// 设置商品条形码图片URL到goods_sn字段
 				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				
@@ -209,6 +211,8 @@ public class TemuOrderService implements ITemuOrderService {
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
 				order.setQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
+				order.setOriginalQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
+
 				
 				// 设置订单状态
 				// todo 前端上传上来使用枚举值，不要使用string
@@ -262,6 +266,11 @@ public class TemuOrderService implements ITemuOrderService {
 						// 如果quantity存在且大于0,则保持原值不更新
 					} else {
 						order.setQuantity(existingOrder.getQuantity());
+					}
+					if (order.getOriginalQuantity() != null && order.getOriginalQuantity() > 0) {
+						// 如果originalQuantity存在且大于0,则保持原值不更新
+					} else {
+						order.setOriginalQuantity(existingOrder.getOriginalQuantity());
 					}
 					if (!StringUtils.hasText(order.getProductProperties()))
 						order.setProductProperties(existingOrder.getProductProperties());

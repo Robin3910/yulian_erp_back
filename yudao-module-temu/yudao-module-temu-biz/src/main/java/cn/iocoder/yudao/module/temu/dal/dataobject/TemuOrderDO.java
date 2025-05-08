@@ -139,4 +139,9 @@ public class TemuOrderDO extends BaseDO {
 	 * 订单备注
 	 */
 	private String remark;
+
+	/*
+	 * temu官方后台显示的数量
+	 */
+	private Integer originalQuantity;
 }
