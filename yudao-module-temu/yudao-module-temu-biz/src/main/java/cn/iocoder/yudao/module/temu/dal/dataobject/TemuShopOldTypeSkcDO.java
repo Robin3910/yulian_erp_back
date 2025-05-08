@@ -1,8 +1,7 @@
 package cn.iocoder.yudao.module.temu.dal.dataobject;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.util.Map;
@@ -25,4 +24,9 @@ public class TemuShopOldTypeSkcDO extends BaseDO {
 
     //合规单类型
     private String oldType;
+
+    // 合规单图片URL
+    @TableField(updateStrategy = FieldStrategy.IGNORED) //强制包含该字段的更新逻辑，即使值为 null
+    private String oldTypeImageUrl;
+
 }
