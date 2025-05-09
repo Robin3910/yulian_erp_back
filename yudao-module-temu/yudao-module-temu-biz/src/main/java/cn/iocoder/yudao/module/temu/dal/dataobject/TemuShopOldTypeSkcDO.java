@@ -23,6 +23,9 @@ public class TemuShopOldTypeSkcDO extends BaseDO {
     //合规单URL
     private String oldTypeUrl;
 
+    //合规单图片URL
+    private String oldTypeImageUrl;
+
     //合规单类型
     private String oldType;
 }

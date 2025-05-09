@@ -167,6 +167,7 @@ public class TemuOrderService implements ITemuOrderService {
 					TemuShopOldTypeSkcDO oldTypeSkcDO = skcToOldTypeMap.get(skc);
 					if (oldTypeSkcDO != null) {
 						order.setComplianceUrl(oldTypeSkcDO.getOldTypeUrl());
+						order.setComplianceImageUrl(oldTypeSkcDO.getOldTypeImageUrl());
 					}
 				}
 				
@@ -295,6 +296,7 @@ public class TemuOrderService implements ITemuOrderService {
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
+					if (order.getComplianceImageUrl() == null) order.setComplianceImageUrl(existingOrder.getComplianceImageUrl());
 					
 					temuOrderMapper.updateById(order);
 				} else {

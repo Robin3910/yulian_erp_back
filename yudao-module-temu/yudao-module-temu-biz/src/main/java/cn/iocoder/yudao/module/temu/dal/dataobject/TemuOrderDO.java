@@ -134,6 +134,11 @@ public class TemuOrderDO extends BaseDO {
 	 * 合规单URL
 	 */
 	private String complianceUrl;
+
+	/**
+	 * 合规单图片URL
+	 */
+	private String complianceImageUrl;
 	
 	/**
 	 * 订单备注
