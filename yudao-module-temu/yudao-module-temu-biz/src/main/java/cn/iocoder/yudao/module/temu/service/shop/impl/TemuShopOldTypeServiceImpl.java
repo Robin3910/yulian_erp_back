@@ -1,14 +1,12 @@
 package cn.iocoder.yudao.module.temu.service.shop.impl;
 
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopBatchSaveSkcReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeUpdateReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.TemuShopOldTypeDeleteReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopOldTypeSkcDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopOldTypeSkcMapper;
 import cn.iocoder.yudao.module.temu.service.shop.TemuShopOldTypeService;
+import cn.iocoder.yudao.module.temu.utils.pdf.PdfToImageUtil;
+import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +16,8 @@ import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -25,46 +25,114 @@ import java.util.List;
 public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
 
     private final TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
+    // 阿里云OSS服务接口
+    private final TemuOssService temuOssService;
+
+    // 一次转换 重复使用 PDF转换图片URL结果
+    // 缓存PDF转图片结果 避免同一店铺同一合规单类型下的合规单图片url重复转换 浪费资源
+    private final Map<String, String> oldTypeUrlCache = new ConcurrentHashMap<>();
 
     // 批量保存合规单SKC
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer batchSaveOldTypeSkc(List<TemuShopBatchSaveSkcReqVO> saveSkcReqVOList) {
-        // 1.参数校验：如果输入列表为空，直接返回0
-        if (saveSkcReqVOList == null || saveSkcReqVOList.isEmpty()) {
+        if (CollUtil.isEmpty(saveSkcReqVOList)) {
             return 0;
         }
-        // 2.准备待插入的实体列表
-        List<TemuShopOldTypeSkcDO> oldTypeSkcDOList = new ArrayList<>();
+        // 遍历处理每个请求对象
+        List<TemuShopOldTypeSkcDO> insertList = new ArrayList<>();
+        List<TemuShopOldTypeSkcDO> updateList = new ArrayList<>();
+
         for (TemuShopBatchSaveSkcReqVO reqVO : saveSkcReqVOList) {
-            // 3.将VO对象转换为DO实体
-            TemuShopOldTypeSkcDO oldTypeSkcDO = new TemuShopOldTypeSkcDO();
-            oldTypeSkcDO.setShopId(reqVO.getShopId());
-            oldTypeSkcDO.setSkc(reqVO.getSkc());
-            oldTypeSkcDO.setOldTypeUrl(reqVO.getOldTypeUrl());
-            oldTypeSkcDO.setOldType(reqVO.getOldType());
-            oldTypeSkcDOList.add(oldTypeSkcDO);
+            // 检查记录是否已存在（包括已删除的记录）
+            TemuShopOldTypeSkcDO existingRecord = temuShopOldTypeSkcMapper.selectByShopIdAndSkcWithoutDeleted(
+                    reqVO.getShopId(), reqVO.getSkc());
+            // 处理当前记录
+            TemuShopOldTypeSkcDO oldTypeSkcDO = processOldTypeRecord(
+                    reqVO.getShopId(),
+                    reqVO.getSkc(),
+                    reqVO.getOldType(),
+                    reqVO.getOldTypeUrl());
+            // 如果记录存在（无论是否删除），都执行更新操作
+            if (existingRecord != null) {
+                oldTypeSkcDO.setId(existingRecord.getId());
+                // 恢复删除标记（如果之前是删除状态）
+                oldTypeSkcDO.setDeleted(false);
+                oldTypeSkcDO.setCreateTime(existingRecord.getCreateTime());
+                updateList.add(oldTypeSkcDO);
+            } else {
+                insertList.add(oldTypeSkcDO);
+            }
         }
-        // 4.批量插入数据库
-        temuShopOldTypeSkcMapper.insertBatch(oldTypeSkcDOList);
-        log.info("oldTypeSkcDOList.size={}", oldTypeSkcDOList.size());
-        // 返回成功插入的记录数
-        return oldTypeSkcDOList.size();
+        // 执行批量插入操作
+        if (!insertList.isEmpty()) {
+            temuShopOldTypeSkcMapper.insertBatch(insertList);
+        }
+        // 执行批量更新操作
+        for (TemuShopOldTypeSkcDO updateObj : updateList) {
+            temuShopOldTypeSkcMapper.updateByIdWithoutDeleted(updateObj);
+        }
+        return insertList.size() + updateList.size();
     }
 
-    //获取合规单信息
+    // 批量更新合规单信息
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchUpdateOldTypeInfo(List<TemuShopOldTypeUpdateReqVO> updateReqList) {
+        if (CollUtil.isEmpty(updateReqList)) {
+            return;
+        }
+        List<TemuShopOldTypeSkcDO> insertList = new ArrayList<>();
+        List<TemuShopOldTypeSkcDO> updateList = new ArrayList<>();
+        for (TemuShopOldTypeUpdateReqVO updateReq : updateReqList) {
+            // 跳过无效SKC（防止空值更新）
+            if (StrUtil.isEmpty(updateReq.getSkc())) {
+                continue;
+            }
+            try {
+                // 检查记录是否存在（包括已删除的记录）
+                TemuShopOldTypeSkcDO existingRecord = temuShopOldTypeSkcMapper.selectByShopIdAndSkcWithoutDeleted(
+                        updateReq.getShopId(), updateReq.getSkc());
+                // 处理当前记录（包含PDF转换逻辑）
+                TemuShopOldTypeSkcDO oldTypeSkcDO = processOldTypeRecord(
+                        updateReq.getShopId(),
+                        updateReq.getSkc(),
+                        updateReq.getOldType(),
+                        updateReq.getOldTypeUrl());
+                // 如果记录存在（无论是否删除），都执行更新操作
+                if (existingRecord != null) {
+                    oldTypeSkcDO.setId(existingRecord.getId());
+                    // 恢复删除标记（如果之前是删除状态）
+                    oldTypeSkcDO.setDeleted(false);
+                    oldTypeSkcDO.setCreateTime(existingRecord.getCreateTime());
+                    updateList.add(oldTypeSkcDO);
+                } else {
+                    insertList.add(oldTypeSkcDO);
+                }
+            } catch (Exception e) {
+                log.error("更新失败，店铺ID：{}，SKC：{}", updateReq.getShopId(), updateReq.getSkc(), e);
+            }
+        }
+        // 执行批量插入操作
+        if (!insertList.isEmpty()) {
+            temuShopOldTypeSkcMapper.insertBatch(insertList);
+        }
+        // 执行批量更新操作
+        for (TemuShopOldTypeSkcDO updateObj : updateList) {
+            temuShopOldTypeSkcMapper.updateByIdWithoutDeleted(updateObj);
+        }
+    }
+
+    // 获取合规单信息
     @Override
     public List<TemuShopOldTypeRespVO> getOldTypeInfo(TemuShopOldTypeReqVO reqVO) {
-        log.info("查询参数：shopId={}, skc={}, oldType={}", reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldType());
-        // 1.构建动态查询条件
+        // 构建查询条件
         LambdaQueryWrapperX<TemuShopOldTypeSkcDO> queryWrapper = new LambdaQueryWrapperX<TemuShopOldTypeSkcDO>()
                 .eqIfPresent(TemuShopOldTypeSkcDO::getShopId, reqVO.getShopId())
                 .eqIfPresent(TemuShopOldTypeSkcDO::getSkc, reqVO.getSkc())
                 .eqIfPresent(TemuShopOldTypeSkcDO::getOldType, reqVO.getOldType());
-        // 2.查询并返回列表结果
+        // 查询并转换结果
         List<TemuShopOldTypeSkcDO> result = temuShopOldTypeSkcMapper.selectList(queryWrapper);
-        log.info("查询到记录数：{}", result.size());
-        // 3.转换为VO对象
         List<TemuShopOldTypeRespVO> respVOList = new ArrayList<>();
         for (TemuShopOldTypeSkcDO skcDO : result) {
             TemuShopOldTypeRespVO respVO = new TemuShopOldTypeRespVO();
@@ -77,54 +145,51 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
         return respVOList;
     }
 
-    //批量更新合规单信息
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void batchUpdateOldTypeInfo(List<TemuShopOldTypeUpdateReqVO> updateReqList) {
-        // 1.参数校验：如果更新列表为空，直接返回
-        if (CollUtil.isEmpty(updateReqList)) {
-            return;
-        }
-        // 2.遍历每个更新请求
-        for (TemuShopOldTypeUpdateReqVO updateReq : updateReqList) {
-            // 2.1 跳过SKC为空的无效记录
-            if (StrUtil.isEmpty(updateReq.getSkc())) {
-                continue;
-            }
-            // 2.2 构建更新条件：按shopId和skc精确匹配
-            LambdaQueryWrapperX<TemuShopOldTypeSkcDO> updateWrapper = new LambdaQueryWrapperX<TemuShopOldTypeSkcDO>()
-                    .eq(TemuShopOldTypeSkcDO::getShopId, updateReq.getShopId())
-                    .eq(TemuShopOldTypeSkcDO::getSkc, updateReq.getSkc());
-            // 2.3 设置待更新的字段（只更新oldTypeUrl和oldType）
-            TemuShopOldTypeSkcDO updateObj = new TemuShopOldTypeSkcDO();
-            updateObj.setOldTypeUrl(updateReq.getOldTypeUrl());
-            updateObj.setOldType(updateReq.getOldType());
-            // 2.4 执行更新操作，并记录结果// 执行更新
-            int rows = temuShopOldTypeSkcMapper.update(updateObj, updateWrapper);
-            log.info("更新合规单信息，店铺ID：{}，SKC：{}，更新结果：{}", 
-                    updateReq.getShopId(), updateReq.getSkc(), rows > 0 ? "成功" : "失败");
-        }
-    }
-
-    //批量删除合规单信息
+    // 批量删除合规单信息
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchDeleteOldTypeInfo(TemuShopOldTypeDeleteReqVO deleteReqVO) {
-        // 参数校验：如果SKC列表为空，直接返回
         if (CollUtil.isEmpty(deleteReqVO.getSkcList())) {
             return;
         }
-        // 构建删除条件：
-        // 1. 按 shopId 精确匹配
-        // 2. 按 skc 列表批量匹配（IN语句）
-        // 3. 可选 按 oldType 精确匹配（如果非空）
+        // 构建删除条件并执行删除
         LambdaQueryWrapperX<TemuShopOldTypeSkcDO> deleteWrapper = new LambdaQueryWrapperX<TemuShopOldTypeSkcDO>()
                 .eq(TemuShopOldTypeSkcDO::getShopId, deleteReqVO.getShopId())
                 .in(TemuShopOldTypeSkcDO::getSkc, deleteReqVO.getSkcList())
                 .eqIfPresent(TemuShopOldTypeSkcDO::getOldType, deleteReqVO.getOldType());
-        // 执行逻辑删除
-        int rows = temuShopOldTypeSkcMapper.delete(deleteWrapper);
-        log.info("批量物理删除合规单信息完成，店铺ID：{}，SKC数量：{}，实际删除数量：{}", 
-                deleteReqVO.getShopId(), deleteReqVO.getSkcList().size(), rows);
+        temuShopOldTypeSkcMapper.delete(deleteWrapper);
+    }
+
+    // 生成缓存键（用于存储/获取PDF转图片结果） 如：shop1_1_http://example.com/report.pdf
+    private String generateCacheKey(Long shopId, String oldType, String oldTypeUrl) {
+        return String.format("%d_%s_%s", shopId, oldType, oldTypeUrl);
+    }
+
+    // 处理单个合规单记录
+    private TemuShopOldTypeSkcDO processOldTypeRecord(Long shopId, String skc, String oldType, String oldTypeUrl) {
+        TemuShopOldTypeSkcDO oldTypeSkcDO = new TemuShopOldTypeSkcDO();
+        oldTypeSkcDO.setShopId(shopId);
+        oldTypeSkcDO.setSkc(skc);
+        oldTypeSkcDO.setOldType(oldType);
+        oldTypeSkcDO.setOldTypeUrl(oldTypeUrl);
+        // 如果oldTypeUrl为空，直接设置oldTypeImageUrl为null,这两个值要保持同步
+        if (oldTypeUrl == null || oldTypeUrl.equals("")) {
+            oldTypeSkcDO.setOldTypeImageUrl(null);
+            return oldTypeSkcDO;
+        }
+        // 缓存逻辑：如果已有转换结果直接使用，否则进行转换并缓存
+        String cacheKey = generateCacheKey(shopId, oldType, oldTypeUrl);
+        String imageUrl = oldTypeUrlCache.get(cacheKey);
+
+        if (imageUrl == null) {
+            // 调用工具类转换PDF为图片，并上传到OSS
+            imageUrl = PdfToImageUtil.getImageUrl(oldTypeUrl, oldType, temuOssService);
+            if (imageUrl != null) {
+                // 缓存转换结果
+                oldTypeUrlCache.put(cacheKey, imageUrl);
+            }
+        }
+        oldTypeSkcDO.setOldTypeImageUrl(imageUrl);
+        return oldTypeSkcDO;
     }
 }
