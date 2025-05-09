@@ -18,4 +18,8 @@ public class TemuShopOldTypeRespVO {
 
     @Schema(description = "合规单类型")
     private String oldType;
+
+    @Schema(description = "合规单图片URL")
+    private String oldTypeImageUrl;
+
 }

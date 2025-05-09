@@ -23,13 +23,9 @@ public class TemuShopOldTypeSkcDO extends BaseDO {
     private String oldTypeUrl;
 
     //合规单图片URL
+    @TableField(updateStrategy = FieldStrategy.IGNORED) //强制包含该字段的更新逻辑，即使值为 null
     private String oldTypeImageUrl;
 
     //合规单类型
     private String oldType;
-
-    // 合规单图片URL
-    @TableField(updateStrategy = FieldStrategy.IGNORED) //强制包含该字段的更新逻辑，即使值为 null
-    private String oldTypeImageUrl;
-
 }

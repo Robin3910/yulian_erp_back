@@ -140,6 +140,7 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
             respVO.setSkc(skcDO.getSkc());
             respVO.setOldTypeUrl(skcDO.getOldTypeUrl());
             respVO.setOldType(skcDO.getOldType());
+            respVO.setOldTypeImageUrl(skcDO.getOldTypeImageUrl());
             respVOList.add(respVO);
         }
         return respVOList;
