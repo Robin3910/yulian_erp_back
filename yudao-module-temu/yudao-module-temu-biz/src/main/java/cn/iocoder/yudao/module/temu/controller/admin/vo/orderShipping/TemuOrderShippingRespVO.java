@@ -58,5 +58,7 @@ public class TemuOrderShippingRespVO {
         @Schema(description = "店铺id", required = true)
         private Long shopId;
 
+        @Schema(description = "物流发货时间")
+        private String shippingTime;
     }
 }

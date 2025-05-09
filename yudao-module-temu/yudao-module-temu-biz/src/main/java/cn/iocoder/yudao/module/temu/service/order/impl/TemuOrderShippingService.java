@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import java.time.format.DateTimeFormatter;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -295,7 +296,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
                         info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
                         info.setShopId(vo.getShopId());
                         info.setShippingStatus(0); // 新保存的记录默认为未发货状态
-                        info.setCreateTime(now);
+                        if (vo.getShippingTime() != null) {
+                            info.setCreateTime(LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        } else {
+                            info.setCreateTime(now);
+                        }
                         info.setUpdateTime(now);
                         return info;
                     })
