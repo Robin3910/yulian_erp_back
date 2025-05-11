@@ -14,14 +14,14 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class TemuShopPageReqVO extends PageParam {
-    
-    @Schema(description = "店铺ID", example = "2048")
-    private Long shopId;
-    
-    @Schema(description = "店铺名称", example = "测试店铺")
-    private String shopName;
-    
-    @Schema(description = "创建时间")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime[] createTime;
+	
+	@Schema(description = "店铺ID", example = "2048")
+	private Long shopId;
+	@Schema(description = "店铺名称", example = "测试店铺")
+	private String shopName;
+	@Schema(description = "用户ID", example = "2048")
+	private Long userId;
+	@Schema(description = "创建时间")
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	private LocalDateTime[] createTime;
 } 
