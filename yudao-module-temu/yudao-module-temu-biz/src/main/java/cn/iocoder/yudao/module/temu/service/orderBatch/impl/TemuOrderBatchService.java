@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
+import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 
 import javax.annotation.Resource;
 
@@ -48,6 +49,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	private AdminUserMapper adminUserMapper;
 	@Resource
 	private OrderBatchTaskMapper orderBatchTaskMapper;
+	@Resource
+	private WeiXinProducer weiXinProducer;
 	
 	/*
 	 * 创建批次订单
@@ -68,7 +71,9 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			temuOrderBatchRelationDO.setOrderId(orderId);
 			return temuOrderBatchRelationDO;
 		});
-		// 检查订单是否存在
+		
+		// 检查订单是否存在，并保存订单信息用于后续统计
+		List<TemuOrderDO> orders = new ArrayList<>();
 		temuOrderBatchRelationDOList.forEach(temuOrderBatchRelationDOItem -> {
 			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchRelationDOItem.getOrderId());
 			// 检查订单是否存在 
@@ -85,7 +90,9 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			if (count > 0) {
 				throw exception(ORDER_BATCH_EXISTS);
 			}
+			orders.add(temuOrderDO);
 		});
+		
 		//批量更新订单
 		QueryWrapper<TemuOrderDO> temuOrderDOQueryWrapper = new QueryWrapper<>();
 		temuOrderDOQueryWrapper.in("id", orderIds);
@@ -110,6 +117,31 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			temuOrderBatchRelationDOItem.setBatchId(temuOrderBatchDO.getId());
 		});
 		Boolean result = temuOrderBatchRelationMapper.insertBatch(temuOrderBatchRelationDOList);
+		
+		// 发送webhook通知
+		if (result) {
+			// 获取所有类目
+			Set<String> categories = orders.stream()
+					.map(TemuOrderDO::getCategoryName)
+					.collect(Collectors.toSet());
+			
+			// 构建通知消息
+			StringBuilder message = new StringBuilder();
+			message.append("批次打包完成通知\n");
+			message.append("批次编号：").append(temuOrderBatchDO.getBatchNo()).append("\n");
+			message.append("订单数量：").append(orders.size()).append("\n");
+			message.append("类目列表：\n");
+			categories.forEach(category -> 
+				message.append("- ").append(category).append("\n")
+			);
+			
+			// 获取shopId为88888888的店铺webhook地址
+			TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+			if (shop != null && StringUtils.isNotEmpty(shop.getWebhook())) {
+				weiXinProducer.sendMessage(shop.getWebhook(), message.toString());
+			}
+		}
+		
 		return result ? temuOrderBatchRelationDOList.size() : null;
 	}
 	
