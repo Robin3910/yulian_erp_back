@@ -80,12 +80,14 @@ public class PdfToImageUtil {
             return null;
         }
     }
+
     /**
      * 判断是否为PDF文件
      */
     private static boolean isPdfFile(String suffix) {
         return "pdf".equalsIgnoreCase(suffix);
     }
+
     /**
      * 将PDF转换为图片
      */
@@ -110,6 +112,7 @@ public class PdfToImageUtil {
             }
         }
     }
+
     /**
      * 清除缓存
      */
