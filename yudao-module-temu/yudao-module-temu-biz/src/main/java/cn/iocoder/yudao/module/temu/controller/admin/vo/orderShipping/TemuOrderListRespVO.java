@@ -29,6 +29,8 @@ public class TemuOrderListRespVO {
 
     private Integer quantity;
 
+    private Integer originalQuantity;
+
     private String productProperties;
 
     private Long shopId;
