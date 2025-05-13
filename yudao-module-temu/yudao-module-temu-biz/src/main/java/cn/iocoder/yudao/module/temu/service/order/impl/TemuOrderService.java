@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.temu.service.order.impl;
 
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ServerException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -14,6 +15,8 @@ import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
+import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
+import cn.iocoder.yudao.module.temu.utils.pdf.PdfMergeUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +52,9 @@ public class TemuOrderService implements ITemuOrderService {
 	private TemuProductCategorySkuMapper temuProductCategorySkuMapper;
 	@Resource
 	private TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
+
+	@Resource
+	private TemuOssService temuOssService;
 	
 	
 	@Override
@@ -154,7 +160,6 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
 
-				
 				// 设置商品条形码图片URL到goods_sn字段
 				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				
@@ -207,6 +212,27 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setCategoryId(String.valueOf(categorySku.getCategoryId()));
 						order.setCategoryName(categorySku.getCategoryName());
 					}
+				}
+
+				// 新增PDF合并逻辑（确保customSku已赋值）
+				String complianceUrl = order.getComplianceUrl();
+				String goodsSnUrl = order.getGoodsSn();
+				String currentCustomSku = order.getCustomSku();
+
+   				// 若customSku为空但查询到历史订单的sku，用历史sku补充
+				if (StrUtil.isBlank(currentCustomSku) && StrUtil.isNotBlank(sku)) {
+					currentCustomSku = sku;
+					order.setCustomSku(currentCustomSku); // 更新订单对象
+				}
+
+				if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
+					String mergedUrl = PdfMergeUtil.mergePdfsAndUpload(
+							complianceUrl,
+							goodsSnUrl,
+							currentCustomSku,
+							temuOssService
+					);
+					order.setComplianceGoodsMergedUrl(mergedUrl);
 				}
 				
 				// 设置价格和数量
