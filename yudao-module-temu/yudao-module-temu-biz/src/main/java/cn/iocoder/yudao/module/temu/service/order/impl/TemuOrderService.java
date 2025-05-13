@@ -234,6 +234,10 @@ public class TemuOrderService implements ITemuOrderService {
 					);
 					order.setComplianceGoodsMergedUrl(mergedUrl);
 				}
+
+				// 设置商品条形码图片URL到goods_sn字段 如果当前商品条码存在多页，通过定制sku去匹配符合的一页
+				String goodsSn = PdfMergeUtil.extractPageBySku(goodsSnUrl, currentCustomSku, temuOssService);
+				order.setGoodsSn(goodsSn);
 				
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
