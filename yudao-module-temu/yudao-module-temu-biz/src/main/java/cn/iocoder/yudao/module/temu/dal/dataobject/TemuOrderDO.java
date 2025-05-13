@@ -149,4 +149,9 @@ public class TemuOrderDO extends BaseDO {
 	 * temu官方后台显示的数量
 	 */
 	private Integer originalQuantity;
+
+	/**
+	 * 合规单和商品条码PDF合并URL
+	 */
+	private String complianceGoodsMergedUrl;
 }

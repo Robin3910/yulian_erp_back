@@ -197,4 +197,63 @@ public class PdfMergeUtil {
         return "pdf".equalsIgnoreCase(FileUtil.getSuffix(url));
     }
 
+    /**
+     * 商品条码PDF多页截取定制sku对应页
+     *
+     * @param goodsSn    商品条码的URL
+     * @param customSku  定制SKU
+     * @param ossService OSS服务
+     * @return 提取后的单页PDF的OSS URL，如果提取失败则返回null
+     */
+    public static String extractPageBySku(String goodsSn, String customSku, TemuOssService ossService) {
+        if (StrUtil.hasBlank(goodsSn, customSku)) {
+            return null;
+        }
+
+        try {
+            // 验证文件类型
+            if (!isPdfFile(goodsSn)) {
+                log.error("文件类型错误，必须是PDF文件。pdfUrl: {}", goodsSn);
+                return null;
+            }
+
+            try (PDDocument document = PDDocument.load(new URL(goodsSn).openStream())) {
+                int pageCount = document.getNumberOfPages();
+
+                // 如果是单页PDF，直接返回原URL
+                if (pageCount == 1) {
+                    return goodsSn;
+                }
+
+                // 查找包含SKU的页面
+                int targetPage = findPageWithSku(document, customSku);
+                if (targetPage == -1) {
+                    log.error("未找到包含SKU的页面。SKU: {}", customSku);
+                    return null;
+                }
+
+                // 创建新的PDF文档，只包含目标页面
+                try (PDDocument newDoc = new PDDocument()) {
+                    newDoc.addPage(document.getPage(targetPage));
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    newDoc.save(baos);
+
+                    // 创建MultipartFile对象
+                    String fileName = String.format("extracted_page_%s.pdf", StrUtil.uuid());
+                    MultipartFile multipartFile = new MockMultipartFile(
+                            fileName,
+                            fileName,
+                            "application/pdf",
+                            baos.toByteArray());
+
+                    // 上传到OSS并返回URL
+                    return ossService.uploadFile(multipartFile);
+                }
+            }
+        } catch (Exception e) {
+            log.error("提取PDF页面失败。pdfUrl: {}, customSku: {}", goodsSn, customSku, e);
+            return null;
+        }
+    }
+
 }
