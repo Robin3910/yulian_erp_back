@@ -16,7 +16,6 @@ import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
-import cn.iocoder.yudao.module.temu.utils.pdf.PdfMergeUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
@@ -25,13 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import org.springframework.util.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-
-import javax.annotation.Resource;
+import org.springframework.scheduling.annotation.Async;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Resource;
+import cn.iocoder.yudao.module.temu.service.pdf.AsyncPdfProcessService;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -55,8 +57,10 @@ public class TemuOrderService implements ITemuOrderService {
 
 	@Resource
 	private TemuOssService temuOssService;
-	
-	
+
+	@Resource
+	private AsyncPdfProcessService asyncPdfService;
+
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
@@ -225,20 +229,42 @@ public class TemuOrderService implements ITemuOrderService {
 					order.setCustomSku(currentCustomSku); // 更新订单对象
 				}
 
+				// 判断合规单URL和商品条形码URL是否均非空
 				if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
-					String mergedUrl = PdfMergeUtil.mergePdfsAndUpload(
+					// 执行以下两个异步操作：
+					// 1. 合并合规单PDF与商品条形码PDF
+					// 2. 从商品条形码PDF提取指定页面
+					// 通过CompletableFuture实现非阻塞处理，提升系统吞吐量
+
+					// 启动PDF合并任务（异步操作）
+					CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
 							complianceUrl,
 							goodsSnUrl,
 							currentCustomSku,
-							temuOssService
-					);
-					order.setComplianceGoodsMergedUrl(mergedUrl);
+							temuOssService);
+					// 启动PDF页面提取任务（异步操作）
+					CompletableFuture<String> goodsSnFuture = asyncPdfService.extractPageAsync(
+							goodsSnUrl,
+							currentCustomSku,
+							temuOssService);
+
+					// 设置回调更新订单
+					mergedUrlFuture.thenAccept(url -> {
+						if (url != null) {
+							// 更新订单合并后的PDF地址（如合规+条码组合文件）
+							updateOrderMergedUrl(order.getId(), url);
+
+						}
+					});
+					goodsSnFuture.thenAccept(url -> {
+						if (url != null) {
+							// 更新订单提取后的独立条形码PDF地址
+							updateOrderGoodsSn(order.getId(), url);
+						}
+					});
+
 				}
 
-				// 设置商品条形码图片URL到goods_sn字段 如果当前商品条码存在多页，通过定制sku去匹配符合的一页
-				String goodsSn = PdfMergeUtil.extractPageBySku(goodsSnUrl, currentCustomSku, temuOssService);
-				order.setGoodsSn(goodsSn);
-				
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
 				order.setQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
@@ -498,4 +524,29 @@ public class TemuOrderService implements ITemuOrderService {
 			temuShopMapper.updateById(existingShop);
 		}
 	}
+
+	@Async
+	public void updateOrderMergedUrl(Long orderId, String url) {
+		if (orderId == null || url == null) {
+			return;
+		}
+		TemuOrderDO order = temuOrderMapper.selectById(orderId);
+		if (order != null) {
+			order.setComplianceGoodsMergedUrl(url);
+			temuOrderMapper.updateById(order);
+		}
+	}
+
+	@Async
+	public void updateOrderGoodsSn(Long orderId, String url) {
+		if (orderId == null || url == null) {
+			return;
+		}
+		TemuOrderDO order = temuOrderMapper.selectById(orderId);
+		if (order != null) {
+			order.setGoodsSn(url);
+			temuOrderMapper.updateById(order);
+		}
+	}
+
 }
