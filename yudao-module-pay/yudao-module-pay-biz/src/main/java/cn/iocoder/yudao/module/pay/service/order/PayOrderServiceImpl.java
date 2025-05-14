@@ -141,7 +141,7 @@ public class PayOrderServiceImpl implements PayOrderService {
         // 1.32 校验支付渠道是否有效
         PayChannelDO channel = validateChannelCanSubmit(order.getAppId(), reqVO.getChannelCode());
         PayClient client = channelService.getPayClient(channel.getId());
-
+          log.info("[submitOrder][渠道编号({}) 获得对应的支付客户端({})]", channel.getId(), client);
         // 2. 插入 PayOrderExtensionDO
         String no = noRedisDAO.generate(payProperties.getOrderNoPrefix());
         PayOrderExtensionDO orderExtension = PayOrderConvert.INSTANCE.convert(reqVO, userIp)
@@ -149,7 +149,7 @@ public class PayOrderServiceImpl implements PayOrderService {
                 .setChannelId(channel.getId()).setChannelCode(channel.getCode())
                 .setStatus(PayOrderStatusEnum.WAITING.getStatus());
         orderExtensionMapper.insert(orderExtension);
-
+        log.info("[通知地址:{}]", genChannelOrderNotifyUrl(channel));
         // 3. 调用三方接口
         PayOrderUnifiedReqDTO unifiedOrderReqDTO = PayOrderConvert.INSTANCE.convert2(reqVO, userIp)
                 // 商户相关的字段
