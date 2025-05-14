@@ -131,8 +131,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			message.append("批次编号：").append(temuOrderBatchDO.getBatchNo()).append("\n");
 			message.append("订单数量：").append(orders.size()).append("\n");
 			message.append("类目列表：\n");
-			categories.forEach(category -> 
-				message.append("- ").append(category).append("\n")
+			categories.forEach(category ->
+					message.append("- ").append(category).append("\n")
 			);
 			
 			// 获取shopId为88888888的店铺webhook地址
@@ -153,7 +153,17 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	@Override
 	public PageResult<TemuOrderBatchDetailDO> list(TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		PageResult<TemuOrderBatchDetailDO> temuOrderBatchDOPageResult = temuOrderBatchMapper.selectPage(temuOrderBatchPageVO);
-		
+		// 获取所有分配关联用户的信息
+		temuOrderBatchDOPageResult.getList().forEach(batch -> {
+			MPJLambdaWrapperX<TemuOrderBatchTaskDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
+			objectMPJLambdaWrapperX.selectAll(TemuOrderBatchTaskDO.class)
+					.selectAs(AdminUserDO::getId, TemuOrderBatchTaskUserInfoDO::getUserId)
+					.selectAs(AdminUserDO::getNickname, TemuOrderBatchTaskUserInfoDO::getNickName)
+					.leftJoin(AdminUserDO.class, AdminUserDO::getId, TemuOrderBatchTaskDO::getUserId)
+					.eq(TemuOrderBatchTaskDO::getBatchOrderId, batch.getId());
+			List<TemuOrderBatchTaskUserInfoDO> adminUserDOS = orderBatchTaskMapper.selectJoinList(TemuOrderBatchTaskUserInfoDO.class, objectMPJLambdaWrapperX);
+			batch.setUserList(adminUserDOS);
+		});
 		// 获取所有订单的shopId
 		List<Long> shopIds = temuOrderBatchDOPageResult.getList().stream()
 				.flatMap(batch -> batch.getOrderList().stream())
@@ -187,7 +197,17 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	@Override
 	public PageResult<TemuOrderBatchUserDetailDO> taskList(TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		PageResult<TemuOrderBatchUserDetailDO> temuOrderBatchDOPageResult = selectUserPage(temuOrderBatchPageVO);
-		
+		// 获取所有分配关联用户的信息
+		temuOrderBatchDOPageResult.getList().forEach(batch -> {
+			MPJLambdaWrapperX<TemuOrderBatchTaskDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
+			objectMPJLambdaWrapperX.selectAll(TemuOrderBatchTaskDO.class)
+					.selectAs(AdminUserDO::getId, TemuOrderBatchTaskUserInfoDO::getUserId)
+					.selectAs(AdminUserDO::getNickname, TemuOrderBatchTaskUserInfoDO::getNickName)
+					.leftJoin(AdminUserDO.class, AdminUserDO::getId, TemuOrderBatchTaskDO::getUserId)
+					.eq(TemuOrderBatchTaskDO::getBatchOrderId, batch.getId());
+			List<TemuOrderBatchTaskUserInfoDO> adminUserDOS = orderBatchTaskMapper.selectJoinList(TemuOrderBatchTaskUserInfoDO.class, objectMPJLambdaWrapperX);
+			batch.setUserList(adminUserDOS);
+		});
 		// 获取所有订单的shopId
 		List<Long> shopIds = temuOrderBatchDOPageResult.getList().stream()
 				.flatMap(batch -> batch.getOrderList().stream())
@@ -248,7 +268,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			temuOrderBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_COMPLETE);
 			orderBatchTaskMapper.updateById(temuOrderBatchTaskDO);
 			if (temuOrderBatchTaskDO.getNextTaskType() != null) {
-			//	查找类型和相同批次id任务
+				//	查找类型和相同批次id任务
 				TemuOrderBatchTaskDO nextBatchTaskDO = orderBatchTaskMapper.selectOne(new QueryWrapper<TemuOrderBatchTaskDO>()
 						.eq("batch_order_id", temuOrderBatchTaskDO.getBatchOrderId())
 						.eq("type", temuOrderBatchTaskDO.getNextTaskType())
@@ -335,7 +355,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderBatchRelationDOList == null || temuOrderBatchRelationDOList.isEmpty()) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
 		}
-	
+		
 		//获取所有的订单id
 		List<Long> orderIds = temuOrderBatchRelationDOList.stream().map(TemuOrderBatchRelationDO::getOrderId).collect(Collectors.toList());
 		//批量更新订单状态

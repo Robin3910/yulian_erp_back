@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.MPJLambdaWrapperX;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.TemuOrderBatchPageVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 
@@ -24,6 +25,8 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 		batchWrapper.select(TemuOrderBatchDO::getId)
 				.leftJoin(TemuOrderBatchRelationDO.class, TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchDO::getId)
 				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
+				.leftJoin(TemuOrderBatchTaskDO.class, TemuOrderBatchTaskDO::getBatchOrderId, TemuOrderBatchDO::getId)
+				.leftJoin(AdminUserDO.class,  AdminUserDO::getId, TemuOrderBatchTaskDO::getUserId)
 				.eqIfExists(TemuOrderBatchDO::getStatus, pageVO.getStatus())
 				.eqIfExists(TemuOrderBatchDO::getIsDispatchTask, pageVO.getIsDispatchTask())
 				.like(StringUtils.isNotEmpty(pageVO.getBatchNo()), TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())

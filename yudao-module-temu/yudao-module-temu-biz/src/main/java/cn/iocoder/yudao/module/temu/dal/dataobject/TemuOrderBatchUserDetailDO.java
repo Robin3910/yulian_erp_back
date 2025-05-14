@@ -15,4 +15,5 @@ public class TemuOrderBatchUserDetailDO extends TemuOrderBatchDO {
 	private Long taskId;
 	private Integer taskStatus;
 	private List<TemuOrderDetailDO> orderList;
+	private List<TemuOrderBatchTaskUserInfoDO> userList;
 }
