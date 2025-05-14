@@ -319,16 +319,14 @@ public class TemuOrderService implements ITemuOrderService {
 					if (!StringUtils.hasText(order.getSkc())) order.setSkc(existingOrder.getSkc());
 					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
 					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
-					if (order.getQuantity() != null && order.getQuantity() > 0) {
-						// 如果quantity存在且大于0,则保持原值不更新
-					} else {
+					if (existingOrder.getQuantity() != null && existingOrder.getQuantity() > 0) {
+						// 如果数据库现存的order中quantity存在且大于0,则保持原值不更新
 						order.setQuantity(existingOrder.getQuantity());
-					}
-					if (order.getOriginalQuantity() != null && order.getOriginalQuantity() > 0) {
+					} 
+					if (existingOrder.getOriginalQuantity() != null && existingOrder.getOriginalQuantity() > 0) {
 						// 如果originalQuantity存在且大于0,则保持原值不更新
-					} else {
 						order.setOriginalQuantity(existingOrder.getOriginalQuantity());
-					}
+					} 
 					if (!StringUtils.hasText(order.getProductProperties()))
 						order.setProductProperties(existingOrder.getProductProperties());
 					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
