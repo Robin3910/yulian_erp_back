@@ -26,33 +26,37 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				.leftJoin(TemuOrderBatchRelationDO.class, TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchDO::getId)
 				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
 				.leftJoin(TemuOrderBatchTaskDO.class, TemuOrderBatchTaskDO::getBatchOrderId, TemuOrderBatchDO::getId)
-				.leftJoin(AdminUserDO.class,  AdminUserDO::getId, TemuOrderBatchTaskDO::getUserId)
+				.leftJoin(AdminUserDO.class, AdminUserDO::getId, TemuOrderBatchTaskDO::getUserId)
 				.eqIfExists(TemuOrderBatchDO::getStatus, pageVO.getStatus())
 				.eqIfExists(TemuOrderBatchDO::getIsDispatchTask, pageVO.getIsDispatchTask())
+				.eqIfExists(TemuOrderDO::getShopId, pageVO.getShopId())
 				.like(StringUtils.isNotEmpty(pageVO.getBatchNo()), TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())
 				.like(StringUtils.isNotEmpty(pageVO.getCustomSku()), TemuOrderDO::getCustomSku, pageVO.getCustomSku());
-
+		
 		// 时间范围查询
 		if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
 			batchWrapper.between(TemuOrderBatchDO::getCreateTime, pageVO.getCreateTime()[0], pageVO.getCreateTime()[1]);
 		}
-
+		// 根据订单类目查询数据
+		if (pageVO.getCategoryId()!=null&&!pageVO.getCategoryId().isEmpty()){
+			batchWrapper.in(TemuOrderDO::getCategoryId, pageVO.getCategoryId());
+		}
 		// 按批次分组并按创建时间倒序
 		batchWrapper.groupBy(TemuOrderBatchDO::getId)
 				.orderByDesc(TemuOrderBatchDO::getCreateTime);
-
+		
 		// 执行分页查询获取批次ID
 		PageResult<TemuOrderBatchDO> batchPageResult = selectJoinPage(pageVO, TemuOrderBatchDO.class, batchWrapper);
 		if (batchPageResult.getList().isEmpty()) {
 			return new PageResult<>(new ArrayList<>(), batchPageResult.getTotal(), pageVO.getPageNo(),
 					pageVO.getPageSize());
 		}
-
+		
 		// 第二步：查询批次详细信息和关联的所有订单
 		List<Long> batchIds = batchPageResult.getList().stream()
 				.map(TemuOrderBatchDO::getId)
 				.collect(Collectors.toList());
-
+		
 		MPJLambdaWrapperX<TemuOrderBatchDO> detailWrapper = new MPJLambdaWrapperX<>();
 		detailWrapper.selectAll(TemuOrderBatchDO.class)
 				.leftJoin(TemuOrderBatchRelationDO.class, TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchDO::getId)
@@ -61,14 +65,14 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				.in(TemuOrderBatchDO::getId, batchIds)
 				.like(StringUtils.isNotEmpty(pageVO.getCustomSku()), TemuOrderDO::getCustomSku, pageVO.getCustomSku())
 				.orderByDesc(TemuOrderDO::getCreateTime);
-
+		
 		// 查询批次详情（包含订单列表）
 		List<TemuOrderBatchDetailDO> batchDetailList = selectJoinList(TemuOrderBatchDetailDO.class, detailWrapper);
-
+		
 		// 根据批次ID对结果进行分组
 		Map<Long, List<TemuOrderBatchDetailDO>> batchDetailMap = batchDetailList.stream()
 				.collect(Collectors.groupingBy(TemuOrderBatchDetailDO::getId));
-
+		
 		// 按原批次顺序组装最终结果
 		List<TemuOrderBatchDetailDO> resultList = new ArrayList<>();
 		for (TemuOrderBatchDO batch : batchPageResult.getList()) {
@@ -91,9 +95,9 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				resultList.add(emptyDetail);
 			}
 		}
-
+		
 		// 返回最终分页结果
 		return new PageResult<>(resultList, batchPageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
 	}
-
+	
 }

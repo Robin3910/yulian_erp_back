@@ -32,4 +32,8 @@ public class TemuOrderBatchPageVO extends PageParam {
 	private Integer taskStatus;
 	@Schema(description = "定制SKU")
 	private String customSku;
+	@Schema(description = "店铺ID")
+	private Long shopId;
+	@Schema(description = "类目ID")
+	private List<Long> categoryId;
 }
