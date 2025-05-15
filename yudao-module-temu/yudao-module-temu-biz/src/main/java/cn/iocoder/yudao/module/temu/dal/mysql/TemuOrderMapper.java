@@ -27,7 +27,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * @param temuOrderRequestVO 条件
 	 * @return 查询条件
 	 */
-	default MPJLambdaWrapper<TemuOrderDO> buliderOrderWapper(TemuOrderRequestVO temuOrderRequestVO) {
+	default MPJLambdaWrapper<TemuOrderDO> builderOrderWrapper(TemuOrderRequestVO temuOrderRequestVO) {
 		//连表分页查询
 		MPJLambdaWrapper<TemuOrderDO> wrapper = new MPJLambdaWrapper<>();
 		wrapper
@@ -49,8 +49,20 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		}
 		//按照订单时间倒序排列
 		wrapper.orderByDesc(TemuOrderDO::getBookingTime);
+		//分类ID查询
 		if (temuOrderRequestVO.getCategoryId() != null && temuOrderRequestVO.getCategoryId().length > 0) {
 			wrapper.in(TemuOrderDO::getCategoryId, Arrays.asList(temuOrderRequestVO.getCategoryId()));
+		}
+		//判断是否存在分类
+		if (temuOrderRequestVO.getHasCategory() != null) {
+			switch (temuOrderRequestVO.getHasCategory()) {
+				case 0:
+					wrapper.isNull(TemuOrderDO::getCategoryId);
+					break;
+				case 1:
+					wrapper.isNotNull(TemuOrderDO::getCategoryId);
+					break;
+			}
 		}
 		return wrapper;
 	}
@@ -80,13 +92,13 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * @return 订单信息
 	 */
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
 		wrapper.selectAll(TemuOrderDO.class);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}
 	
 	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
 		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
 		TemuOrderDO temuOrderDO = selectOne(wrapper);
 		
@@ -98,7 +110,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	}
 	
 	default TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
 		wrapper.selectSum(TemuOrderDO::getTotalPrice, TemuOrderDO::getTotalPrice);
 		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		TemuOrderDO temuOrderDO = selectOne(wrapper);
@@ -110,7 +122,7 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	}
 	
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO, List<String> shopIds) {
-		MPJLambdaWrapper<TemuOrderDO> wrapper = buliderOrderWapper(temuOrderRequestVO);
+		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
 		wrapper.selectAll(TemuOrderDO.class);
 		wrapper.in(TemuOrderDO::getShopId, shopIds);
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.springframework.format.annotation.DateTimeFormat;
+
 import java.time.LocalDate;
 import java.util.List;
 import javax.validation.constraints.NotEmpty;
@@ -16,40 +17,43 @@ import javax.validation.constraints.NotNull;
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class TemuOrderShippingPageReqVO extends PageParam {
-
-    @Schema(description = "订单ID", example = "1024")
-    private Long orderId;
-
-    @Schema(description = "店铺ID")
-    private Long shopId;
-
-    @Schema(description = "物流单号")
-    private String trackingNumber;
-
-    @Schema(description = "订单编号")
-    private String orderNo;
-
-    @Schema(description = "订单状态", example = "3")
-    private Integer orderStatus;
-
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
-    @Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
-    private LocalDate[] createTime;
-
-    @Data
-    @Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")
-    public static class BatchUpdateStatusReqVO {
-
-        @Schema(description = "订单ID列表", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotEmpty(message = "订单ID列表不能为空")
-        private List<Long> orderIds;
-
-        @Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "订单状态不能为空")
-        private Integer orderStatus;
-
-        @Schema(description = "物流单号")
-        private String trackingNumber;
-    }
-
+	
+	@Schema(description = "订单ID", example = "1024")
+	private Long orderId;
+	
+	@Schema(description = "店铺ID")
+	private Long shopId;
+	
+	@Schema(description = "物流单号")
+	private String trackingNumber;
+	
+	@Schema(description = "订单编号")
+	private String orderNo;
+	
+	@Schema(description = "订单状态", example = "3")
+	private Integer orderStatus;
+	
+	@Schema(description = "定制SKU")
+	private String customSku;
+	
+	@DateTimeFormat(pattern = "yyyy-MM-dd")
+	@Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
+	private LocalDate[] createTime;
+	
+	@Data
+	@Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")
+	public static class BatchUpdateStatusReqVO {
+		
+		@Schema(description = "订单ID列表", requiredMode = Schema.RequiredMode.REQUIRED)
+		@NotEmpty(message = "订单ID列表不能为空")
+		private List<Long> orderIds;
+		
+		@Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED)
+		@NotNull(message = "订单状态不能为空")
+		private Integer orderStatus;
+		
+		@Schema(description = "物流单号")
+		private String trackingNumber;
+	}
+	
 }
