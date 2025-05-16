@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,7 +73,7 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
             }
 
             // 处理近两天内的订单PDF合并
-            processRecentOrders(reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldTypeUrl());
+            processRecentOrders(reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldTypeUrl(),oldTypeSkcDO.getOldTypeImageUrl());
         }
         // 执行批量插入操作
         if (!insertList.isEmpty()) {
@@ -91,21 +92,27 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
      * @param skc SKC编号
      * @param oldTypeUrl 合规单URL
      */
-    private void processRecentOrders(Long shopId, String skc, String oldTypeUrl) {
+    private void processRecentOrders(Long shopId, String skc, String oldTypeUrl,String oldTypeImageUrl) {
         try {
             // 计算三天前的时间
-            LocalDateTime twoDaysAgo = LocalDateTime.now().minusDays(3);
+            LocalDateTime threeDaysAgo = LocalDate.now().minusDays(3).atStartOfDay();
 
             // 查询符合条件的订单
             LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<TemuOrderDO>()
                     .eq(TemuOrderDO::getShopId, shopId)
                     .eq(TemuOrderDO::getSkc, skc)
-                    .ge(TemuOrderDO::getBookingTime, twoDaysAgo);
+                    .ge(TemuOrderDO::getBookingTime, threeDaysAgo);
 
             List<TemuOrderDO> orders = temuOrderMapper.selectList(queryWrapper);
 
             // 处理每个订单
             for (TemuOrderDO order : orders) {
+
+                order.setComplianceUrl(oldTypeUrl);
+                order.setComplianceImageUrl(oldTypeImageUrl);
+                log.info("更新订单{}的合规单{}",order.getSkc(),oldTypeUrl);
+                temuOrderMapper.updateById(order);
+
                 if (StrUtil.isNotEmpty(order.getGoodsSn()) && StrUtil.isNotEmpty(order.getCustomSku())) {
                     // 异步处理PDF合并
                     CompletableFuture<String> future = asyncPdfProcessService.processPdfAsync(
