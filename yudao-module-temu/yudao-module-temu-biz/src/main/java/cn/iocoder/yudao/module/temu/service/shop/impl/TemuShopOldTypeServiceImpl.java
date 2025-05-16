@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -73,7 +75,8 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
             }
 
             // 处理近两天内的订单PDF合并
-            processRecentOrders(reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldTypeUrl(),oldTypeSkcDO.getOldTypeImageUrl());
+            processRecentOrders(reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldTypeUrl(),
+                    oldTypeSkcDO.getOldTypeImageUrl());
         }
         // 执行批量插入操作
         if (!insertList.isEmpty()) {
@@ -88,20 +91,21 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
 
     /**
      * 处理近两天内的订单PDF合并
-     * @param shopId 店铺ID
-     * @param skc SKC编号
+     * 
+     * @param shopId     店铺ID
+     * @param skc        SKC编号
      * @param oldTypeUrl 合规单URL
      */
-    private void processRecentOrders(Long shopId, String skc, String oldTypeUrl,String oldTypeImageUrl) {
+    private void processRecentOrders(Long shopId, String skc, String oldTypeUrl, String oldTypeImageUrl) {
         try {
-            // 计算三天前的时间
-            LocalDateTime threeDaysAgo = LocalDate.now().minusDays(3).atStartOfDay();
+            // 计算两天前的时间
+            LocalDateTime twoDaysAgo = LocalDate.now().minusDays(2).atStartOfDay();
 
             // 查询符合条件的订单
             LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<TemuOrderDO>()
                     .eq(TemuOrderDO::getShopId, shopId)
                     .eq(TemuOrderDO::getSkc, skc)
-                    .ge(TemuOrderDO::getBookingTime, threeDaysAgo);
+                    .ge(TemuOrderDO::getBookingTime, twoDaysAgo);
 
             List<TemuOrderDO> orders = temuOrderMapper.selectList(queryWrapper);
 
@@ -110,7 +114,7 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
 
                 order.setComplianceUrl(oldTypeUrl);
                 order.setComplianceImageUrl(oldTypeImageUrl);
-                log.info("更新订单{}的合规单{}",order.getSkc(),oldTypeUrl);
+                log.info("更新订单{}的合规单{}", order.getSkc(), oldTypeUrl);
                 temuOrderMapper.updateById(order);
 
                 if (StrUtil.isNotEmpty(order.getGoodsSn()) && StrUtil.isNotEmpty(order.getCustomSku())) {
@@ -119,8 +123,7 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
                             oldTypeUrl,
                             order.getGoodsSn(),
                             order.getCustomSku(),
-                            temuOssService
-                    );
+                            temuOssService);
 
                     // 处理合并结果
                     future.thenAccept(mergedUrl -> {
@@ -151,27 +154,67 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
         if (CollUtil.isEmpty(updateReqList)) {
             return;
         }
-        List<TemuShopOldTypeSkcDO> insertList = new ArrayList<>();
-        List<TemuShopOldTypeSkcDO> updateList = new ArrayList<>();
+
+        // 1. 收集所有的shopId和skc
+        List<String> skcList = new ArrayList<>();
+        Long shopId = null;
+        Map<String, TemuShopOldTypeUpdateReqVO> updateReqMap = new HashMap<>();
+
         for (TemuShopOldTypeUpdateReqVO updateReq : updateReqList) {
-            // 跳过无效SKC（防止空值更新）
             if (StrUtil.isEmpty(updateReq.getSkc())) {
                 continue;
             }
+            // 确保所有记录都是同一个shopId
+            if (shopId == null) {
+                shopId = updateReq.getShopId();
+            } else if (!shopId.equals(updateReq.getShopId())) {
+                log.error("批量更新包含不同的shopId，请确保所有记录属于同一个店铺");
+                return;
+            }
+            skcList.add(updateReq.getSkc());
+            updateReqMap.put(updateReq.getSkc(), updateReq);
+        }
+
+        if (CollUtil.isEmpty(skcList)) {
+            return;
+        }
+
+        // 2. 批量查询现有记录
+        LambdaQueryWrapper<TemuShopOldTypeSkcDO> queryWrapper = new LambdaQueryWrapper<TemuShopOldTypeSkcDO>()
+                .eq(TemuShopOldTypeSkcDO::getShopId, shopId)
+                .in(TemuShopOldTypeSkcDO::getSkc, skcList);
+        List<TemuShopOldTypeSkcDO> existingRecords = temuShopOldTypeSkcMapper.selectList(queryWrapper);
+
+        // 3. 将现有记录转换为Map，方便查找
+        Map<String, TemuShopOldTypeSkcDO> existingRecordMap = existingRecords.stream()
+                .collect(Collectors.toMap(TemuShopOldTypeSkcDO::getSkc, record -> record));
+
+        // 4. 分类处理：需要新增的和需要更新的
+        List<TemuShopOldTypeSkcDO> insertList = new ArrayList<>();
+        List<TemuShopOldTypeSkcDO> updateList = new ArrayList<>();
+
+        for (String skc : skcList) {
+            TemuShopOldTypeUpdateReqVO updateReq = updateReqMap.get(skc);
+            TemuShopOldTypeSkcDO existingRecord = existingRecordMap.get(skc);
+
             try {
-                // 检查记录是否存在（包括已删除的记录）
-                TemuShopOldTypeSkcDO existingRecord = temuShopOldTypeSkcMapper.selectByShopIdAndSkcWithoutDeleted(
-                        updateReq.getShopId(), updateReq.getSkc());
+                // 如果记录存在，检查是否需要更新
+                if (existingRecord != null &&
+                        StrUtil.equals(existingRecord.getOldType(), updateReq.getOldType()) &&
+                        StrUtil.equals(existingRecord.getOldTypeUrl(), updateReq.getOldTypeUrl())) {
+                    // 内容相同，跳过更新
+                    continue;
+                }
+
                 // 处理当前记录（包含PDF转换逻辑）
                 TemuShopOldTypeSkcDO oldTypeSkcDO = processOldTypeRecord(
                         updateReq.getShopId(),
                         updateReq.getSkc(),
                         updateReq.getOldType(),
                         updateReq.getOldTypeUrl());
-                // 如果记录存在（无论是否删除），都执行更新操作
+
                 if (existingRecord != null) {
                     oldTypeSkcDO.setId(existingRecord.getId());
-                    // 恢复删除标记（如果之前是删除状态）
                     oldTypeSkcDO.setDeleted(false);
                     oldTypeSkcDO.setCreateTime(existingRecord.getCreateTime());
                     updateList.add(oldTypeSkcDO);
@@ -182,11 +225,11 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
                 log.error("更新失败，店铺ID：{}，SKC：{}", updateReq.getShopId(), updateReq.getSkc(), e);
             }
         }
-        // 执行批量插入操作
+
+        // 5. 执行批量操作
         if (!insertList.isEmpty()) {
             temuShopOldTypeSkcMapper.insertBatch(insertList);
         }
-        // 执行批量更新操作
         for (TemuShopOldTypeSkcDO updateObj : updateList) {
             temuShopOldTypeSkcMapper.updateByIdWithoutDeleted(updateObj);
         }
