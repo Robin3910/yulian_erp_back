@@ -6,7 +6,15 @@ import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ServerException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
+import cn.iocoder.yudao.module.pay.dal.dataobject.wallet.PayWalletDO;
+import cn.iocoder.yudao.module.pay.enums.wallet.PayWalletBizTypeEnum;
+import cn.iocoder.yudao.module.pay.service.wallet.PayWalletService;
+import cn.iocoder.yudao.module.system.dal.dataobject.dict.DictTypeDO;
+import cn.iocoder.yudao.module.system.dal.mysql.dict.DictTypeMapper;
+import cn.iocoder.yudao.module.system.enums.DictTypeConstants;
 import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
 import cn.iocoder.yudao.module.temu.api.category.factory.PriceRuleFactory;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
@@ -25,6 +33,7 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuUserShopDO;
 import org.springframework.util.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.scheduling.annotation.Async;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,9 +42,15 @@ import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 
 import javax.annotation.Resource;
+
 import cn.iocoder.yudao.module.temu.service.pdf.AsyncPdfProcessService;
 
+import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN;
+import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.MEMBER;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser;
+import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.WALLET_NOT_FOUND;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 
 @Service
 @Slf4j
@@ -54,13 +69,19 @@ public class TemuOrderService implements ITemuOrderService {
 	private TemuProductCategorySkuMapper temuProductCategorySkuMapper;
 	@Resource
 	private TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
-
+	
 	@Resource
 	private TemuOssService temuOssService;
-
+	
 	@Resource
 	private AsyncPdfProcessService asyncPdfService;
-
+	
+	@Resource
+	private DictTypeMapper dictTypeMapper;
+	@Resource
+	private PayWalletService payWalletService;
+	
+	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
@@ -115,7 +136,7 @@ public class TemuOrderService implements ITemuOrderService {
 			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
-		LogRecordContext.putVariable("user", SecurityFrameworkUtils.getLoginUser());
+		LogRecordContext.putVariable("user", getLoginUser());
 		LogRecordContext.putVariable("orderSize", requestVO.size());
 		HashMap<String, String> stringStringHashMap = new HashMap<>();
 		requestVO.iterator().forEachRemaining(temuOrderDO -> {
@@ -163,7 +184,7 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
-
+				
 				// 设置商品条形码图片URL到goods_sn字段
 				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				
@@ -217,25 +238,25 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setCategoryName(categorySku.getCategoryName());
 					}
 				}
-
+				
 				// 新增PDF合并逻辑（确保customSku已赋值）
 				String complianceUrl = order.getComplianceUrl();
 				String goodsSnUrl = order.getGoodsSn();
 				String currentCustomSku = order.getCustomSku();
-
-   				// 若customSku为空但查询到历史订单的sku，用历史sku补充
+				
+				// 若customSku为空但查询到历史订单的sku，用历史sku补充
 				if (StrUtil.isBlank(currentCustomSku) && StrUtil.isNotBlank(sku)) {
 					currentCustomSku = sku;
 					order.setCustomSku(currentCustomSku); // 更新订单对象
 				}
-
+				
 				// 判断合规单URL和商品条形码URL是否均非空
 				if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
 					// 执行以下两个异步操作：
 					// 1. 合并合规单PDF与商品条形码PDF
 					// 2. 从商品条形码PDF提取指定页面
 					// 通过CompletableFuture实现非阻塞处理，提升系统吞吐量
-
+					
 					// 启动PDF合并任务（异步操作）
 					CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
 							complianceUrl,
@@ -247,13 +268,13 @@ public class TemuOrderService implements ITemuOrderService {
 							goodsSnUrl,
 							currentCustomSku,
 							temuOssService);
-
+					
 					// 设置回调更新订单
 					mergedUrlFuture.thenAccept(url -> {
 						if (url != null) {
 							// 更新订单合并后的PDF地址（如合规+条码组合文件）
 							updateOrderMergedUrl(order.getId(), url);
-
+							
 						}
 					});
 					goodsSnFuture.thenAccept(url -> {
@@ -262,14 +283,14 @@ public class TemuOrderService implements ITemuOrderService {
 							updateOrderGoodsSn(order.getId(), url);
 						}
 					});
-
+					
 				}
-
+				
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
 				order.setQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
 				order.setOriginalQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
-
+				
 				
 				// 设置订单状态
 				// todo 前端上传上来使用枚举值，不要使用string
@@ -322,11 +343,11 @@ public class TemuOrderService implements ITemuOrderService {
 					if (existingOrder.getQuantity() != null && existingOrder.getQuantity() > 0) {
 						// 如果数据库现存的order中quantity存在且大于0,则保持原值不更新
 						order.setQuantity(existingOrder.getQuantity());
-					} 
+					}
 					if (existingOrder.getOriginalQuantity() != null && existingOrder.getOriginalQuantity() > 0) {
 						// 如果originalQuantity存在且大于0,则保持原值不更新
 						order.setOriginalQuantity(existingOrder.getOriginalQuantity());
-					} 
+					}
 					if (!StringUtils.hasText(order.getProductProperties()))
 						order.setProductProperties(existingOrder.getProductProperties());
 					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
@@ -350,7 +371,8 @@ public class TemuOrderService implements ITemuOrderService {
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
-					if (order.getComplianceImageUrl() == null) order.setComplianceImageUrl(existingOrder.getComplianceImageUrl());
+					if (order.getComplianceImageUrl() == null)
+						order.setComplianceImageUrl(existingOrder.getComplianceImageUrl());
 					
 					temuOrderMapper.updateById(order);
 				} else {
@@ -421,7 +443,7 @@ public class TemuOrderService implements ITemuOrderService {
 	@Override
 	@Transactional
 	public int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO) {
-		
+		ArrayList<TemuOrderDO> temuOrderDOList = new ArrayList<>();
 		int processCount = 0;
 		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
 			//检查订单是否存在
@@ -454,11 +476,44 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderDO.setPriceRule(rule);
 			//修改订单状态
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
-			//更新订单信息
-			temuOrderMapper.updateById(temuOrderDO);
+			////更新订单信息
+			//temuOrderMapper.updateById(temuOrderDO);
+			temuOrderDOList.add(temuOrderDO);
 			processCount++;
 		}
+		//批量更新订单
+		temuOrderMapper.updateBatch(temuOrderDOList);
+		//批量支付订单
+		payOrderBatch(temuOrderDOList);
 		return processCount;
+	}
+	
+	private void payOrderBatch(ArrayList<TemuOrderDO> temuOrderDOList) {
+		//检查当前订单是否允许被支付
+		DictTypeDO dictTypeDO = dictTypeMapper.selectByType("temu_order_batch_pay_order_status");
+		//如果状态开启那么开始处理支付
+		if (dictTypeDO.getStatus() == 0) {
+			//统计订单总金额
+			BigDecimal totalPrice = temuOrderDOList.stream().map(TemuOrderDO::getTotalPrice).reduce(BigDecimal::add).orElse(BigDecimal.ZERO);
+			//检查当前用户是否存在余额
+			LoginUser loginUser = getLoginUser();
+			if (loginUser == null) {
+				throw exception(USER_NOT_EXISTS);
+			}
+			// 获得用户钱包
+			PayWalletDO wallet = payWalletService.getOrCreateWallet(loginUser.getId(), ADMIN.getValue());
+			if (wallet == null) {
+				throw exception(WALLET_NOT_FOUND);
+			}
+			//检查用户余额是否充足
+			if (new BigDecimal(wallet.getBalance() / 100).compareTo(totalPrice) < 0) {
+				throw exception(ErrorCodeConstants.WALLET_NOT_ENOUGH);
+			}
+			temuOrderDOList.forEach(temuOrderDO -> {
+				payWalletService.reduceWalletBalance(wallet.getId(), temuOrderDO.getId(), PayWalletBizTypeEnum.PAYMENT_TEMU_ORDER, temuOrderDO.getTotalPrice().multiply(new BigDecimal(100)).intValue());
+			});
+		}
+		
 	}
 	
 	@Override
@@ -479,8 +534,8 @@ public class TemuOrderService implements ITemuOrderService {
 		}
 		//根据分类类型匹配合规单
 		Map<String, Object> oldTypeUrl = temuShopDO.getOldTypeUrl();
-	
-		return new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), oldTypeUrl!=null?convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())):"");
+		
+		return new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), oldTypeUrl != null ? convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())) : "");
 	}
 	
 	@Override
@@ -522,7 +577,7 @@ public class TemuOrderService implements ITemuOrderService {
 			temuShopMapper.updateById(existingShop);
 		}
 	}
-
+	
 	@Async
 	public void updateOrderMergedUrl(Long orderId, String url) {
 		if (orderId == null || url == null) {
@@ -534,7 +589,7 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderMapper.updateById(order);
 		}
 	}
-
+	
 	@Async
 	public void updateOrderGoodsSn(Long orderId, String url) {
 		if (orderId == null || url == null) {
@@ -546,5 +601,5 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderMapper.updateById(order);
 		}
 	}
-
+	
 }

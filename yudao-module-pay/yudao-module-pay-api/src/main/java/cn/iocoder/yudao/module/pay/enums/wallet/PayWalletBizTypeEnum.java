@@ -18,9 +18,11 @@ public enum PayWalletBizTypeEnum implements ArrayValuable<Integer> {
     RECHARGE(1, "充值"),
     RECHARGE_REFUND(2, "充值退款"),
     PAYMENT(3, "支付"),
+    PAYMENT_TEMU_ORDER(7, "TEMU订单支付"),
     PAYMENT_REFUND(4, "支付退款"),
     UPDATE_BALANCE(5, "更新余额"),
     BROKERAGE_WITHDRAW(6, "分佣提现");
+  
 
     /**
      * 业务分类

@@ -147,7 +147,8 @@ public class PayWalletServiceImpl implements PayWalletService {
             // 2. 扣除余额
             int updateCounts;
             switch (bizType) {
-                case PAYMENT: {
+                case PAYMENT:
+	            case PAYMENT_TEMU_ORDER: {
                     updateCounts = walletMapper.updateWhenConsumption(payWallet.getId(), price);
                     break;
                 }
@@ -155,7 +156,7 @@ public class PayWalletServiceImpl implements PayWalletService {
                     updateCounts = walletMapper.updateWhenRechargeRefund(payWallet.getId(), price);
                     break;
                 }
-                default: {
+	            default: {
                     // TODO 其它类型待实现
                     throw new UnsupportedOperationException("待实现");
                 }
