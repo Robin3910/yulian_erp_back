@@ -2,11 +2,15 @@ package cn.iocoder.yudao.module.temu.service.shop.impl;
 
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.shopBatch.*;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopOldTypeSkcDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopOldTypeSkcMapper;
+import cn.iocoder.yudao.module.temu.service.pdf.AsyncPdfProcessService;
 import cn.iocoder.yudao.module.temu.service.shop.TemuShopOldTypeService;
 import cn.iocoder.yudao.module.temu.utils.pdf.PdfToImageUtil;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,9 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -25,8 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
 
     private final TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
-    // 阿里云OSS服务接口
+    private final TemuOrderMapper temuOrderMapper;
     private final TemuOssService temuOssService;
+    private final AsyncPdfProcessService asyncPdfProcessService;
 
     // 一次转换 重复使用 PDF转换图片URL结果
     // 缓存PDF转图片结果 避免同一店铺同一合规单类型下的合规单图片url重复转换 浪费资源
@@ -63,6 +70,9 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
             } else {
                 insertList.add(oldTypeSkcDO);
             }
+
+            // 处理近两天内的订单PDF合并
+            processRecentOrders(reqVO.getShopId(), reqVO.getSkc(), reqVO.getOldTypeUrl());
         }
         // 执行批量插入操作
         if (!insertList.isEmpty()) {
@@ -73,6 +83,58 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
             temuShopOldTypeSkcMapper.updateByIdWithoutDeleted(updateObj);
         }
         return insertList.size() + updateList.size();
+    }
+
+    /**
+     * 处理近两天内的订单PDF合并
+     * @param shopId 店铺ID
+     * @param skc SKC编号
+     * @param oldTypeUrl 合规单URL
+     */
+    private void processRecentOrders(Long shopId, String skc, String oldTypeUrl) {
+        try {
+            // 计算三天前的时间
+            LocalDateTime twoDaysAgo = LocalDateTime.now().minusDays(3);
+
+            // 查询符合条件的订单
+            LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<TemuOrderDO>()
+                    .eq(TemuOrderDO::getShopId, shopId)
+                    .eq(TemuOrderDO::getSkc, skc)
+                    .ge(TemuOrderDO::getBookingTime, twoDaysAgo);
+
+            List<TemuOrderDO> orders = temuOrderMapper.selectList(queryWrapper);
+
+            // 处理每个订单
+            for (TemuOrderDO order : orders) {
+                if (StrUtil.isNotEmpty(order.getGoodsSn()) && StrUtil.isNotEmpty(order.getCustomSku())) {
+                    // 异步处理PDF合并
+                    CompletableFuture<String> future = asyncPdfProcessService.processPdfAsync(
+                            oldTypeUrl,
+                            order.getGoodsSn(),
+                            order.getCustomSku(),
+                            temuOssService
+                    );
+
+                    // 处理合并结果
+                    future.thenAccept(mergedUrl -> {
+                        if (StrUtil.isNotEmpty(mergedUrl)) {
+                            // 更新订单的合并PDF URL
+                            TemuOrderDO currentOrder = temuOrderMapper.selectById(order.getId());
+                            if (currentOrder != null) {
+                                currentOrder.setComplianceGoodsMergedUrl(mergedUrl);
+                                temuOrderMapper.updateById(currentOrder);
+                                log.info("订单PDF合并成功 - orderId: {}, mergedUrl: {}", order.getId(), mergedUrl);
+                            }
+                        }
+                    }).exceptionally(e -> {
+                        log.error("订单PDF合并失败 - orderId: {}, error: {}", order.getId(), e.getMessage());
+                        return null;
+                    });
+                }
+            }
+        } catch (Exception e) {
+            log.error("处理近两天订单PDF合并失败 - shopId: {}, skc: {}", shopId, skc, e);
+        }
     }
 
     // 批量更新合规单信息
