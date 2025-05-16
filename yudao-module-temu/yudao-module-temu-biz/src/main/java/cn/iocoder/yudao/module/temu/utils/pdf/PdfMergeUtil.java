@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.utils.pdf;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
+import cn.iocoder.yudao.module.temu.utils.io.ThrottledInputStream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.multipdf.LayerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -16,8 +17,12 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
 
 /**
  * PDF合并工具类
@@ -25,6 +30,47 @@ import java.net.URL;
  */
 @Slf4j
 public class PdfMergeUtil {
+
+    // 下载限速：128KB/s
+    private static final int DOWNLOAD_SPEED_LIMIT = 128 * 1024;
+
+    // 上传限速：128KB/s
+    private static final int UPLOAD_SPEED_LIMIT = 128 * 1024;
+
+    /**
+     * 从URL下载PDF文档，并应用带宽限制
+     */
+    private static PDDocument downloadPdfWithThrottle(String pdfUrl) throws IOException {
+        URL url = new URL(pdfUrl);
+        try (InputStream inputStream = url.openStream();
+                BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
+            // 应用限速
+            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream,
+                    DOWNLOAD_SPEED_LIMIT);
+            return PDDocument.load(throttledInputStream);
+        }
+    }
+
+    /**
+     * 带限速的文件上传到OSS
+     */
+    private static String uploadFileWithThrottle(MultipartFile file, TemuOssService ossService) throws IOException {
+        // 使用缓冲流来读取文件
+        try (BufferedInputStream bis = new BufferedInputStream(file.getInputStream())) {
+            // 创建限速输入流
+            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
+
+            // 创建新的MultipartFile对象，使用限速输入流
+            MultipartFile throttledFile = new MockMultipartFile(
+                    file.getName(),
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    throttledInputStream);
+
+            // 上传到OSS
+            return ossService.uploadFile(throttledFile);
+        }
+    }
 
     /**
      * 合并两个PDF文件并上传到OSS（统一入口）
@@ -51,7 +97,7 @@ public class PdfMergeUtil {
             byte[] mergedPdfBytes;
             // 如果提供了SKU，先检查是否需要处理多页PDF
             if (StrUtil.isNotEmpty(customSku)) {
-                try (PDDocument secondDoc = PDDocument.load(new URL(secondPdfUrl).openStream())) {
+                try (PDDocument secondDoc = downloadPdfWithThrottle(secondPdfUrl)) {
                     int pageCount = secondDoc.getNumberOfPages();
 
                     if (pageCount > 1) {
@@ -73,8 +119,8 @@ public class PdfMergeUtil {
                                     tempFileName,
                                     "application/pdf",
                                     baos.toByteArray());
-                            // 上传临时文件到OSS并获取URL
-                            String tempUrl = ossService.uploadFile(tempFile);
+                            // 上传临时文件到OSS并获取URL（使用限速上传）
+                            String tempUrl = uploadFileWithThrottle(tempFile, ossService);
                             // 使用临时URL进行合并
                             mergedPdfBytes = mergePdfsWithScaling(firstPdfUrl, tempUrl);
                         }
@@ -98,24 +144,28 @@ public class PdfMergeUtil {
                     fileName,
                     "application/pdf",
                     mergedPdfBytes);
-            // 上传到OSS
-            return ossService.uploadFile(multipartFile);
+            // 使用限速上传到OSS
+            return uploadFileWithThrottle(multipartFile, ossService);
         } catch (Exception e) {
             log.error("合并PDF失败。firstPdfUrl: {}, secondPdfUrl: {}, customSku: {}", firstPdfUrl, secondPdfUrl, customSku,
                     e);
             return null;
         }
     }
+
     /**
      * 合并两个PDF文件，并对合规单进行缩放（内部方法）
      */
     private static byte[] mergePdfsWithScaling(String firstPdfUrl, String secondPdfUrl) throws IOException {
-        try (PDDocument firstDoc = PDDocument.load(new URL(firstPdfUrl).openStream());
-                PDDocument secondDoc = PDDocument.load(new URL(secondPdfUrl).openStream());
+        // 使用临时文件来减少内存使用
+        File tempFile = null;
+        try (PDDocument firstDoc = downloadPdfWithThrottle(firstPdfUrl);
+                PDDocument secondDoc = downloadPdfWithThrottle(secondPdfUrl);
                 PDDocument mergedDoc = new PDDocument()) {
+
             // 获取两个PDF的第一页
-            PDPage compliancePage = firstDoc.getPage(0); // 合规单
-            PDPage barcodePage = secondDoc.getPage(0); // 商品条码
+            PDPage compliancePage = firstDoc.getPage(0);
+            PDPage barcodePage = secondDoc.getPage(0);
 
             // 获取页面尺寸
             PDRectangle complianceSize = compliancePage.getMediaBox();
@@ -130,42 +180,48 @@ public class PdfMergeUtil {
             PDFormXObject barcodeForm = layerUtility.importPageAsForm(secondDoc, 0);
             PDFormXObject complianceForm = layerUtility.importPageAsForm(firstDoc, 0);
 
-            // 计算合规单需要缩放的高度比例
-            // 目标：商品条码原尺寸 + 缩放后的合规单高度 = 原合规单高度
             float targetComplianceHeight = complianceSize.getHeight() - barcodeSize.getHeight();
             float heightScale = targetComplianceHeight / complianceSize.getHeight();
 
-            // 开始内容流
+            // 创建临时文件
+            tempFile = File.createTempFile("merged_pdf_", ".pdf");
+
+            // 使用临时文件写入合并后的PDF
             try (PDPageContentStream contentStream = new PDPageContentStream(mergedDoc, newPage)) {
-                // 绘制商品条码 - 原尺寸，居中放置在上方
+                // 绘制商品条码
                 contentStream.saveGraphicsState();
-                // 计算水平居中的位置
                 float barcodeX = (complianceSize.getWidth() - barcodeSize.getWidth()) / 2;
                 float barcodeY = complianceSize.getHeight() - barcodeSize.getHeight();
                 contentStream.transform(Matrix.getTranslateInstance(barcodeX, barcodeY));
                 contentStream.drawForm(barcodeForm);
                 contentStream.restoreGraphicsState();
 
-                // 绘制合规单 - 只缩小高度，放在下方
+                // 绘制合规单
                 contentStream.saveGraphicsState();
-                // 计算水平居中的位置
-                float complianceX = 0; // 不需要水平居中，保持原始宽度
-                float complianceY = 0; // 从底部开始
-                contentStream.transform(Matrix.getTranslateInstance(complianceX, complianceY));
-                // 分别设置宽度和高度的缩放比例
-                contentStream.transform(Matrix.getScaleInstance(1.0f, heightScale)); // 宽度比例为1，保持不变
+                contentStream.transform(Matrix.getTranslateInstance(0, 0));
+                contentStream.transform(Matrix.getScaleInstance(1.0f, heightScale));
                 contentStream.drawForm(complianceForm);
                 contentStream.restoreGraphicsState();
             }
 
-            // 将合并后的文档转换为字节数组
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            mergedDoc.save(baos);
-            return baos.toByteArray();
+            mergedDoc.save(tempFile);
+
+            // 使用NIO读取临时文件
+            byte[] result = Files.readAllBytes(tempFile.toPath());
+            return result;
 
         } catch (Exception e) {
             log.error("合并PDF文件失败", e);
             return null;
+        } finally {
+            // 清理临时文件
+            if (tempFile != null && tempFile.exists()) {
+                try {
+                    Files.delete(tempFile.toPath());
+                } catch (IOException e) {
+                    log.warn("删除临时文件失败", e);
+                }
+            }
         }
     }
 
@@ -217,7 +273,7 @@ public class PdfMergeUtil {
                 return null;
             }
 
-            try (PDDocument document = PDDocument.load(new URL(goodsSn).openStream())) {
+            try (PDDocument document = downloadPdfWithThrottle(goodsSn)) {
                 int pageCount = document.getNumberOfPages();
 
                 // 如果是单页PDF，直接返回原URL
@@ -246,8 +302,8 @@ public class PdfMergeUtil {
                             "application/pdf",
                             baos.toByteArray());
 
-                    // 上传到OSS并返回URL
-                    return ossService.uploadFile(multipartFile);
+                    // 使用限速上传到OSS
+                    return uploadFileWithThrottle(multipartFile, ossService);
                 }
             }
         } catch (Exception e) {
