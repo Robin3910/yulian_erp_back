@@ -257,12 +257,25 @@ public class TemuOrderService implements ITemuOrderService {
 					currentCustomSku = sku;
 					order.setCustomSku(currentCustomSku); // 更新订单对象
 				}
-				
+
+				// 从商品条形码PDF提取指定页面	无论合规单是否存在，只要商品条码URL有效且SKU已赋值，则执行提取
+				if (StrUtil.isNotBlank(goodsSnUrl) && StrUtil.isNotBlank(currentCustomSku)) {
+					CompletableFuture<String> goodsSnFuture = asyncPdfService.extractPageAsync(
+							goodsSnUrl,
+							currentCustomSku,
+							temuOssService
+					);
+					goodsSnFuture.thenAccept(url -> {
+						if (url != null) {
+							updateOrderGoodsSn(order.getId(), url);
+						}
+					});
+				}
+
 				// 判断合规单URL和商品条形码URL是否均非空
 				if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
 					// 执行以下两个异步操作：
 					// 1. 合并合规单PDF与商品条形码PDF
-					// 2. 从商品条形码PDF提取指定页面
 					// 通过CompletableFuture实现非阻塞处理，提升系统吞吐量
 					
 					// 启动PDF合并任务（异步操作）
@@ -271,12 +284,7 @@ public class TemuOrderService implements ITemuOrderService {
 							goodsSnUrl,
 							currentCustomSku,
 							temuOssService);
-					// 启动PDF页面提取任务（异步操作）
-					CompletableFuture<String> goodsSnFuture = asyncPdfService.extractPageAsync(
-							goodsSnUrl,
-							currentCustomSku,
-							temuOssService);
-					
+
 					// 设置回调更新订单
 					mergedUrlFuture.thenAccept(url -> {
 						if (url != null) {
@@ -285,13 +293,6 @@ public class TemuOrderService implements ITemuOrderService {
 							
 						}
 					});
-					goodsSnFuture.thenAccept(url -> {
-						if (url != null) {
-							// 更新订单提取后的独立条形码PDF地址
-							updateOrderGoodsSn(order.getId(), url);
-						}
-					});
-					
 				}
 				
 				// 设置价格和数量
