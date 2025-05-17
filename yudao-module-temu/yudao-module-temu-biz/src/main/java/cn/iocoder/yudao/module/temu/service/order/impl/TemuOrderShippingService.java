@@ -203,7 +203,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		return new PageResult<>(voList, total, pageVO.getPageNo(), pageVO.getPageSize());
 	}
 	
-	// 批量保存待发货订单
+	//
 	
 	/**
 	 * 物流单号可以重复
@@ -236,7 +236,18 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				throw new IllegalArgumentException("物流单号不能为空");
 			}
 		}
-		
+
+		// 特殊情况： 平台物流取消重新预约 再次同步物流记录的 店铺，订单编号一样，但是物流单号会改变，之前的物流记录作废，保证同步上来的是最新的
+		// 删除这些订单对应的未发货记录（按orderNo和shopId匹配），即使 shippingStatus是 已发货状态 也删除
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			shippingInfoMapper.delete(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
+							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
+							//.eq(TemuOrderShippingInfoDO::getShippingStatus, 0) // 只删除未发货的记录
+			);
+		}
+
 		// 2. 提取所有 trackingNumber
 		Set<String> trackingNumbers = saveRequestVOs.stream()
 				.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
