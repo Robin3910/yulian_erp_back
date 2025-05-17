@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.order.impl;
 
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
@@ -44,6 +45,7 @@ import java.util.concurrent.CompletableFuture;
 import javax.annotation.Resource;
 
 import cn.iocoder.yudao.module.temu.service.pdf.AsyncPdfProcessService;
+import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 
 import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN;
 import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.MEMBER;
@@ -62,6 +64,12 @@ public class TemuOrderService implements ITemuOrderService {
 	
 	@Resource
 	TemuUserShopMapper temuUserShopMapper;
+	
+	@Resource
+	private TemuOrderBatchRelationMapper temuOrderBatchRelationMapper;
+
+	@Resource
+	private WeiXinProducer weiXinProducer;
 	
 	@Resource
 	TemuProductCategoryMapper temuProductCategoryMapper;
@@ -326,6 +334,9 @@ public class TemuOrderService implements ITemuOrderService {
 				
 				// 检查订单是否已存在
 				TemuOrderDO existingOrder = temuOrderMapper.selectByCustomSku(order.getCustomSku());
+				// bookingTime 要识别一下，bookingTime不一样的话，就插入新的数据
+				// 1、不是返单，只是更新 => 拿到数据正常更新
+				// 2、bookingTime不一样，属于返单 => 需要删除batch_relation表中的记录，并将status置为0，往企业微信发消息
 				if (existingOrder != null) {
 					// 更新现有订单，只更新非空字段
 					order.setId(existingOrder.getId());
@@ -350,7 +361,29 @@ public class TemuOrderService implements ITemuOrderService {
 					}
 					if (!StringUtils.hasText(order.getProductProperties()))
 						order.setProductProperties(existingOrder.getProductProperties());
-					if (order.getBookingTime() == null) order.setBookingTime(existingOrder.getBookingTime());
+
+					// 如果bookingTime不一样，说明是返单
+					if (order.getBookingTime() != null && !order.getBookingTime().equals(existingOrder.getBookingTime())) {
+						// 删除关联关系
+						temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
+						// 将状态置为0
+						order.setOrderStatus(0);
+						// 发送企业微信消息
+						String message = String.format("订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
+							order.getOrderNo(),	
+							order.getCustomSku(),
+							DateUtil.format(existingOrder.getBookingTime(), "yyyy-MM-dd HH:mm:ss"),
+							DateUtil.format(order.getBookingTime(), "yyyy-MM-dd HH:mm:ss"));
+						// 获取shopId为88888888的店铺webhook地址
+						TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+						if (shop != null && StringUtils.hasText(shop.getWebhook())) {
+							weiXinProducer.sendMessage(shop.getWebhook(), message.toString());
+						}
+					}
+					// 如果bookingTime为空，则使用existingOrder的bookingTime,这种是上传定制图片的场景
+					if (order.getBookingTime() == null) {
+						order.setBookingTime(existingOrder.getBookingTime());
+					}
 					if (order.getShopId() == null) order.setShopId(existingOrder.getShopId());
 					if (!StringUtils.hasText(order.getCustomImageUrls()))
 						order.setCustomImageUrls(existingOrder.getCustomImageUrls());
