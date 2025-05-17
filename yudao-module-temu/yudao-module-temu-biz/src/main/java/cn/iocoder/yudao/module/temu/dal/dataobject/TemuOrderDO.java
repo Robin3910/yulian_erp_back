@@ -129,12 +129,12 @@ public class TemuOrderDO extends BaseDO {
 	 * 商品编号
 	 */
 	private String goodsSn;
-
+	
 	/**
 	 * 合规单URL
 	 */
 	private String complianceUrl;
-
+	
 	/**
 	 * 合规单图片URL
 	 */
@@ -144,14 +144,23 @@ public class TemuOrderDO extends BaseDO {
 	 * 订单备注
 	 */
 	private String remark;
-
+	
 	/*
 	 * temu官方后台显示的数量
 	 */
 	private Integer originalQuantity;
-
+	
 	/**
 	 * 合规单和商品条码PDF合并URL
 	 */
 	private String complianceGoodsMergedUrl;
+	/**
+	 * 是否完成绘图任务
+	 */
+	private Integer isCompleteDrawTask;
+	/**
+	 * 是否完成生产任务
+	 */
+	private Integer isCompleteProducerTask;
+	
 }

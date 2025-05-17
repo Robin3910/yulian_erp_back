@@ -25,6 +25,7 @@ public interface ErrorCodeConstants {
 	ErrorCode ORDER_BATCH_TASK_NOT_EXISTS = new ErrorCode(1_001_002_006, "订单批次任务不存在");
 	ErrorCode ORDER_BATCH_TASK_NOT_OWNER = new ErrorCode(1_001_002_007, "不是任务的所有者无法处理当前任务");
 	ErrorCode ORDER_BATCH_TASK_COMPLETE = new ErrorCode(1_001_002_008, "当前订单批次任务已经完成无法再次操作");
+	ErrorCode ORDER_BATCH_TASK_STATUS_ERROR = new ErrorCode(1_001_002_001, "当前批次任务状态下不允许操作");
 	
 	
 	ErrorCode WALLET_NOT_ENOUGH =  new ErrorCode(1_001_003_001, "钱包余额不足");

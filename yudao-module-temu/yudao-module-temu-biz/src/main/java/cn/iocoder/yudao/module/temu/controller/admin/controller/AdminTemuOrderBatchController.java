@@ -94,7 +94,7 @@ public class AdminTemuOrderBatchController {
 	}
 	
 	@PutMapping("/update-status-by-task")
-	@Operation(summary = "更新订单批次状态")
+	@Operation(summary = "确认完成批次任务")
 	public CommonResult<?> updateStatusByTask(@Valid @RequestBody TemuOrderBatchUpdateStatusByTaskVO temuOrderBatchUpdateStatusVO) {
 		return CommonResult.success(temuOrderBatchService.updateStatusByTask(temuOrderBatchUpdateStatusVO));
 	}
@@ -119,5 +119,12 @@ public class AdminTemuOrderBatchController {
 	@Operation(summary = "批量分配批次订单任务")
 	public CommonResult<?> dispatchTask(@Valid @RequestBody TemuOrderBatchDispatchTaskVO requestVO) {
 		return CommonResult.success(temuOrderBatchService.dispatchTask(requestVO));
+	}
+//
+	//完成单个批次任务中的单个订单任务
+	@PostMapping("/complete-batch-order-task")
+	@Operation(summary = "完成单个批次任务中的单个订单任务")
+	public CommonResult<?> completeBatchOrderTask(@Valid @RequestBody TemuOrderBatchCompleteOrderTaskVO requestVO) {
+		return CommonResult.success(temuOrderBatchService.completeBatchOrderTask(requestVO));
 	}
 }

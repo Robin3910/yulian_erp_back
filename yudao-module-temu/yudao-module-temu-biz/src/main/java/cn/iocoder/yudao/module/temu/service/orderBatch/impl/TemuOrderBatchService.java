@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
+import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
@@ -264,22 +265,22 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			throw exception(ORDER_BATCH_TASK_NOT_OWNER);
 		}
 		//待处理状态下完成任务 ，并且修改下个关联任务的状态
-		if (temuOrderBatchTaskDO.getStatus() == TemuOrderBatchStatusEnum.TASK_STATUS_WAIT) {
-			temuOrderBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_COMPLETE);
-			orderBatchTaskMapper.updateById(temuOrderBatchTaskDO);
-			if (temuOrderBatchTaskDO.getNextTaskType() != null) {
-				//	查找类型和相同批次id任务
-				TemuOrderBatchTaskDO nextBatchTaskDO = orderBatchTaskMapper.selectOne(new QueryWrapper<TemuOrderBatchTaskDO>()
-						.eq("batch_order_id", temuOrderBatchTaskDO.getBatchOrderId())
-						.eq("type", temuOrderBatchTaskDO.getNextTaskType())
-						.eq("status", TemuOrderBatchStatusEnum.TASK_STATUS_NOT_HANDLED)
-				);
-				if (nextBatchTaskDO != null) {
-					nextBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_WAIT);
-					orderBatchTaskMapper.updateById(nextBatchTaskDO);
-				}
-			}
-		}
+		//if (temuOrderBatchTaskDO.getStatus() == TemuOrderBatchStatusEnum.TASK_STATUS_WAIT) {
+		//	temuOrderBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_COMPLETE);
+		//	orderBatchTaskMapper.updateById(temuOrderBatchTaskDO);
+		//	if (temuOrderBatchTaskDO.getNextTaskType() != null) {
+		//		//	查找类型和相同批次id任务
+		//		TemuOrderBatchTaskDO nextBatchTaskDO = orderBatchTaskMapper.selectOne(new QueryWrapper<TemuOrderBatchTaskDO>()
+		//				.eq("batch_order_id", temuOrderBatchTaskDO.getBatchOrderId())
+		//				.eq("type", temuOrderBatchTaskDO.getNextTaskType())
+		//				.eq("status", TemuOrderBatchStatusEnum.TASK_STATUS_NOT_HANDLED)
+		//		);
+		//		if (nextBatchTaskDO != null) {
+		//			nextBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_WAIT);
+		//			orderBatchTaskMapper.updateById(nextBatchTaskDO);
+		//		}
+		//	}
+		//}
 		return temuOrderBatchMapper.updateById(BeanUtils.toBean(temuOrderBatchUpdateFileVO, TemuOrderBatchDO.class));
 	}
 	
@@ -335,12 +336,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderBatchTaskDO.getStatus() == TemuOrderBatchStatusEnum.TASK_STATUS_COMPLETE) {
 			throw exception(ORDER_BATCH_TASK_COMPLETE);
 		}
-		//待处理状态下完成任务 ，并且修改下个关联任务的状态
-		if (temuOrderBatchTaskDO.getStatus() == TemuOrderBatchStatusEnum.TASK_STATUS_WAIT) {
-			temuOrderBatchTaskDO.setStatus(TemuOrderBatchStatusEnum.TASK_STATUS_COMPLETE);
-			orderBatchTaskMapper.updateById(temuOrderBatchTaskDO);
-		}
-		//检查批次订单是否存在
+		
+		//检查关联的批次订单是否存在
 		TemuOrderBatchDO temuOrderBatchDO = temuOrderBatchMapper.selectById(temuOrderBatchUpdateStatusVO.getId());
 		if (temuOrderBatchDO == null) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
@@ -362,13 +359,29 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		List<TemuOrderDO> temuOrderDOList = orderIds.stream().unordered().map(orderId -> {
 			TemuOrderDO temuOrderDO = new TemuOrderDO();
 			temuOrderDO.setId(orderId);
-			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.SHIPPED);
+			//作图员
+			if (temuOrderBatchTaskDO.getType() == TASK_TYPE_PRODUCTION) {
+				temuOrderDO.setOrderStatus(TemuOrderStatusEnum.SHIPPED);
+				temuOrderDO.setIsCompleteProducerTask(1);
+				
+			}
+			//生产员
+			if (temuOrderBatchTaskDO.getType() == TASK_TYPE_ART) {
+				temuOrderDO.setIsCompleteDrawTask(TemuOrderStatusEnum.TASK_STATUS_COMPLETE);
+			}
 			return temuOrderDO;
 		}).collect(Collectors.toList());
 		temuOrderMapper.updateBatch(temuOrderDOList);
-		//设置批次订单状态
-		temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
-		return temuOrderBatchMapper.updateById(temuOrderBatchDO);
+		//设置批次订单状态 生产任务完成 则整个任务就完成了
+		if (temuOrderBatchTaskDO.getType() == TASK_TYPE_PRODUCTION) {
+			temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
+			temuOrderBatchMapper.updateById(temuOrderBatchDO);
+		}
+		
+		//设置已分配任务的完成状态
+		temuOrderBatchTaskDO.setStatus(TASK_STATUS_COMPLETE);
+		
+		return orderBatchTaskMapper.updateById(temuOrderBatchTaskDO);
 	}
 	
 	@Override
@@ -413,6 +426,20 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			if (temuOrderBatchDO.getIsDispatchTask() != null && temuOrderBatchDO.getIsDispatchTask() == DISPATCH_TASK) {
 				throw exception(ORDER_BATCH_STATUS_ERROR);
 			}
+			//批量修改批次下订单的任务状态
+			List<TemuOrderBatchRelationDO> temuOrderBatchRelationList = temuOrderBatchRelationMapper.selectList(TemuOrderBatchRelationDO::getBatchId, orderId);
+			if (temuOrderBatchRelationList != null && !temuOrderBatchRelationList.isEmpty()) {
+				List<TemuOrderDO> collect = temuOrderBatchRelationList.stream().map(temuOrderBatchRelationDO -> {
+					TemuOrderDO temuOrderDO = new TemuOrderDO();
+					temuOrderDO.setId(temuOrderBatchRelationDO.getOrderId());
+					temuOrderDO.setIsCompleteDrawTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+					temuOrderDO.setIsCompleteProducerTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+					return temuOrderDO;
+				}).collect(Collectors.toList());
+				//初始化任务完成状态
+				temuOrderMapper.updateBatch(collect);
+			}
+			//设置批次分配状态
 			temuOrderBatchDO.setIsDispatchTask(DISPATCH_TASK);
 			temuOrderBatchDOList.add(temuOrderBatchDO);
 			//作图员任务分配
@@ -427,14 +454,71 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			temuOrderBatchTaskDOList.add(TemuOrderBatchTaskDO.builder()
 					.batchOrderId(orderId)
 					.userId(requestVO.getProductionStaffUserId())
+					.status(TASK_STATUS_WAIT)
 					.type(TASK_TYPE_PRODUCTION)
-					.status(TASK_STATUS_NOT_HANDLED)
 					.build());
 		}
 		//处理批量插入
 		temuOrderBatchMapper.updateBatch(temuOrderBatchDOList);
 		orderBatchTaskMapper.insertBatch(temuOrderBatchTaskDOList);
 		return true;
+	}
+	
+	@Override
+	@Transactional
+	public int completeBatchOrderTask(TemuOrderBatchCompleteOrderTaskVO requestVO) {
+		//检查批次任务是否存在
+		TemuOrderBatchTaskDO orderBatchTaskDO = orderBatchTaskMapper.selectById(requestVO.getTaskId());
+		if (orderBatchTaskDO == null) {
+			throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_NOT_EXISTS);
+		}
+		//检查批次任务是否已经完成
+		if (orderBatchTaskDO.getStatus() != TASK_STATUS_WAIT) {
+			throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_STATUS_ERROR);
+		}
+		//批次根据批次类型设置订单的状态
+		TemuOrderDO temuOrderDO = new TemuOrderDO();
+		temuOrderDO.setId(requestVO.getOrderId());
+		switch (orderBatchTaskDO.getType()) {
+			case TASK_TYPE_ART:
+				//作图任务
+				temuOrderDO.setIsCompleteDrawTask(ORDER_TASK_STATUS_COMPLETE);
+				break;
+			case TASK_TYPE_PRODUCTION:
+				//生产任务
+				temuOrderDO.setIsCompleteProducerTask(ORDER_TASK_STATUS_COMPLETE);
+				break;
+		}
+		temuOrderMapper.updateById(temuOrderDO);
+		//检查当前任务关联的订单是否完成当前类型的所有任务  如果已经完成 修改当前批次任务的
+		MPJLambdaWrapperX<TemuOrderBatchRelationDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
+		objectMPJLambdaWrapperX
+				.selectAll(TemuOrderBatchRelationDO.class)
+				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId);
+		switch (orderBatchTaskDO.getType()) {
+			case TASK_TYPE_ART:
+				//查找作图任务没有完成的记录
+				objectMPJLambdaWrapperX.eq(TemuOrderDO::getIsCompleteDrawTask, ORDER_TASK_STATUS_NOT_COMPLETE);
+				break;
+			case TASK_TYPE_PRODUCTION:
+				//查找生产任务没有完成的记录
+				objectMPJLambdaWrapperX.eq(TemuOrderDO::getIsCompleteProducerTask, ORDER_TASK_STATUS_NOT_COMPLETE);
+				break;
+		}
+		List<TemuOrderBatchRelationDO> temuOrderBatchRelationList = temuOrderBatchRelationMapper.selectJoinList(TemuOrderBatchRelationDO.class, objectMPJLambdaWrapperX);
+		if (temuOrderBatchRelationList == null || temuOrderBatchRelationList.isEmpty()) {
+			//更新任务完成状态
+			orderBatchTaskDO.setStatus(TASK_STATUS_COMPLETE);
+			orderBatchTaskMapper.updateById(orderBatchTaskDO);
+			//如果批次任务类型是生产 需要修改批次任务为已完成 修改所有批次关联的订单状态得待发货
+			if(orderBatchTaskDO.getType()==TASK_TYPE_PRODUCTION){
+				TemuOrderBatchUpdateStatusByTaskVO temuOrderBatchUpdateStatusByTaskVO = new TemuOrderBatchUpdateStatusByTaskVO();
+				temuOrderBatchUpdateStatusByTaskVO.setId(orderBatchTaskDO.getBatchOrderId());
+				temuOrderBatchUpdateStatusByTaskVO.setTaskId(orderBatchTaskDO.getId());
+				updateStatusByTask(temuOrderBatchUpdateStatusByTaskVO);
+			}
+		}
+		return 1;
 	}
 	
 	private PageResult<TemuOrderBatchUserDetailDO> selectUserPage(TemuOrderBatchPageVO temuOrderBatchPageVO) {

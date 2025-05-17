@@ -16,6 +16,10 @@ public interface TemuOrderBatchStatusEnum {
 	int TASK_STATUS_NOT_HANDLED = 0;
 	int TASK_STATUS_WAIT = 1;
 	int TASK_STATUS_COMPLETE = 2;
+	
+	//订单任务完成状态 0未完成 1已完成
+	int ORDER_TASK_STATUS_NOT_COMPLETE = 0;
+	int ORDER_TASK_STATUS_COMPLETE = 1;
 
 	
 }

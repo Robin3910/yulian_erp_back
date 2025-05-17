@@ -8,4 +8,8 @@ public interface TemuOrderStatusEnum {
 	int SHIPPED = 3;
 	int COMPLETED = 4;
 	int CANCELLED = 5;
+	
+	//分配任务完成状态
+	int TASK_STATUS_WAIT = 0;
+	int TASK_STATUS_COMPLETE = 1;
 }
