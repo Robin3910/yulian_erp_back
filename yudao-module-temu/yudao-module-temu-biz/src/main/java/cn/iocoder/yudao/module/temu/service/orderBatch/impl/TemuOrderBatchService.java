@@ -309,6 +309,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			TemuOrderDO temuOrderDO = new TemuOrderDO();
 			temuOrderDO.setId(orderId);
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.SHIPPED);
+			temuOrderDO.setIsCompleteDrawTask(ORDER_TASK_STATUS_COMPLETE);
+			temuOrderDO.setIsCompleteProducerTask(ORDER_TASK_STATUS_COMPLETE);
 			return temuOrderDO;
 		}).collect(Collectors.toList());
 		temuOrderMapper.updateBatch(temuOrderDOList);
@@ -485,6 +487,9 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				temuOrderDO.setIsCompleteDrawTask(ORDER_TASK_STATUS_COMPLETE);
 				break;
 			case TASK_TYPE_PRODUCTION:
+				if(temuOrderDO.getIsCompleteDrawTask()!=ORDER_TASK_STATUS_COMPLETE){
+					throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_DRAW_NOT_COMPLETE);
+				}
 				//生产任务
 				temuOrderDO.setIsCompleteProducerTask(ORDER_TASK_STATUS_COMPLETE);
 				break;
@@ -511,7 +516,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			orderBatchTaskDO.setStatus(TASK_STATUS_COMPLETE);
 			orderBatchTaskMapper.updateById(orderBatchTaskDO);
 			//如果批次任务类型是生产 需要修改批次任务为已完成 修改所有批次关联的订单状态得待发货
-			if(orderBatchTaskDO.getType()==TASK_TYPE_PRODUCTION){
+			if (orderBatchTaskDO.getType() == TASK_TYPE_PRODUCTION) {
 				TemuOrderBatchUpdateStatusByTaskVO temuOrderBatchUpdateStatusByTaskVO = new TemuOrderBatchUpdateStatusByTaskVO();
 				temuOrderBatchUpdateStatusByTaskVO.setId(orderBatchTaskDO.getBatchOrderId());
 				temuOrderBatchUpdateStatusByTaskVO.setTaskId(orderBatchTaskDO.getId());
@@ -520,6 +525,60 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		}
 		return 1;
 	}
+	
+	@Override
+	@Transactional
+	public int completeBatchOrderTaskByAdmin(TemuOrderBatchCompleteOrderTaskByAdminVO requestVO) {
+		//检查批次是否存在
+		TemuOrderBatchDO temuOrderBatchDO = temuOrderBatchMapper.selectById(requestVO.getId());
+		if (temuOrderBatchDO == null) {
+			throw exception(ErrorCodeConstants.ORDER_BATCH_NOT_EXISTS);
+		}
+		//检查批次状态 已生产的批次订单不允许操作
+		if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+			throw exception(ErrorCodeConstants.ORDER_BATCH_STATUS_ERROR);
+		}
+		//检查订单状态
+		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getOrderId());
+		if (temuOrderDO == null) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+		if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.IN_PRODUCTION) {
+			throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
+		}
+		switch (requestVO.getTaskType()) {
+			case TASK_TYPE_ART:
+				temuOrderDO.setIsCompleteDrawTask(ORDER_TASK_STATUS_COMPLETE);
+				break;
+			case TASK_TYPE_PRODUCTION:
+				//作图未完成的 不允许完成生产任务
+				if (temuOrderDO.getIsCompleteDrawTask() != ORDER_TASK_STATUS_COMPLETE) {
+					throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_DRAW_NOT_COMPLETE);
+				}
+				temuOrderDO.setIsCompleteProducerTask(ORDER_TASK_STATUS_COMPLETE);
+				
+				break;
+			default:
+				throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_TYPE_ERROR);
+		}
+		//更新订单状态
+		temuOrderMapper.updateById(temuOrderDO);
+		//如果是生产类型完成任务 检查 当前批次所有的订单是否已经完成
+		if (requestVO.getTaskType() == TASK_TYPE_PRODUCTION) {
+			MPJLambdaWrapperX<TemuOrderBatchRelationDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
+			objectMPJLambdaWrapperX
+					.selectAll(TemuOrderBatchRelationDO.class)
+					.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId);
+			objectMPJLambdaWrapperX.eq(TemuOrderDO::getIsCompleteProducerTask, ORDER_TASK_STATUS_NOT_COMPLETE);
+			List<TemuOrderBatchRelationDO> temuOrderBatchRelationList = temuOrderBatchRelationMapper.selectJoinList(TemuOrderBatchRelationDO.class, objectMPJLambdaWrapperX);
+			//当所有任务已经完成的时候
+			if (temuOrderBatchRelationList == null || temuOrderBatchRelationList.isEmpty()) {
+				updateStatus(new TemuOrderBatchUpdateStatusVO().setId(requestVO.getId()));
+			}
+		}
+		return 1;
+	}
+	
 	
 	private PageResult<TemuOrderBatchUserDetailDO> selectUserPage(TemuOrderBatchPageVO temuOrderBatchPageVO) {
 		// 第一步：查询批次信息

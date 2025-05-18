@@ -120,11 +120,19 @@ public class AdminTemuOrderBatchController {
 	public CommonResult<?> dispatchTask(@Valid @RequestBody TemuOrderBatchDispatchTaskVO requestVO) {
 		return CommonResult.success(temuOrderBatchService.dispatchTask(requestVO));
 	}
-//
+	
 	//完成单个批次任务中的单个订单任务
 	@PostMapping("/complete-batch-order-task")
 	@Operation(summary = "完成单个批次任务中的单个订单任务")
 	public CommonResult<?> completeBatchOrderTask(@Valid @RequestBody TemuOrderBatchCompleteOrderTaskVO requestVO) {
 		return CommonResult.success(temuOrderBatchService.completeBatchOrderTask(requestVO));
 	}
+	
+	//完成单个批次任务中的单个订单任务[管理员版]
+	@PostMapping("/complete-batch-order-task-by-admin")
+	@Operation(summary = "完成单个批次任务中的单个订单任务[管理员版]")
+	public CommonResult<?> completeBatchOrderTaskByAdmin(@Valid @RequestBody TemuOrderBatchCompleteOrderTaskByAdminVO requestVO) {
+		return CommonResult.success(temuOrderBatchService.completeBatchOrderTaskByAdmin(requestVO));
+	}
+	
 }
