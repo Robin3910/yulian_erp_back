@@ -31,6 +31,11 @@ public class TemuShopDO extends BaseDO {
 	private String shopName;
 	
 	/**
+	 * 店铺别名
+	 */
+	private String aliasName;
+	
+	/**
 	 * 信息通知机器人webhook地址
 	 */
 	private String webhook;

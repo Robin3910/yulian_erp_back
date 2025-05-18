@@ -109,7 +109,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		TemuOrderBatchDO temuOrderBatchDO = new TemuOrderBatchDO();
 		//设置uuid年月日时分秒毫秒
 		DateTime dateTime = DateTime.now();
-		temuOrderBatchDO.setBatchNo(dateTime.toString("yyyyMMddHHmmssSSS") + (new Random().nextInt(10000) + 10000));
+		temuOrderBatchDO.setBatchNo(dateTime.toString("yyyyMMddHHmmss"));
 		int insert = temuOrderBatchMapper.insert(temuOrderBatchDO);
 		if (insert <= 0) {
 			throw exception(ORDER_BATCH_CREATE_FAIL);

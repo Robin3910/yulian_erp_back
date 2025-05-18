@@ -58,6 +58,7 @@ public class PayWalletServiceImpl implements PayWalletService {
     private PayRefundService refundService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public PayWalletDO getOrCreateWallet(Long userId, Integer userType) {
         PayWalletDO wallet = walletMapper.selectByUserIdAndType(userId, userType);
         if (wallet == null) {
