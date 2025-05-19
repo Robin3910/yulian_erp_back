@@ -30,11 +30,11 @@ public class PdfProcessConfig {
     public Executor pdfProcessExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         // 核心线程数：考虑到2核CPU，设置为3个线程（2个工作线程+1个接收线程）
-        executor.setCorePoolSize(3);
+        executor.setCorePoolSize(2);
         // 最大线程数：与核心线程数保持一致，避免创建过多线程
-        executor.setMaxPoolSize(3);
+        executor.setMaxPoolSize(2);
         // 队列容量：设置较大的队列，确保任务不丢失
-        executor.setQueueCapacity(500);
+        executor.setQueueCapacity(700);
         // 线程名前缀
         executor.setThreadNamePrefix("pdf-process-");
         // 拒绝策略：使用CallerRunsPolicy，在调用者线程中执行任务

@@ -32,10 +32,10 @@ import java.nio.file.Files;
 public class PdfMergeUtil {
 
     // 下载限速：128KB/s
-    private static final int DOWNLOAD_SPEED_LIMIT = 300 * 1024;
+    private static final int DOWNLOAD_SPEED_LIMIT = 100 * 1024;
 
     // 上传限速：128KB/s
-    private static final int UPLOAD_SPEED_LIMIT = 300 * 1024;
+    private static final int UPLOAD_SPEED_LIMIT = 100 * 1024;
 
     /**
      * 从URL下载PDF文档，并应用带宽限制
