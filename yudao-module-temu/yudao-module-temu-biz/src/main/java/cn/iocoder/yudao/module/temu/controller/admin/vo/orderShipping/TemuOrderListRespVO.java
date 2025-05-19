@@ -50,5 +50,11 @@ public class TemuOrderListRespVO {
     @Schema(description = "合规单URL")
     private String oldTypeUrl;
 
+    @Schema(description = "合规单图片URL")
+    private String complianceImageUrl;
+
+    @Schema(description = "合规单和商品条码PDF合并URL")
+    private String complianceGoodsMergedUrl;
+
 
 }
