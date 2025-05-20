@@ -26,32 +26,31 @@ public class AsyncPdfProcessService {
      *   4.将合并后的PDF上传至OSS，返回访问地址
      * @param complianceUrl  合规单URL（
      * @param goodsSnUrl     商品条形码URL
-     * @param customSku      定制SKU，用于生成合并后的文件名
      * @param temuOssService OSS服务接口，用于文件上传操作
      * @return CompletableFuture<String> 异步返回合并后的PDF文件OSS地址
      * @throws Exception 异步任务内部异常（已捕获并记录日志，返回null）
      */
     @Async("pdfProcessExecutor")// 指定自定义线程池执行异步任务
     public CompletableFuture<String> processPdfAsync(String complianceUrl, String goodsSnUrl,
-            String customSku, TemuOssService temuOssService) {
+            TemuOssService temuOssService) {
         return CompletableFuture.supplyAsync(() -> {
             long startTime = System.currentTimeMillis();
             try {
                 log.info("[PDF合并] 开始处理 - customSku: {}, complianceUrl: {}, goodsSnUrl: {}",
-                        customSku, complianceUrl, goodsSnUrl);
+                         complianceUrl, goodsSnUrl);
 
                 // 核心操作：合并PDF并上传OSS
-                String result = PdfMergeUtil.mergePdfsAndUpload(complianceUrl, goodsSnUrl, customSku, temuOssService);
+                String result = PdfMergeUtil.mergePdfsAndUpload(complianceUrl, goodsSnUrl, temuOssService);
 
                 long endTime = System.currentTimeMillis();
                 log.info("[PDF合并] 处理完成 - customSku: {}, 耗时: {}ms, 结果URL: {}",
-                        customSku, (endTime - startTime), result);
+                        (endTime - startTime), result);
 
                 return result;
             } catch (Exception e) {
                 long endTime = System.currentTimeMillis();
                 log.error("[PDF合并] 处理失败 - customSku: {}, 耗时: {}ms, 错误: {}",
-                        customSku, (endTime - startTime), e.getMessage(), e);
+                         (endTime - startTime), e.getMessage(), e);
                 return null;
             }
         });

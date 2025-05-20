@@ -122,7 +122,6 @@ public class TemuShopOldTypeServiceImpl implements TemuShopOldTypeService {
                     CompletableFuture<String> future = asyncPdfProcessService.processPdfAsync(
                             oldTypeUrl,
                             order.getGoodsSn(),
-                            order.getCustomSku(),
                             temuOssService);
 
                     // 处理合并结果

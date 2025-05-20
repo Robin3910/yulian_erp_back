@@ -258,31 +258,42 @@ public class TemuOrderService implements ITemuOrderService {
 					order.setCustomSku(currentCustomSku); // 更新订单对象
 				}
 
-				// 从商品条形码PDF提取指定页面	无论合规单是否存在，只要商品条码URL有效且SKU已赋值，则执行提取
+				// 从商品条形码PDF提取指定页面
 				if (StrUtil.isNotBlank(goodsSnUrl) && StrUtil.isNotBlank(currentCustomSku)) {
 					CompletableFuture<String> goodsSnFuture = asyncPdfService.extractPageAsync(
 							goodsSnUrl,
 							currentCustomSku,
-							temuOssService
-					);
-					goodsSnFuture.thenAccept(url -> {
-						if (url != null) {
-							updateOrderGoodsSn(order.getId(), url);
+							temuOssService);
+
+					// 处理提取结果，并在成功后进行PDF合并
+					goodsSnFuture.thenAccept(extractedUrl -> {
+						if (extractedUrl != null) {
+							// 更新订单的商品条码URL
+							updateOrderGoodsSn(order.getId(), extractedUrl);
+
+							// 判断合规单URL是否存在，存在则进行合并
+							if (StrUtil.isNotBlank(complianceUrl)) {
+								// 使用提取后的页面URL进行合并
+								CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
+										complianceUrl,
+										extractedUrl,
+										temuOssService);
+
+								// 设置回调更新订单
+								mergedUrlFuture.thenAccept(mergedUrl -> {
+									if (mergedUrl != null) {
+										// 更新订单合并后的PDF地址
+										updateOrderMergedUrl(order.getId(), mergedUrl);
+									}
+								});
+							}
 						}
 					});
-				}
-
-				// 判断合规单URL和商品条形码URL是否均非空
-				if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
-					// 执行以下两个异步操作：
-					// 1. 合并合规单PDF与商品条形码PDF
-					// 通过CompletableFuture实现非阻塞处理，提升系统吞吐量
-					
-					// 启动PDF合并任务（异步操作）
+				} else if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
+					// 如果没有customSku但有两个PDF，直接合并
 					CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
 							complianceUrl,
 							goodsSnUrl,
-							currentCustomSku,
 							temuOssService);
 
 					// 设置回调更新订单

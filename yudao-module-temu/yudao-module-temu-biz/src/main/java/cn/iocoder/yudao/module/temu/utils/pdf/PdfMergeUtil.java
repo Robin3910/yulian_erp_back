@@ -32,10 +32,10 @@ import java.nio.file.Files;
 public class PdfMergeUtil {
 
     // 下载限速：128KB/s
-    private static final int DOWNLOAD_SPEED_LIMIT = 100 * 1024;
+    private static final int DOWNLOAD_SPEED_LIMIT = 180 * 1024;
 
     // 上传限速：128KB/s
-    private static final int UPLOAD_SPEED_LIMIT = 100 * 1024;
+    private static final int UPLOAD_SPEED_LIMIT = 180 * 1024;
 
     /**
      * 从URL下载PDF文档，并应用带宽限制
@@ -77,12 +77,10 @@ public class PdfMergeUtil {
      *
      * @param firstPdfUrl  第一个PDF的URL（合规单）
      * @param secondPdfUrl 第二个PDF的URL（商品条码）
-     * @param customSku    商品SKU（可选，用于多页PDF时匹配指定页面）
      * @param ossService   OSS服务
      * @return 合并后的PDF的OSS URL，如果合并失败则返回null
      */
-    public static String mergePdfsAndUpload(String firstPdfUrl, String secondPdfUrl, String customSku,
-            TemuOssService ossService) {
+    public static String mergePdfsAndUpload(String firstPdfUrl, String secondPdfUrl, TemuOssService ossService) {
         if (StrUtil.hasBlank(firstPdfUrl, secondPdfUrl)) {
             return null;
         }
@@ -93,49 +91,13 @@ public class PdfMergeUtil {
                 log.error("文件类型错误，必须是PDF文件。firstPdfUrl: {}, secondPdfUrl: {}", firstPdfUrl, secondPdfUrl);
                 return null;
             }
-            // 合并PDF
-            byte[] mergedPdfBytes;
-            // 如果提供了SKU，先检查是否需要处理多页PDF
-            if (StrUtil.isNotEmpty(customSku)) {
-                try (PDDocument secondDoc = downloadPdfWithThrottle(secondPdfUrl)) {
-                    int pageCount = secondDoc.getNumberOfPages();
 
-                    if (pageCount > 1) {
-                        // 多页PDF，需要查找匹配页
-                        int targetPage = findPageWithSku(secondDoc, customSku);
-                        if (targetPage == -1) {
-                            log.error("未找到包含SKU的商品条码页面。SKU: {}", customSku);
-                            return null;
-                        }
-                        // 创建临时文件保存匹配的页面
-                        try (PDDocument tempDoc = new PDDocument()) {
-                            tempDoc.addPage(secondDoc.getPage(targetPage));
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            tempDoc.save(baos);
-                            // 创建临时文件
-                            String tempFileName = String.format("temp_barcode_%s.pdf", StrUtil.uuid());
-                            MultipartFile tempFile = new MockMultipartFile(
-                                    tempFileName,
-                                    tempFileName,
-                                    "application/pdf",
-                                    baos.toByteArray());
-                            // 上传临时文件到OSS并获取URL（使用限速上传）
-                            String tempUrl = uploadFileWithThrottle(tempFile, ossService);
-                            // 使用临时URL进行合并
-                            mergedPdfBytes = mergePdfsWithScaling(firstPdfUrl, tempUrl);
-                        }
-                    } else {
-                        // 单页PDF，直接合并
-                        mergedPdfBytes = mergePdfsWithScaling(firstPdfUrl, secondPdfUrl);
-                    }
-                }
-            } else {
-                // 未提供SKU，按单页处理
-                mergedPdfBytes = mergePdfsWithScaling(firstPdfUrl, secondPdfUrl);
-            }
+            // 直接合并PDF
+            byte[] mergedPdfBytes = mergePdfsWithScaling(firstPdfUrl, secondPdfUrl);
             if (mergedPdfBytes == null) {
                 return null;
             }
+
             // 生成文件名
             String fileName = String.format("merged_compliance_%s.pdf", StrUtil.uuid());
             // 创建MultipartFile对象
@@ -147,8 +109,7 @@ public class PdfMergeUtil {
             // 使用限速上传到OSS
             return uploadFileWithThrottle(multipartFile, ossService);
         } catch (Exception e) {
-            log.error("合并PDF失败。firstPdfUrl: {}, secondPdfUrl: {}, customSku: {}", firstPdfUrl, secondPdfUrl, customSku,
-                    e);
+            log.error("合并PDF失败。firstPdfUrl: {}, secondPdfUrl: {}", firstPdfUrl, secondPdfUrl, e);
             return null;
         }
     }
