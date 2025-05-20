@@ -34,7 +34,7 @@ public class PdfProcessConfig {
         // 最大线程数：与核心线程数保持一致，避免创建过多线程
         executor.setMaxPoolSize(2);
         // 队列容量：设置较大的队列，确保任务不丢失
-        executor.setQueueCapacity(700);
+        executor.setQueueCapacity(5000);
         // 线程名前缀
         executor.setThreadNamePrefix("pdf-process-");
         // 拒绝策略：使用CallerRunsPolicy，在调用者线程中执行任务
@@ -42,7 +42,7 @@ public class PdfProcessConfig {
         // 等待所有任务结束后再关闭线程池
         executor.setWaitForTasksToCompleteOnShutdown(true);
         // 等待时间（设置较长的等待时间，确保任务能够完成）
-        executor.setAwaitTerminationSeconds(300);
+        executor.setAwaitTerminationSeconds(7200);
         // 初始化
         executor.initialize();
         return executor;
