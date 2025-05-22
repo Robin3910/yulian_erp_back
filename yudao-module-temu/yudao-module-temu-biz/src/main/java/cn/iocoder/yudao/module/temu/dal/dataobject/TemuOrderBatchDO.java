@@ -25,6 +25,4 @@ public class TemuOrderBatchDO extends BaseDO {
 	private String remark;
 	// 是否派单
 	private Integer isDispatchTask;
-	// 批次所属类目id
-	private String batchCategoryId;
 }
