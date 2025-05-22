@@ -143,6 +143,16 @@ public class TemuOrderService implements ITemuOrderService {
 			success = "id：{{#user.id}} 更新了{{#orderSize}}条数据,提交的数据是{{#orderString}}",
 			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
+		for (TemuOrderDO temuOrderDO : requestVO) {
+			if (TemuOrderStatusEnum.UNDELIVERED == temuOrderDO.getOrderStatus()) {
+				// 先查询原始订单数据，确保有正确的originalQuantity值
+				TemuOrderDO originalOrder = temuOrderMapper.selectById(temuOrderDO.getId());
+				if (originalOrder != null && originalOrder.getOriginalQuantity() != null) {
+					// 将制作数量重置为与官网一致的原始数量
+					temuOrderDO.setQuantity(originalOrder.getOriginalQuantity());
+				}
+			}
+		}
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
 		LogRecordContext.putVariable("user", getLoginUser());
 		LogRecordContext.putVariable("orderSize", requestVO.size());
