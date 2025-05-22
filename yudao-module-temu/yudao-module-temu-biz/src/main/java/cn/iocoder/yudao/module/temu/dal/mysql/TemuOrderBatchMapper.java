@@ -11,7 +11,9 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,5 +101,17 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 		// 返回最终分页结果
 		return new PageResult<>(resultList, batchPageResult.getTotal(), pageVO.getPageNo(), pageVO.getPageSize());
 	}
-	
+
+	/**
+	 * 根据分类ID查询当天最新的批次
+	 *
+	 * @param batchCategoryId 批次分类ID
+	 * @param startTime       开始时间
+	 * @param endTime         结束时间
+	 * @return 最新的批次信息
+	 */
+	TemuOrderBatchDO selectLatestBatchByCategoryId(@Param("batchCategoryId") String batchCategoryId,
+												   @Param("startTime") LocalDateTime startTime,
+												   @Param("endTime") LocalDateTime endTime);
 }
+

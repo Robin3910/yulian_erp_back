@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
+import cn.iocoder.yudao.module.temu.service.orderBatch.impl.TemuOrderBatchCategoryService;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
@@ -88,6 +89,9 @@ public class TemuOrderService implements ITemuOrderService {
 	private DictTypeMapper dictTypeMapper;
 	@Resource
 	private PayWalletService payWalletService;
+
+	@Resource
+	private TemuOrderBatchCategoryService temuOrderBatchCategoryService;
 	
 	
 	@Override
@@ -498,6 +502,20 @@ public class TemuOrderService implements ITemuOrderService {
 	@Override
 	@Transactional
 	public int batchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO) {
+		// 1. 获取所有订单ID
+		List<Long> orderIds = requestVO.stream()
+				.map(TemuOrderBatchOrderReqVO::getId)
+				.collect(Collectors.toList());
+
+		// 2. 批量查询订单，只获取id和categoryId字段
+		List<TemuOrderDO> orders = temuOrderMapper.selectBatchIds(orderIds);
+
+		// 3. 使用Map存储categoryId和对应的订单id列表
+		Map<String, List<Long>> categoryOrderMap = orders.stream()
+				.collect(Collectors.groupingBy(
+						TemuOrderDO::getCategoryId,
+						Collectors.mapping(TemuOrderDO::getId, Collectors.toList())));
+
 		ArrayList<TemuOrderDO> temuOrderDOList = new ArrayList<>();
 		int processCount = 0;
 		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
@@ -540,6 +558,12 @@ public class TemuOrderService implements ITemuOrderService {
 		temuOrderMapper.updateBatch(temuOrderDOList);
 		//批量支付订单
 		payOrderBatch(temuOrderDOList);
+
+		// 获取batchCategoryId和订单id的映射
+		Map<String, List<Long>> batchCategoryOrderMap = temuOrderBatchCategoryService
+				.getBatchCategoryOrderMap(categoryOrderMap);
+		temuOrderBatchCategoryService.processBatchAndRelations(batchCategoryOrderMap);
+
 		return processCount;
 	}
 	
