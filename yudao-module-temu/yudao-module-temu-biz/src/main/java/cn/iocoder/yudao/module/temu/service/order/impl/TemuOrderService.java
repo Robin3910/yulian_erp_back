@@ -559,10 +559,15 @@ public class TemuOrderService implements ITemuOrderService {
 		//批量支付订单
 		payOrderBatch(temuOrderDOList);
 
-		// 获取batchCategoryId和订单id的映射
-		Map<String, List<Long>> batchCategoryOrderMap = temuOrderBatchCategoryService
-				.getBatchCategoryOrderMap(categoryOrderMap);
-		temuOrderBatchCategoryService.processBatchAndRelations(batchCategoryOrderMap);
+		//检查当前订单是否允许自动打批次
+		DictTypeDO dictTypeDO = dictTypeMapper.selectByType("temu_order_batch_category_status");
+		//如果状态开启那么开始自动打批次
+		if(dictTypeDO.getStatus() == 0){
+			// 获取batchCategoryId和订单id的映射
+			Map<String, List<Long>> batchCategoryOrderMap = temuOrderBatchCategoryService
+					.getBatchCategoryOrderMap(categoryOrderMap);
+			temuOrderBatchCategoryService.processBatchAndRelations(batchCategoryOrderMap);
+		}
 
 		return processCount;
 	}
