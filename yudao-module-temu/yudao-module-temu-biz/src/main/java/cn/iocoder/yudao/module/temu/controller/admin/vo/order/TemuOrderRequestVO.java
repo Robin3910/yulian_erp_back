@@ -15,7 +15,7 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @NoArgsConstructor
 public class TemuOrderRequestVO extends PageParam {
 	// 店铺id
-	private String shopId;
+	private Long[] shopId;
 	private String sku;
 	private String skc;
 	private String customSku;

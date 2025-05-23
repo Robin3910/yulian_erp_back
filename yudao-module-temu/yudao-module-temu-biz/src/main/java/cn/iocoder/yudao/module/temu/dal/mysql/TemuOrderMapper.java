@@ -40,9 +40,13 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
 				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU
 				.likeIfExists(TemuOrderDO::getSkc, temuOrderRequestVO.getSkc())// SKC
-				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku())// 定制SKU
+				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku());// 定制SKU
 				//.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
-				.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
+				//.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
+		//多店铺查询
+		if (temuOrderRequestVO.getShopId() != null && temuOrderRequestVO.getShopId().length > 0) {
+			wrapper.in(TemuOrderDO::getShopId, Arrays.asList(temuOrderRequestVO.getShopId()));
+		}
 		//判断数组是否为空
 		if (temuOrderRequestVO.getBookingTime() != null && temuOrderRequestVO.getBookingTime().length == 2) {
 			wrapper.between(TemuOrderDO::getBookingTime, temuOrderRequestVO.getBookingTime()[0], temuOrderRequestVO.getBookingTime()[1]);
