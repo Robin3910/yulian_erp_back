@@ -394,8 +394,10 @@ public class TemuOrderService implements ITemuOrderService {
 						temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
 						// 将状态置为0
 						order.setOrderStatus(0);
+
 						// 发送企业微信消息
-						String message = String.format("订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
+						String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
+							shopName,
 							order.getOrderNo(),	
 							order.getCustomSku(),
 							DateUtil.format(existingOrder.getBookingTime(), "yyyy-MM-dd HH:mm:ss"),
