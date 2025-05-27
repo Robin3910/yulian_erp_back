@@ -31,4 +31,6 @@ public interface ErrorCodeConstants {
 	
 	
 	ErrorCode WALLET_NOT_ENOUGH =  new ErrorCode(1_001_003_001, "钱包余额不足");
+
+	ErrorCode PDF_PARSE_LIMIT_NOT_EXISTS = new ErrorCode(1002001000, "PDF解析限速配置不存在");
 }

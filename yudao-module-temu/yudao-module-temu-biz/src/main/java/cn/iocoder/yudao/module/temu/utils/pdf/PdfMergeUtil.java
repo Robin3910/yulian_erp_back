@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import cn.iocoder.yudao.module.temu.utils.io.ThrottledInputStream;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.multipdf.LayerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -15,6 +16,10 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.util.Matrix;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.stereotype.Component;
+import javax.annotation.Resource;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants.PDF_PARSE_LIMIT_NOT_EXISTS;
 
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedInputStream;
@@ -29,13 +34,21 @@ import java.nio.file.Files;
  * 用于合并合规单和商品条码PDF
  */
 @Slf4j
+@Component
 public class PdfMergeUtil {
 
+    private static ConfigApi configApi;
+
+    @Resource
+    public void setConfigApi(ConfigApi configApi) {
+        PdfMergeUtil.configApi = configApi;
+    }
+
     // 下载限速：128KB/s
-    private static final int DOWNLOAD_SPEED_LIMIT = 180 * 1024;
+    private static final int DOWNLOAD_SPEED_LIMIT = 50 * 1024;
 
     // 上传限速：128KB/s
-    private static final int UPLOAD_SPEED_LIMIT = 180 * 1024;
+    private static final int UPLOAD_SPEED_LIMIT = 50 * 1024;
 
     /**
      * 从URL下载PDF文档，并应用带宽限制
