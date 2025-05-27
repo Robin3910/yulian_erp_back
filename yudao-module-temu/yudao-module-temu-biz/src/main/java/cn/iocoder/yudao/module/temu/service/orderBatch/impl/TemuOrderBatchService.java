@@ -34,8 +34,10 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 import static cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum.*;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class TemuOrderBatchService implements ITemuOrderBatchService {
 	
 	@Resource
@@ -153,9 +155,116 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	 */
 	@Override
 	public PageResult<TemuOrderBatchDetailDO> list(TemuOrderBatchPageVO temuOrderBatchPageVO) {
-		PageResult<TemuOrderBatchDetailDO> temuOrderBatchDOPageResult = temuOrderBatchMapper.selectPage(temuOrderBatchPageVO);
+		long startTime = System.currentTimeMillis();
+		log.info("开始查询批次ID");
+		
+		// 第一步：查询满足条件的批次ID
+		PageResult<TemuOrderBatchDO> batchPageResult = temuOrderBatchMapper.selectBatchPage(temuOrderBatchPageVO);
+		if (batchPageResult.getList().isEmpty()) {
+			log.info("批次查询耗时：{}ms", System.currentTimeMillis() - startTime);
+			return new PageResult<>(new ArrayList<>(), batchPageResult.getTotal(), temuOrderBatchPageVO.getPageNo(),
+					temuOrderBatchPageVO.getPageSize());
+		}
+		
+		long step1Time = System.currentTimeMillis();
+		log.info("查询批次ID耗时：{}ms", step1Time - startTime);
+		log.info("开始查询批次详细信息");
+		
+		// 第二步：查询批次详细信息和关联的所有订单
+		List<Long> batchIds = batchPageResult.getList().stream()
+				.map(TemuOrderBatchDO::getId)
+				.collect(Collectors.toList());
+		
+		// 查询批次基本信息
+		List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectBatchList(batchIds);
+		long batchDetailTime = System.currentTimeMillis();
+		log.info("查询批次基本信息耗时：{}ms", batchDetailTime - step1Time);
+
+		// 先查询relation表中的orderId
+		MPJLambdaWrapperX<TemuOrderBatchRelationDO> relationWrapper = new MPJLambdaWrapperX<>();
+		relationWrapper.select(TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchRelationDO::getOrderId)
+				.in(TemuOrderBatchRelationDO::getBatchId, batchIds);
+		List<TemuOrderBatchRelationDO> relationList = temuOrderBatchRelationMapper.selectJoinList(TemuOrderBatchRelationDO.class, relationWrapper);
+		
+		// log.info("查询到的relationList大小: {}", relationList != null ? relationList.size() : 0);
+		// if (relationList != null && !relationList.isEmpty()) {
+		// 	log.info("relationList第一条数据: batchId={}, orderId={}", 
+		// 		relationList.get(0).getBatchId(), 
+		// 		relationList.get(0).getOrderId());
+		// }
+		
+		// 获取所有orderId
+		List<Long> orderIds = relationList.stream()
+				.map(TemuOrderBatchRelationDO::getOrderId)
+				.collect(Collectors.toList());
+		
+		// log.info("提取的orderIds大小: {}", orderIds.size());
+		
+		// 根据orderId查询订单信息
+		MPJLambdaWrapperX<TemuOrderDO> orderWrapper = new MPJLambdaWrapperX<>();
+		orderWrapper.selectAll(TemuOrderDO.class)
+				.in(TemuOrderDO::getId, orderIds)
+				.eq(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku, temuOrderBatchPageVO.getCustomSku())
+				.orderByDesc(TemuOrderDO::getCreateTime);
+		
+		List<TemuOrderDO> orderList = temuOrderMapper.selectJoinList(TemuOrderDO.class, orderWrapper);
+		// log.info("查询到的orderList大小: {}", orderList != null ? orderList.size() : 0);
+		
+		// 构建orderId到订单的映射
+		Map<Long, TemuOrderDO> orderMap = orderList.stream()
+				.filter(order -> order != null && order.getId() != null)
+				.collect(Collectors.toMap(TemuOrderDO::getId, order -> order, (existing, replacement) -> existing));
+		
+		// log.info("构建的orderMap大小: {}", orderMap.size());
+		
+		// 构建batchId到orderId列表的映射
+		Map<Long, List<Long>> batchOrderMap = relationList.stream()
+				.filter(relation -> relation != null && relation.getBatchId() != null && relation.getOrderId() != null)
+				.collect(Collectors.groupingBy(
+						TemuOrderBatchRelationDO::getBatchId,
+						Collectors.mapping(TemuOrderBatchRelationDO::getOrderId, Collectors.toList())
+				));
+		
+		// log.info("构建的batchOrderMap大小: {}", batchOrderMap.size());
+		// if (!batchOrderMap.isEmpty()) {
+		// 	log.info("batchOrderMap第一个key: {}, 对应的orderIds: {}", 
+		// 		batchOrderMap.keySet().iterator().next(),
+		// 		batchOrderMap.values().iterator().next());
+		// }
+		
+		// 组装最终结果
+		List<TemuOrderBatchDetailDO> resultList = new ArrayList<>();
+		for (TemuOrderBatchDO batch : batchList) {
+			if (batch == null) {
+				continue;
+			}
+			TemuOrderBatchDetailDO detail = new TemuOrderBatchDetailDO();
+			BeanUtils.copyProperties(batch, detail);
+			
+			List<Long> batchOrderIds = batchOrderMap.get(batch.getId());
+			if (batchOrderIds != null && !batchOrderIds.isEmpty()) {
+				List<TemuOrderDetailDO> orders = batchOrderIds.stream()
+						.map(orderMap::get)
+						.filter(Objects::nonNull)
+						.map(order -> {
+							TemuOrderDetailDO orderDetail = new TemuOrderDetailDO();
+							BeanUtils.copyProperties(order, orderDetail);
+							return orderDetail;
+						})
+						.collect(Collectors.toList());
+				detail.setOrderList(orders);
+			} else {
+				detail.setOrderList(new ArrayList<>());
+			}
+			resultList.add(detail);
+		}
+		
+		long step2Time = System.currentTimeMillis();
+		log.info("查询批次详细信息耗时：{}ms", step2Time - batchDetailTime);
+		log.info("开始处理结果数据");
+		
 		// 获取所有分配关联用户的信息
-		temuOrderBatchDOPageResult.getList().forEach(batch -> {
+		resultList.forEach(batch -> {
 			MPJLambdaWrapperX<TemuOrderBatchTaskDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
 			objectMPJLambdaWrapperX.selectAll(TemuOrderBatchTaskDO.class)
 					.selectAs(AdminUserDO::getId, TemuOrderBatchTaskUserInfoDO::getUserId)
@@ -165,8 +274,9 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			List<TemuOrderBatchTaskUserInfoDO> adminUserDOS = orderBatchTaskMapper.selectJoinList(TemuOrderBatchTaskUserInfoDO.class, objectMPJLambdaWrapperX);
 			batch.setUserList(adminUserDOS);
 		});
+		
 		// 获取所有订单的shopId
-		List<Long> shopIds = temuOrderBatchDOPageResult.getList().stream()
+		List<Long> shopIds = resultList.stream()
 				.flatMap(batch -> batch.getOrderList().stream())
 				.map(TemuOrderDetailDO::getShopId)
 				.distinct()
@@ -180,7 +290,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 					.collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop));
 			
 			// 为每个订单设置shopName
-			temuOrderBatchDOPageResult.getList().forEach(batch -> {
+			resultList.forEach(batch -> {
 				if (batch.getOrderList() != null) {
 					batch.getOrderList().forEach(order -> {
 						TemuShopDO shop = shopMap.get(order.getShopId());
@@ -192,7 +302,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			});
 		}
 		
-		return temuOrderBatchDOPageResult;
+		return new PageResult<>(resultList, batchPageResult.getTotal(), temuOrderBatchPageVO.getPageNo(), temuOrderBatchPageVO.getPageSize());
 	}
 	
 	@Override
