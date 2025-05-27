@@ -56,10 +56,25 @@ public class PdfMergeUtil {
     private static PDDocument downloadPdfWithThrottle(String pdfUrl) throws IOException {
         URL url = new URL(pdfUrl);
         try (InputStream inputStream = url.openStream();
-                BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
-            // 应用限速
-            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream,
-                    DOWNLOAD_SPEED_LIMIT);
+        
+            BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
+                // 应用限速
+                String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+                int limit = DOWNLOAD_SPEED_LIMIT;
+                if (StrUtil.isNotEmpty(limitStr)) {
+                    try {
+                        limit = Integer.parseInt(limitStr);
+                        if (limit <= 0) {
+                            limit = DOWNLOAD_SPEED_LIMIT;
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("PDF解析限速配置格式错误，使用默认值");
+                    }
+                }
+                ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream, limit);
+    
+            // ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream,
+                    // DOWNLOAD_SPEED_LIMIT);
             return PDDocument.load(throttledInputStream);
         }
     }
@@ -71,7 +86,21 @@ public class PdfMergeUtil {
         // 使用缓冲流来读取文件
         try (BufferedInputStream bis = new BufferedInputStream(file.getInputStream())) {
             // 创建限速输入流
-            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
+            // ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
+
+            String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+            int limit = UPLOAD_SPEED_LIMIT;
+            if (StrUtil.isNotEmpty(limitStr)) {
+                try {
+                    limit = Integer.parseInt(limitStr);
+                    if (limit <= 0) {
+                        limit = UPLOAD_SPEED_LIMIT;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("PDF解析限速配置格式错误，使用默认值");
+                }
+            }
+            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, limit);
 
             // 创建新的MultipartFile对象，使用限速输入流
             MultipartFile throttledFile = new MockMultipartFile(
