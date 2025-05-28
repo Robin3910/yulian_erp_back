@@ -66,4 +66,13 @@ public interface ITemuOrderService {
 	 * @return 是否保存成功
 	 */
 	Boolean saveOrderRemark(TemuOrderSaveOrderRemarkReqVO requestVO);
+	
+	/**
+	 * 更新订单定制图片
+	 *
+	 * @param orderId 订单ID
+	 * @param customImageUrls 定制图片URL列表，多个URL使用逗号分隔
+	 * @return 更新是否成功
+	 */
+	Boolean updateOrderCustomImages(Long orderId, String customImageUrls);
 }

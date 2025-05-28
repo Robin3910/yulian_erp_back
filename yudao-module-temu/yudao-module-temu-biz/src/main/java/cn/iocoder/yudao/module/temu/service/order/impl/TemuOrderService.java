@@ -634,6 +634,14 @@ public class TemuOrderService implements ITemuOrderService {
 		return temuOrderMapper.updateById(temuOrderDO) > 0;
 	}
 	
+	@Override
+	public Boolean updateOrderCustomImages(Long orderId, String customImageUrls) {
+		TemuOrderDO temuOrderDO = new TemuOrderDO();
+		temuOrderDO.setId(orderId);
+		temuOrderDO.setCustomImageUrls(customImageUrls);
+		return temuOrderMapper.updateById(temuOrderDO) > 0;
+	}
+	
 	private String convertToString(Object obj) {
 		return obj == null ? "" : obj.toString();
 	}

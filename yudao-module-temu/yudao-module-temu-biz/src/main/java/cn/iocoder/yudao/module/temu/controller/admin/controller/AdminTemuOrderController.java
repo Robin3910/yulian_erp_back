@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
@@ -109,4 +110,16 @@ public class AdminTemuOrderController {
 		return success(temuOrderService.saveOrderRemark(requestVO));
 	}
 	
+	/**
+	 * 更新订单定制图片
+	 * 
+	 * @param reqVO 请求VO
+	 * @return 更新结果
+	 */
+	@PutMapping("/update-custom-images")
+	@Operation(summary = "更新订单定制图片")
+	@PreAuthorize("@ss.hasPermission('temu:order:update')")
+	public CommonResult<Boolean> updateOrderCustomImages(@Valid @RequestBody TemuOrderUpdateCustomImagesReqVO reqVO) {
+		return success(temuOrderService.updateOrderCustomImages(reqVO.getOrderId(), reqVO.getCustomImageUrls()));
+	}
 }
