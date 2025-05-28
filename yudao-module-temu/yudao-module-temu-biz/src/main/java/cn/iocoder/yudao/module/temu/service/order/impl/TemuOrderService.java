@@ -547,10 +547,6 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderDO.setUnitPrice(unitPrice);
 			//更新总价
 			temuOrderDO.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity())));
-			//设置订单规则，如果当前订单没有规则则设置
-			if (temuOrderDO.getPriceRule() == null) {
-				temuOrderDO.setPriceRule(rule);
-			}
 			//修改订单状态
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
 			////更新订单信息

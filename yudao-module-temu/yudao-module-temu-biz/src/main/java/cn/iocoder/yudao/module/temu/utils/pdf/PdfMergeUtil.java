@@ -45,10 +45,10 @@ public class PdfMergeUtil {
     }
 
     // 下载限速：128KB/s
-    private static final int DOWNLOAD_SPEED_LIMIT = 50 * 1024;
+    private static final int DOWNLOAD_SPEED_LIMIT = 150 * 1024;
 
     // 上传限速：128KB/s
-    private static final int UPLOAD_SPEED_LIMIT = 50 * 1024;
+    private static final int UPLOAD_SPEED_LIMIT = 150 * 1024;
 
     /**
      * 从URL下载PDF文档，并应用带宽限制
@@ -60,6 +60,7 @@ public class PdfMergeUtil {
             BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
                 // 应用限速
                 String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+                log.info("PDF下载限速配置值: {}", limitStr);
                 int limit = DOWNLOAD_SPEED_LIMIT;
                 if (StrUtil.isNotEmpty(limitStr)) {
                     try {
@@ -89,6 +90,7 @@ public class PdfMergeUtil {
             // ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
 
             String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+            log.info("PDF上传限速配置值: {}", limitStr);
             int limit = UPLOAD_SPEED_LIMIT;
             if (StrUtil.isNotEmpty(limitStr)) {
                 try {
