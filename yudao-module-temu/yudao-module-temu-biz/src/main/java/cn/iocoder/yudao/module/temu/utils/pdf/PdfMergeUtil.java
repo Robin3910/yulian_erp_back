@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import cn.iocoder.yudao.module.temu.utils.io.ThrottledInputStream;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.multipdf.LayerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -15,6 +16,10 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.util.Matrix;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.stereotype.Component;
+import javax.annotation.Resource;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants.PDF_PARSE_LIMIT_NOT_EXISTS;
 
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedInputStream;
@@ -29,13 +34,21 @@ import java.nio.file.Files;
  * 用于合并合规单和商品条码PDF
  */
 @Slf4j
+@Component
 public class PdfMergeUtil {
 
+    private static ConfigApi configApi;
+
+    @Resource
+    public void setConfigApi(ConfigApi configApi) {
+        PdfMergeUtil.configApi = configApi;
+    }
+
     // 下载限速：128KB/s
-    private static final int DOWNLOAD_SPEED_LIMIT = 180 * 1024;
+    private static final int DOWNLOAD_SPEED_LIMIT = 50 * 1024;
 
     // 上传限速：128KB/s
-    private static final int UPLOAD_SPEED_LIMIT = 180 * 1024;
+    private static final int UPLOAD_SPEED_LIMIT = 50 * 1024;
 
     /**
      * 从URL下载PDF文档，并应用带宽限制
@@ -43,10 +56,25 @@ public class PdfMergeUtil {
     private static PDDocument downloadPdfWithThrottle(String pdfUrl) throws IOException {
         URL url = new URL(pdfUrl);
         try (InputStream inputStream = url.openStream();
-                BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
-            // 应用限速
-            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream,
-                    DOWNLOAD_SPEED_LIMIT);
+        
+            BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
+                // 应用限速
+                String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+                int limit = DOWNLOAD_SPEED_LIMIT;
+                if (StrUtil.isNotEmpty(limitStr)) {
+                    try {
+                        limit = Integer.parseInt(limitStr);
+                        if (limit <= 0) {
+                            limit = DOWNLOAD_SPEED_LIMIT;
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("PDF解析限速配置格式错误，使用默认值");
+                    }
+                }
+                ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream, limit);
+    
+            // ThrottledInputStream throttledInputStream = new ThrottledInputStream(bufferedInputStream,
+                    // DOWNLOAD_SPEED_LIMIT);
             return PDDocument.load(throttledInputStream);
         }
     }
@@ -58,7 +86,21 @@ public class PdfMergeUtil {
         // 使用缓冲流来读取文件
         try (BufferedInputStream bis = new BufferedInputStream(file.getInputStream())) {
             // 创建限速输入流
-            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
+            // ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, UPLOAD_SPEED_LIMIT);
+
+            String limitStr = configApi.getConfigValueByKey("yulian.pdf_parse_limit");
+            int limit = UPLOAD_SPEED_LIMIT;
+            if (StrUtil.isNotEmpty(limitStr)) {
+                try {
+                    limit = Integer.parseInt(limitStr);
+                    if (limit <= 0) {
+                        limit = UPLOAD_SPEED_LIMIT;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("PDF解析限速配置格式错误，使用默认值");
+                }
+            }
+            ThrottledInputStream throttledInputStream = new ThrottledInputStream(bis, limit);
 
             // 创建新的MultipartFile对象，使用限速输入流
             MultipartFile throttledFile = new MockMultipartFile(
