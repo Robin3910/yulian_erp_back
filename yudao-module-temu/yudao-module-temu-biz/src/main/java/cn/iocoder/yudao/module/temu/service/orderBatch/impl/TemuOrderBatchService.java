@@ -202,7 +202,13 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		
 		// 根据orderId查询订单信息
 		MPJLambdaWrapperX<TemuOrderDO> orderWrapper = new MPJLambdaWrapperX<>();
-		orderWrapper.selectAll(TemuOrderDO.class)
+		// price_rule不能查，price_rule出错了，数据量巨大
+		orderWrapper.select("id, order_no, product_title, order_status, sku, skc, sale_price, custom_sku, " +
+				"quantity, product_properties, booking_time, shop_id, create_time, update_time, custom_image_urls, " +
+				"custom_text_list, product_img_url, category_id, category_name, " +
+				"effective_img_url, unit_price, total_price, default_price, " +
+				"goods_sn, compliance_url, remark, original_quantity, compliance_image_url, compliance_goods_merged_url, " +
+				"is_complete_draw_task, is_complete_producer_task")
 				.in(TemuOrderDO::getId, orderIds)
 				.eq(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku, temuOrderBatchPageVO.getCustomSku())
 				.orderByDesc(TemuOrderDO::getCreateTime);
@@ -712,7 +718,6 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 					temuOrderBatchPageVO.getCreateTime()[1]);
 		}
 		
-		
 		// 按照创建时间倒序排列
 		batchWrapper.orderByDesc(TemuOrderBatchDO::getCreateTime);
 		
@@ -730,44 +735,71 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				.map(TemuOrderBatchDO::getId)
 				.collect(Collectors.toList());
 		
-		// 第二步：查询批次关联的订单信息
-		MPJLambdaWrapperX<TemuOrderBatchDO> orderWrapper = new MPJLambdaWrapperX<>();
-		orderWrapper.selectAll(TemuOrderBatchDO.class)
-				.leftJoin(TemuOrderBatchRelationDO.class, TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchDO::getId)
-				.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
-				.selectCollection(TemuOrderDO.class, TemuOrderBatchDetailDO::getOrderList)
-				.in(TemuOrderBatchDO::getId, batchIds)
-				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku,
+		// 第二步：查询批次关联的订单关系
+		MPJLambdaWrapperX<TemuOrderBatchRelationDO> relationWrapper = new MPJLambdaWrapperX<>();
+		relationWrapper.select(TemuOrderBatchRelationDO::getBatchId, TemuOrderBatchRelationDO::getOrderId)
+				.in(TemuOrderBatchRelationDO::getBatchId, batchIds);
+		List<TemuOrderBatchRelationDO> relationList = temuOrderBatchRelationMapper.selectJoinList(TemuOrderBatchRelationDO.class, relationWrapper);
+		
+		// 获取所有orderId
+		List<Long> orderIds = relationList.stream()
+				.map(TemuOrderBatchRelationDO::getOrderId)
+				.collect(Collectors.toList());
+		
+		// 第三步：查询订单信息
+		MPJLambdaWrapperX<TemuOrderDO> orderWrapper = new MPJLambdaWrapperX<>();
+		orderWrapper.select(TemuOrderDO::getId, TemuOrderDO::getOrderNo, TemuOrderDO::getProductTitle, 
+				TemuOrderDO::getOrderStatus, TemuOrderDO::getSku, TemuOrderDO::getSkc,
+				TemuOrderDO::getSalePrice, TemuOrderDO::getCustomSku, TemuOrderDO::getQuantity,
+				TemuOrderDO::getProductProperties, TemuOrderDO::getBookingTime, TemuOrderDO::getShopId,
+				TemuOrderDO::getCreateTime, TemuOrderDO::getUpdateTime, TemuOrderDO::getCustomImageUrls,
+				TemuOrderDO::getCustomTextList, TemuOrderDO::getProductImgUrl, TemuOrderDO::getCategoryId,
+				TemuOrderDO::getCategoryName, TemuOrderDO::getEffectiveImgUrl, TemuOrderDO::getUnitPrice,
+				TemuOrderDO::getTotalPrice, TemuOrderDO::getDefaultPrice, TemuOrderDO::getGoodsSn,
+				TemuOrderDO::getComplianceUrl, TemuOrderDO::getRemark, TemuOrderDO::getOriginalQuantity,
+				TemuOrderDO::getComplianceImageUrl, TemuOrderDO::getComplianceGoodsMergedUrl,
+				TemuOrderDO::getIsCompleteDrawTask, TemuOrderDO::getIsCompleteProducerTask)
+				.in(TemuOrderDO::getId, orderIds)
+				.eq(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku,
 						temuOrderBatchPageVO.getCustomSku())
 				.orderByDesc(TemuOrderDO::getCreateTime);
 		
-		// 查询批次详情（包含订单列表）
-		List<TemuOrderBatchUserDetailDO> batchDetailList = temuOrderBatchMapper.selectJoinList(TemuOrderBatchUserDetailDO.class, orderWrapper);
+		List<TemuOrderDO> orderList = temuOrderMapper.selectJoinList(TemuOrderDO.class, orderWrapper);
 		
-		// 根据批次ID对结果进行分组
-		Map<Long, List<TemuOrderBatchUserDetailDO>> batchDetailMap = batchDetailList.stream()
-				.collect(Collectors.groupingBy(TemuOrderBatchUserDetailDO::getId));
+		// 构建orderId到订单的映射
+		Map<Long, TemuOrderDO> orderMap = orderList.stream()
+				.filter(order -> order != null && order.getId() != null)
+				.collect(Collectors.toMap(TemuOrderDO::getId, order -> order, (existing, replacement) -> existing));
 		
-		// 按原批次顺序组装最终结果
+		// 构建batchId到orderId列表的映射
+		Map<Long, List<Long>> batchOrderMap = relationList.stream()
+				.filter(relation -> relation != null && relation.getBatchId() != null && relation.getOrderId() != null)
+				.collect(Collectors.groupingBy(
+						TemuOrderBatchRelationDO::getBatchId,
+						Collectors.mapping(TemuOrderBatchRelationDO::getOrderId, Collectors.toList())
+				));
+		
+		// 组装最终结果
 		List<TemuOrderBatchUserDetailDO> resultList = new ArrayList<>();
 		for (TemuOrderBatchUserDetailDO batch : batchPageResult.getList()) {
-			List<TemuOrderBatchUserDetailDO> details = batchDetailMap.get(batch.getId());
-			if (details != null && !details.isEmpty()) {
-				batch.setOrderList(details.get(0).getOrderList());
-				//// 合并同一批次下的所有订单
-				//TemuOrderBatchUserDetailDO mergedDetail = details.get(0);
-				//if (details.size() > 1) {
-				//	List<TemuOrderDetailDO> allOrders = details.stream()
-				//			.filter(d -> d.getOrderList() != null)
-				//			.flatMap(d -> d.getOrderList().stream())
-				//			.collect(Collectors.toList());
-				//	mergedDetail.setOrderList(allOrders);
-				//}
-				resultList.add(batch);
+			List<Long> batchOrderIds = batchOrderMap.get(batch.getId());
+			if (batchOrderIds != null && !batchOrderIds.isEmpty()) {
+				List<TemuOrderDetailDO> orders = batchOrderIds.stream()
+						.map(orderMap::get)
+						.filter(Objects::nonNull)
+						.map(order -> {
+							TemuOrderDetailDO orderDetail = new TemuOrderDetailDO();
+							BeanUtils.copyProperties(order, orderDetail);
+							return orderDetail;
+						})
+						.collect(Collectors.toList());
+				batch.setOrderList(orders);
+			} else {
+				batch.setOrderList(new ArrayList<>());
 			}
+			resultList.add(batch);
 		}
 		
-		// 返回最终分页结果
 		return new PageResult<>(resultList, batchPageResult.getTotal(),
 				temuOrderBatchPageVO.getPageNo(), temuOrderBatchPageVO.getPageSize());
 	}

@@ -15,7 +15,7 @@ import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
  *
  * @author 芋道源码
  */
-@TableName("temu_order")
+@TableName(value = "temu_order", autoResultMap = true)
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 @Builder
