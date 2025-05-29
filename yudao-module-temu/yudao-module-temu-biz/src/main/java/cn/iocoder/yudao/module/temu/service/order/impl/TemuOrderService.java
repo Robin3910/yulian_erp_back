@@ -148,6 +148,10 @@ public class TemuOrderService implements ITemuOrderService {
 			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
 		for (TemuOrderDO temuOrderDO : requestVO) {
+			//作图和生产任务标识重置为未完成
+			temuOrderDO.setIsCompleteDrawTask(0);
+			temuOrderDO.setIsCompleteProducerTask(0);
+
 			if (TemuOrderStatusEnum.UNDELIVERED == temuOrderDO.getOrderStatus()) {
 				// 先查询原始订单数据，确保有正确的originalQuantity值
 				TemuOrderDO originalOrder = temuOrderMapper.selectById(temuOrderDO.getId());
@@ -157,6 +161,8 @@ public class TemuOrderService implements ITemuOrderService {
 				}
 			}
 		}
+
+
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
 
 		// 如果更新成功，删除对应的批次关系记录
