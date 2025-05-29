@@ -158,6 +158,14 @@ public class TemuOrderService implements ITemuOrderService {
 			}
 		}
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
+
+		// 如果更新成功，删除对应的批次关系记录
+		if (result) {
+			for (TemuOrderDO temuOrderDO : requestVO) {
+				temuOrderBatchRelationMapper.deleteByOrderId(temuOrderDO.getId());
+			}
+		}
+
 		LogRecordContext.putVariable("user", getLoginUser());
 		LogRecordContext.putVariable("orderSize", requestVO.size());
 		HashMap<String, String> stringStringHashMap = new HashMap<>();
