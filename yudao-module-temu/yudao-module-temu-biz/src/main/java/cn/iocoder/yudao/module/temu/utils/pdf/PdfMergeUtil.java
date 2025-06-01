@@ -281,10 +281,16 @@ public class PdfMergeUtil {
             try (PDDocument document = downloadPdfWithThrottle(goodsSn)) {
                 int pageCount = document.getNumberOfPages();
 
-                // 如果是单页PDF，直接返回原URL
-                if (pageCount == 1) {
-                    return goodsSn;
-                }
+                // 如果是单页PDF，验证SKU是否匹配
+                // if (pageCount == 1) {
+                //     PDFTextStripper stripper = new PDFTextStripper();
+                //     String pageText = stripper.getText(document);
+                //     if (!pageText.contains(customSku)) {
+                //         log.error("单页PDF中的SKU与请求的SKU不匹配。PDF URL: {}, 请求SKU: {}", goodsSn, customSku);
+                //         return null;
+                //     }
+                //     return goodsSn;
+                // }
 
                 // 查找包含SKU的页面
                 int targetPage = findPageWithSku(document, customSku);
