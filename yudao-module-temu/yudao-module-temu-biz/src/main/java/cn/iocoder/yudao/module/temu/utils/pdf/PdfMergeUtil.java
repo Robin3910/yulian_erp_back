@@ -2,6 +2,9 @@ package cn.iocoder.yudao.module.temu.utils.pdf;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
+import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import cn.iocoder.yudao.module.temu.utils.io.ThrottledInputStream;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
@@ -38,10 +41,22 @@ import java.nio.file.Files;
 public class PdfMergeUtil {
 
     private static ConfigApi configApi;
+    private static WeiXinProducer weiXinProducer;
+    private static TemuShopMapper temuShopMapper;
 
     @Resource
     public void setConfigApi(ConfigApi configApi) {
         PdfMergeUtil.configApi = configApi;
+    }
+
+    @Resource
+    public void setWeiXinProducer(WeiXinProducer weiXinProducer) {
+        PdfMergeUtil.weiXinProducer = weiXinProducer;
+    }
+
+    @Resource
+    public void setTemuShopMapper(TemuShopMapper temuShopMapper) {
+        PdfMergeUtil.temuShopMapper = temuShopMapper;
     }
 
     // 下载限速：128KB/s
@@ -279,23 +294,17 @@ public class PdfMergeUtil {
             }
 
             try (PDDocument document = downloadPdfWithThrottle(goodsSn)) {
-                int pageCount = document.getNumberOfPages();
-
-                // 如果是单页PDF，验证SKU是否匹配
-                // if (pageCount == 1) {
-                //     PDFTextStripper stripper = new PDFTextStripper();
-                //     String pageText = stripper.getText(document);
-                //     if (!pageText.contains(customSku)) {
-                //         log.error("单页PDF中的SKU与请求的SKU不匹配。PDF URL: {}, 请求SKU: {}", goodsSn, customSku);
-                //         return null;
-                //     }
-                //     return goodsSn;
-                // }
 
                 // 查找包含SKU的页面
                 int targetPage = findPageWithSku(document, customSku);
                 if (targetPage == -1) {
                     log.error("未找到包含SKU的页面。SKU: {}", customSku);
+                    // 发送企业微信告警
+                    String message = String.format("警告：定制SKU条码错误，未能合成二合一合规单，请重新同步对应订单：\nSKU: %s", customSku);
+                    TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+                    if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
+                        weiXinProducer.sendMessage(shop.getWebhook(), message);
+                    }
                     return null;
                 }
 

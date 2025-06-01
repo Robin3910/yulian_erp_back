@@ -210,7 +210,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				"goods_sn, compliance_url, remark, original_quantity, compliance_image_url, compliance_goods_merged_url, " +
 				"is_complete_draw_task, is_complete_producer_task")
 				.in(TemuOrderDO::getId, orderIds)
-				.eq(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku, temuOrderBatchPageVO.getCustomSku())
+				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku, "%" + temuOrderBatchPageVO.getCustomSku() + "%")
 				.orderByDesc(TemuOrderDO::getCreateTime);
 		
 		List<TemuOrderDO> orderList = temuOrderMapper.selectJoinList(TemuOrderDO.class, orderWrapper);
@@ -760,8 +760,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				TemuOrderDO::getComplianceImageUrl, TemuOrderDO::getComplianceGoodsMergedUrl,
 				TemuOrderDO::getIsCompleteDrawTask, TemuOrderDO::getIsCompleteProducerTask)
 				.in(TemuOrderDO::getId, orderIds)
-				.eq(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku,
-						temuOrderBatchPageVO.getCustomSku())
+				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku,
+						"%" + temuOrderBatchPageVO.getCustomSku() + "%")
 				.orderByDesc(TemuOrderDO::getCreateTime);
 		
 		List<TemuOrderDO> orderList = temuOrderMapper.selectJoinList(TemuOrderDO.class, orderWrapper);
