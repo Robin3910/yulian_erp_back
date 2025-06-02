@@ -118,8 +118,7 @@ public class AdminTemuOrderController {
 	 */
 	@PutMapping("/update-custom-images")
 	@Operation(summary = "更新订单定制图片")
-	// 移除权限限制，允许所有已登录用户访问
-	@PermitAll
+	@PreAuthorize("@ss.hasPermission('temu:order:update')")
 	public CommonResult<Boolean> updateOrderCustomImages(@Valid @RequestBody TemuOrderUpdateCustomImagesReqVO reqVO) {
 		return success(temuOrderService.updateOrderCustomImages(reqVO.getOrderId(), reqVO.getCustomImageUrls()));
 	}
