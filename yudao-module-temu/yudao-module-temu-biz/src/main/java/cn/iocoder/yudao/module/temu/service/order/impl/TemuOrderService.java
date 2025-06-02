@@ -227,8 +227,6 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
 				
 				
-				// 设置商品条形码图片URL到goods_sn字段
-				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				
 				// 设置SKU相关信息
 				String skc = convertToString(orderMap.get("skc"));
@@ -281,6 +279,8 @@ public class TemuOrderService implements ITemuOrderService {
 					}
 				}
 				
+				// 设置商品条形码图片URL到goods_sn字段
+				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				// 新增PDF合并逻辑（确保customSku已赋值）
 				String complianceUrl = order.getComplianceUrl();
 				String goodsSnUrl = order.getGoodsSn();
@@ -321,24 +321,29 @@ public class TemuOrderService implements ITemuOrderService {
 									}
 								});
 							}
+						} else {
+							// order.setGoodsSn(null);
+							// 条码是错的,删除条形码PDF
+							updateOrderGoodsSn(order.getId(), null);
 						}
 					});
-				} else if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
-					// 如果没有customSku但有两个PDF，直接合并
-					CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
-							complianceUrl,
-							goodsSnUrl,
-							temuOssService);
+				} 
+				// else if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
+				// 	// 如果没有customSku但有两个PDF，直接合并
+				// 	CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
+				// 			complianceUrl,
+				// 			goodsSnUrl,
+				// 			temuOssService);
 
-					// 设置回调更新订单
-					mergedUrlFuture.thenAccept(url -> {
-						if (url != null) {
-							// 更新订单合并后的PDF地址（如合规+条码组合文件）
-							updateOrderMergedUrl(order.getId(), url);
+				// 	// 设置回调更新订单
+				// 	mergedUrlFuture.thenAccept(url -> {
+				// 		if (url != null) {
+				// 			// 更新订单合并后的PDF地址（如合规+条码组合文件）
+				// 			updateOrderMergedUrl(order.getId(), url);
 							
-						}
-					});
-				}
+				// 		}
+				// 	});
+				// }
 				
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
