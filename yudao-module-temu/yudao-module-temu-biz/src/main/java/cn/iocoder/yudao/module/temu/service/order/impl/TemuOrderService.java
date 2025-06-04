@@ -414,7 +414,7 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setProductProperties(existingOrder.getProductProperties());
 
 					// 如果bookingTime不一样，说明是返单
-					if (order.getBookingTime() != null && !order.getBookingTime().equals(existingOrder.getBookingTime())) {
+					if (order.getBookingTime() != null && order.getBookingTime().isAfter(existingOrder.getBookingTime())) {
 						// 删除关联关系
 						temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
 						// 将状态置为0

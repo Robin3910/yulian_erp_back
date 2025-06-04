@@ -117,15 +117,26 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
             return;
         }
 
-        // 获取今天的开始时间和结束时间
-        LocalDateTime todayStart = LocalDateTime.now().with(LocalTime.MIN);
-        LocalDateTime todayEnd = LocalDateTime.now().with(LocalTime.MAX);
+        // 获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime periodStart;
+        LocalDateTime periodEnd;
+
+        if (now.getHour() < 12) {
+            // 上午时段 (0:00 - 12:00)
+            periodStart = now.with(LocalTime.MIN); // 当天 0:00
+            periodEnd = now.with(LocalTime.NOON); // 当天 12:00
+        } else {
+            // 下午时段 (12:00 - 24:00)
+            periodStart = now.with(LocalTime.NOON); // 当天 12:00
+            periodEnd = now.with(LocalTime.MAX); // 当天 23:59:59
+        }
 
         // 遍历每个batchCategoryId
         batchCategoryOrderMap.forEach((batchCategoryId, orderIds) -> {
             // 1. 查询当天最新的批次
             TemuOrderBatchDO latestBatch = temuOrderBatchMapper.selectLatestBatchByCategoryId(batchCategoryId,
-                    todayStart, todayEnd);
+                    periodStart, periodEnd);
 
             Long batchId;
             if (latestBatch != null) {
