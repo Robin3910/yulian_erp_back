@@ -402,6 +402,11 @@ public class TemuOrderService implements ITemuOrderService {
 					if (!StringUtils.hasText(order.getSkc())) order.setSkc(existingOrder.getSkc());
 					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
 					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
+					
+					// 先保存原始订单数量，用于后续判断是否为返单
+					Integer newOrderQuantity = order.getQuantity();
+					Integer newOrderOriginalQuantity = order.getOriginalQuantity();
+					
 					if (existingOrder.getQuantity() != null && existingOrder.getQuantity() > 0) {
 						// 如果数据库现存的order中quantity存在且大于0,则保持原值不更新
 						order.setQuantity(existingOrder.getQuantity());
@@ -413,12 +418,35 @@ public class TemuOrderService implements ITemuOrderService {
 					if (!StringUtils.hasText(order.getProductProperties()))
 						order.setProductProperties(existingOrder.getProductProperties());
 
+					// 标记是否为返单
+					boolean isReturnOrder = false;
+					
 					// 如果bookingTime不一样，说明是返单
 					if (order.getBookingTime() != null && order.getBookingTime().isAfter(existingOrder.getBookingTime())) {
+						// 标记为返单
+						isReturnOrder = true;
 						// 删除关联关系
 						temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
 						// 将状态置为0
 						order.setOrderStatus(0);
+						// 对于返单，使用新上传的订单数量，而不是保留原有数量
+						// 恢复新订单的数量值，覆盖前面的保留逻辑
+						if (newOrderQuantity != null) {
+							order.setQuantity(newOrderQuantity);
+						}
+						if (newOrderOriginalQuantity != null) {
+							order.setOriginalQuantity(newOrderOriginalQuantity);
+						}
+						
+						// 将作图完成和生产完成状态回退为未完成
+						order.setIsCompleteDrawTask(0);
+						order.setIsCompleteProducerTask(0);
+						
+						// 确保使用新订单的价格信息
+						// 先将价格明确设置为0，而不是null，确保能覆盖数据库中的旧值
+						// 后续batchSaveOrder时会根据订单数量重新计算价格
+						order.setUnitPrice(BigDecimal.ZERO);
+						order.setTotalPrice(BigDecimal.ZERO);
 
 						// 发送企业微信消息
 						String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
@@ -453,8 +481,13 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setOriginalInfo(existingOrder.getOriginalInfo());
 					if (!StringUtils.hasText(order.getEffectiveImgUrl()))
 						order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
-					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
-					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
+					
+					// 如果不是返单，才从旧订单中填充价格信息
+					if (!isReturnOrder) {
+						if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
+						if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
+					}
+					
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
 					if (order.getComplianceImageUrl() == null)
