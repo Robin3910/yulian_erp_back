@@ -56,5 +56,7 @@ public class TemuOrderListRespVO {
     @Schema(description = "合规单和商品条码PDF合并URL")
     private String complianceGoodsMergedUrl;
 
+    @Schema(description = "是否完成生产任务")
+    private Integer isCompleteProducerTask;
 
 }
