@@ -54,6 +54,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser;
 import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.WALLET_NOT_FOUND;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
+import cn.hutool.core.collection.CollUtil;
 
 @Service
 @Slf4j
@@ -384,10 +385,30 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setOriginalInfo(JSONUtil.toJsonStr(orderMap));
 				
 				// 检查订单是否已存在
-				TemuOrderDO existingOrder = temuOrderMapper.selectByCustomSku(order.getCustomSku());
-				// bookingTime 要识别一下，bookingTime不一样的话，就插入新的数据
-				// 1、不是返单，只是更新 => 拿到数据正常更新
-				// 2、bookingTime不一样，属于返单 => 需要删除batch_relation表中的记录，并将status置为0，往企业微信发消息
+				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
+				// 返单的订单，备货单ID会不一样
+				TemuOrderDO existingOrder = null;
+				if (CollUtil.isNotEmpty(existingOrders)) {
+					for (TemuOrderDO tempOrder : existingOrders) {
+						if (!tempOrder.getOrderNo().equals(order.getOrderNo())) {
+							// 发送企业微信告警，提醒返单
+							String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
+								order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
+								tempOrder.getBookingTime(), order.getBookingTime(), shopName);
+							TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+							// bookingTime更晚的订单，为返单
+							if (order.getBookingTime() != null && order.getBookingTime().isAfter(tempOrder.getBookingTime())) {
+								order.setIsReturnOrder(1);
+							}
+							if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
+								weiXinProducer.sendMessage(shop.getWebhook(), message);
+							}
+						} else {
+							existingOrder = tempOrder;
+						}
+					}
+				}
+
 				if (existingOrder != null) {
 					// 更新现有订单，只更新非空字段
 					order.setId(existingOrder.getId());
@@ -404,8 +425,8 @@ public class TemuOrderService implements ITemuOrderService {
 					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
 					
 					// 先保存原始订单数量，用于后续判断是否为返单
-					Integer newOrderQuantity = order.getQuantity();
-					Integer newOrderOriginalQuantity = order.getOriginalQuantity();
+					// Integer newOrderQuantity = order.getQuantity();
+					// Integer newOrderOriginalQuantity = order.getOriginalQuantity();
 					
 					if (existingOrder.getQuantity() != null && existingOrder.getQuantity() > 0) {
 						// 如果数据库现存的order中quantity存在且大于0,则保持原值不更新
@@ -419,48 +440,48 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setProductProperties(existingOrder.getProductProperties());
 
 					// 标记是否为返单
-					boolean isReturnOrder = false;
+					// boolean isReturnOrder = false;
 					
 					// 如果bookingTime不一样，说明是返单
-					if (order.getBookingTime() != null && order.getBookingTime().isAfter(existingOrder.getBookingTime())) {
-						// 标记为返单
-						isReturnOrder = true;
-						// 删除关联关系
-						temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
-						// 将状态置为0
-						order.setOrderStatus(0);
-						// 对于返单，使用新上传的订单数量，而不是保留原有数量
-						// 恢复新订单的数量值，覆盖前面的保留逻辑
-						if (newOrderQuantity != null) {
-							order.setQuantity(newOrderQuantity);
-						}
-						if (newOrderOriginalQuantity != null) {
-							order.setOriginalQuantity(newOrderOriginalQuantity);
-						}
+					// if (order.getBookingTime() != null && order.getBookingTime().isAfter(existingOrder.getBookingTime())) {
+					// 	// 标记为返单
+					// 	isReturnOrder = true;
+					// 	// 删除关联关系
+					// 	temuOrderBatchRelationMapper.deleteByOrderId(existingOrder.getId());
+					// 	// 将状态置为0
+					// 	order.setOrderStatus(0);
+					// 	// 对于返单，使用新上传的订单数量，而不是保留原有数量
+					// 	// 恢复新订单的数量值，覆盖前面的保留逻辑
+					// 	if (newOrderQuantity != null) {
+					// 		order.setQuantity(newOrderQuantity);
+					// 	}
+					// 	if (newOrderOriginalQuantity != null) {
+					// 		order.setOriginalQuantity(newOrderOriginalQuantity);
+					// 	}
 						
-						// 将作图完成和生产完成状态回退为未完成
-						order.setIsCompleteDrawTask(0);
-						order.setIsCompleteProducerTask(0);
+					// 	// 将作图完成和生产完成状态回退为未完成
+					// 	order.setIsCompleteDrawTask(0);
+					// 	order.setIsCompleteProducerTask(0);
 						
-						// 确保使用新订单的价格信息
-						// 先将价格明确设置为0，而不是null，确保能覆盖数据库中的旧值
-						// 后续batchSaveOrder时会根据订单数量重新计算价格
-						order.setUnitPrice(BigDecimal.ZERO);
-						order.setTotalPrice(BigDecimal.ZERO);
+					// 	// 确保使用新订单的价格信息
+					// 	// 先将价格明确设置为0，而不是null，确保能覆盖数据库中的旧值
+					// 	// 后续batchSaveOrder时会根据订单数量重新计算价格
+					// 	order.setUnitPrice(BigDecimal.ZERO);
+					// 	order.setTotalPrice(BigDecimal.ZERO);
 
-						// 发送企业微信消息
-						String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
-							shopName,
-							order.getOrderNo(),	
-							order.getCustomSku(),
-							DateUtil.format(existingOrder.getBookingTime(), "yyyy-MM-dd HH:mm:ss"),
-							DateUtil.format(order.getBookingTime(), "yyyy-MM-dd HH:mm:ss"));
-						// 获取shopId为88888888的店铺webhook地址
-						TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
-						if (shop != null && StringUtils.hasText(shop.getWebhook())) {
-							weiXinProducer.sendMessage(shop.getWebhook(), message.toString());
-						}
-					}
+					// 	// 发送企业微信消息
+					// 	String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
+					// 		shopName,
+					// 		order.getOrderNo(),	
+					// 		order.getCustomSku(),
+					// 		DateUtil.format(existingOrder.getBookingTime(), "yyyy-MM-dd HH:mm:ss"),
+					// 		DateUtil.format(order.getBookingTime(), "yyyy-MM-dd HH:mm:ss"));
+					// 	// 获取shopId为88888888的店铺webhook地址
+					// 	TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+					// 	if (shop != null && StringUtils.hasText(shop.getWebhook())) {
+					// 		weiXinProducer.sendMessage(shop.getWebhook(), message.toString());
+					// 	}
+					// }
 					// 如果bookingTime为空，则使用existingOrder的bookingTime,这种是上传定制图片的场景
 					if (order.getBookingTime() == null) {
 						order.setBookingTime(existingOrder.getBookingTime());
@@ -481,18 +502,23 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setOriginalInfo(existingOrder.getOriginalInfo());
 					if (!StringUtils.hasText(order.getEffectiveImgUrl()))
 						order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
+					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
+					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					
 					// 如果不是返单，才从旧订单中填充价格信息
-					if (!isReturnOrder) {
-						if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
-						if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
-					}
+					// if (!isReturnOrder) {
+					// 	if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
+					// 	if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
+					// }
 					
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
 					if (order.getComplianceImageUrl() == null)
 						order.setComplianceImageUrl(existingOrder.getComplianceImageUrl());
-					
+					if (order.getIsCompleteDrawTask() == null) order.setIsCompleteDrawTask(existingOrder.getIsCompleteDrawTask());
+					if (order.getIsCompleteProducerTask() == null) order.setIsCompleteProducerTask(existingOrder.getIsCompleteProducerTask());
+					if (order.getIsReturnOrder() == null) order.setIsReturnOrder(existingOrder.getIsReturnOrder());
+
 					temuOrderMapper.updateById(order);
 				} else {
 					// 插入新订单

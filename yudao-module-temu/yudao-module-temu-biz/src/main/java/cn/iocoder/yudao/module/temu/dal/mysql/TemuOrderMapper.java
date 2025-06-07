@@ -136,12 +136,28 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 * 根据定制SKU查询订单
 	 *
 	 * @param customSku 定制SKU
+	 * @return 订单信息列表
+	 */
+	default List<TemuOrderDO> selectByCustomSku(String customSku) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+		queryWrapper.eq(TemuOrderDO::getCustomSku, customSku);
+		return selectList(queryWrapper);
+	}
+
+	/**
+	 * 根据定制SKU和订单号查询订单
+	 *
+	 * @param customSku 定制SKU
+	 * @param orderNo 订单号
 	 * @return 订单信息
 	 */
-	default TemuOrderDO selectByCustomSku(String customSku) {
-		return selectOne(TemuOrderDO::getCustomSku, customSku);
+	default TemuOrderDO selectByCustomSkuAndOrderNo(String customSku, String orderNo) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+		queryWrapper.eq(TemuOrderDO::getCustomSku, customSku)
+				.eq(TemuOrderDO::getOrderNo, orderNo);
+		return selectOne(queryWrapper);
 	}
-	
+
 	/**
 	 * 根据定制SKU查询所有订单
 	 *

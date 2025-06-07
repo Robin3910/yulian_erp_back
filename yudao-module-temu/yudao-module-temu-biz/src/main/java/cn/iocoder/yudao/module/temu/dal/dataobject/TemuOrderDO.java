@@ -162,5 +162,10 @@ public class TemuOrderDO extends BaseDO {
 	 * 是否完成生产任务
 	 */
 	private Integer isCompleteProducerTask;
+
+	/**
+	 * 是否为返单
+	 */
+	private Integer isReturnOrder;
 	
 }
