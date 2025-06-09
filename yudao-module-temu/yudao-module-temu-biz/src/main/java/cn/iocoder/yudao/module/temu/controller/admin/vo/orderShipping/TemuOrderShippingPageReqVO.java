@@ -35,7 +35,10 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	
 	@Schema(description = "定制SKU")
 	private String customSku;
-	
+
+	@Schema(description = "类目ID列表")
+	private List<String> categoryIds;
+
 	@DateTimeFormat(pattern = "yyyy-MM-dd")
 	@Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
 	private LocalDate[] createTime;
