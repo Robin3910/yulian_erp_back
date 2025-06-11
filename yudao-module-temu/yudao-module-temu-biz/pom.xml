@@ -79,6 +79,14 @@
             <version>2.4.1-jdk8-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- 阿里云 图像搜索 依赖 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>imagesearch20201214</artifactId>
+            <version>4.2.2</version>
+        </dependency>
+
     </dependencies>
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

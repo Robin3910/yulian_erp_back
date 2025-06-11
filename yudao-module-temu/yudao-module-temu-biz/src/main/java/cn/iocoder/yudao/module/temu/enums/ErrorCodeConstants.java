@@ -33,4 +33,8 @@ public interface ErrorCodeConstants {
 	ErrorCode WALLET_NOT_ENOUGH =  new ErrorCode(1_001_003_001, "钱包余额不足");
 
 	ErrorCode PDF_PARSE_LIMIT_NOT_EXISTS = new ErrorCode(1002001000, "PDF解析限速配置不存在");
+
+	// ========== 图像搜索相关 ==========
+	ErrorCode TEMU_IMAGE_SIZE_EXCEEDS_LIMIT = new ErrorCode(1008001000, "图片大小超过限制");
+	ErrorCode TEMU_IMAGE_TYPE_NOT_SUPPORTED = new ErrorCode(1008001001, "不支持的图片格式");
 }
