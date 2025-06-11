@@ -56,6 +56,12 @@ import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.WALLET_NOT_FO
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 import cn.hutool.core.collection.CollUtil;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+
 @Service
 @Slf4j
 public class TemuOrderService implements ITemuOrderService {
@@ -195,6 +201,30 @@ public class TemuOrderService implements ITemuOrderService {
 		if (ordersList == null || ordersList.isEmpty()) {
 			return 0;
 		}
+		try {
+			// 上传图片到阿里云 以图搜图
+			// 创建HTTP客户端
+			HttpClient httpClient = HttpClients.createDefault();
+			HttpPost httpPost = new HttpPost("http://39.106.136.96:8088/upload");
+			
+			// 设置请求头
+			httpPost.setHeader("Content-Type", "application/json");
+			
+			// 设置请求体
+			StringEntity entity = new StringEntity(originalJson, "UTF-8");
+			httpPost.setEntity(entity);
+			
+			// 发送请求并获取响应
+			HttpResponse response = httpClient.execute(httpPost);
+			
+			// 检查响应状态
+			int statusCode = response.getStatusLine().getStatusCode();
+			if (statusCode != 200 && statusCode != 202) {
+				log.error("上传原始JSON失败，状态码: {}", statusCode);
+			}
+		} catch (Exception e) {
+			log.error("上传原始JSON时发生错误: {}", e.getMessage(), e);
+		}
 		
 		int count = 0;
 		Long shopIdLong = Long.parseLong(shopId);
@@ -226,8 +256,6 @@ public class TemuOrderService implements ITemuOrderService {
 				order.setProductTitle(convertToString(orderMap.get("title")));
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
 				order.setEffectiveImgUrl(convertToString(orderMap.get("effective_image_url"))); // 写入合成预览图url信息
-				
-				
 				
 				// 设置SKU相关信息
 				String skc = convertToString(orderMap.get("skc"));
@@ -329,22 +357,6 @@ public class TemuOrderService implements ITemuOrderService {
 						}
 					});
 				} 
-				// else if (StrUtil.isAllNotBlank(complianceUrl, goodsSnUrl)) {
-				// 	// 如果没有customSku但有两个PDF，直接合并
-				// 	CompletableFuture<String> mergedUrlFuture = asyncPdfService.processPdfAsync(
-				// 			complianceUrl,
-				// 			goodsSnUrl,
-				// 			temuOssService);
-
-				// 	// 设置回调更新订单
-				// 	mergedUrlFuture.thenAccept(url -> {
-				// 		if (url != null) {
-				// 			// 更新订单合并后的PDF地址（如合规+条码组合文件）
-				// 			updateOrderMergedUrl(order.getId(), url);
-							
-				// 		}
-				// 	});
-				// }
 				
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
