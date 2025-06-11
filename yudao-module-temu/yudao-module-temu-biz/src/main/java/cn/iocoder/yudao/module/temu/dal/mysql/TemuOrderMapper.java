@@ -40,7 +40,8 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.eqIfExists(TemuOrderDO::getOrderStatus, temuOrderRequestVO.getOrderStatus())// 订单状态
 				.likeIfExists(TemuOrderDO::getSku, temuOrderRequestVO.getSku())// SKU
 				.likeIfExists(TemuOrderDO::getSkc, temuOrderRequestVO.getSkc())// SKC
-				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku());// 定制SKU
+				.likeIfExists(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSku())// 定制SKU
+				.likeIfExists(TemuOrderDO::getOrderNo, temuOrderRequestVO.getOrderNo());//  订单编号
 				//.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
 				//.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
 		//多店铺查询
