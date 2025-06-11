@@ -40,7 +40,8 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 				.eqIfExists(TemuOrderBatchDO::getIsDispatchTask, pageVO.getIsDispatchTask())
 				.eqIfExists(TemuOrderDO::getShopId, pageVO.getShopId())
 				.like(StringUtils.isNotEmpty(pageVO.getBatchNo()), TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())
-				.like(StringUtils.isNotEmpty(pageVO.getCustomSku()), TemuOrderDO::getCustomSku, pageVO.getCustomSku());
+				.like(StringUtils.isNotEmpty(pageVO.getCustomSku()), TemuOrderDO::getCustomSku, pageVO.getCustomSku())
+				.like(StringUtils.isNotEmpty(pageVO.getOrderNo()), TemuOrderDO::getOrderNo, pageVO.getOrderNo());
 		
 		// 时间范围查询
 		if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {

@@ -36,4 +36,6 @@ public class TemuOrderBatchPageVO extends PageParam {
 	private Long shopId;
 	@Schema(description = "类目ID")
 	private List<Long> categoryId;
+	@Schema(description = "订单编号")
+	private String orderNo;
 }
