@@ -14,6 +14,8 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -173,4 +175,14 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		queryWrapperX.in(TemuOrderDO::getCustomSku, customSku);
 		return selectList(queryWrapperX);
 	}
+
+	/**
+	 * 根据定制SKU更新订单的goods_sn_no字段
+	 *
+	 * @param customSku 定制SKU
+	 * @param goodsSnNo 条码值
+	 * @return 更新的记录数
+	 */
+	@Update("UPDATE temu_order SET goods_sn_no = #{goodsSnNo} WHERE custom_sku = #{customSku}")
+	int updateGoodsSnNoByCustomSku(@Param("customSku") String customSku, @Param("goodsSnNo") String goodsSnNo);
 }

@@ -1,10 +1,22 @@
 package cn.iocoder.yudao.module.temu.service.pdf;
 
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import cn.iocoder.yudao.module.temu.utils.pdf.PdfMergeUtil;
+import cn.iocoder.yudao.module.temu.utils.pdf.PdfToImageUtil;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.Result;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
+import com.google.zxing.common.HybridBinarizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import javax.annotation.Resource;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.net.URL;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -16,6 +28,9 @@ import java.util.concurrent.CompletableFuture;
 @Service
 @Slf4j
 public class AsyncPdfProcessService {
+
+    @Resource
+    private TemuOrderMapper temuOrderMapper;
 
     /**
      * 异步合并PDF文件并上传至OSS
@@ -71,19 +86,47 @@ public class AsyncPdfProcessService {
         return CompletableFuture.supplyAsync(() -> {
             long startTime = System.currentTimeMillis();
             try {
-                log.info("[PDF提取] 开始处理 - customSku: {}, goodsSnUrl: {}",
-                        customSku, goodsSnUrl);
+                log.info("[PDF提取] 开始处理 - customSku: {}, goodsSnUrl: {}", customSku, goodsSnUrl);
 
-                String result = PdfMergeUtil.extractPageBySku(goodsSnUrl, customSku, temuOssService);
+                // 提取指定页面并上传到OSS
+                String extractedPdfUrl = PdfMergeUtil.extractPageBySku(goodsSnUrl, customSku, temuOssService);
+                
+                if (StrUtil.isNotBlank(extractedPdfUrl)) {
+                    // 将提取后的PDF转换为图片
+                    String imageUrl = PdfToImageUtil.getImageUrl(extractedPdfUrl, "barcode", temuOssService);
+                    
+                    if (StrUtil.isNotBlank(imageUrl)) {
+                        try {
+                            // 下载图片并使用ZXing解析条码
+                            BufferedImage image = ImageIO.read(new URL(imageUrl).openStream());
+                            if (image != null) {
+                                BufferedImageLuminanceSource source = new BufferedImageLuminanceSource(image);
+                                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                                Result result = new MultiFormatReader().decode(bitmap);
+                                
+                                if (result != null) {
+                                    String barcodeValue = result.getText();
+                                    if (StrUtil.isNotBlank(barcodeValue)) {
+                                        // 更新订单的条码值
+                                        temuOrderMapper.updateGoodsSnNoByCustomSku(customSku, barcodeValue);
+                                        log.info("[条码解析] 成功解析条码 - customSku: {}, barcodeValue: {}", customSku, barcodeValue);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("[条码解析] 解析失败 - customSku: {}, error: {}", customSku, e.getMessage(), e);
+                        }
+                    }
+                }
 
                 long endTime = System.currentTimeMillis();
-                log.info("[PDF提取] 处理完成 - customSku: {}, 耗时: {}ms, 结果URL: {}",
-                        customSku, (endTime - startTime), result);
+                log.info("[PDF提取] 处理完成 - customSku: {}, 耗时: {}ms, 结果URL: {}", 
+                        customSku, (endTime - startTime), extractedPdfUrl);
 
-                return result;
+                return extractedPdfUrl;
             } catch (Exception e) {
                 long endTime = System.currentTimeMillis();
-                log.error("[PDF提取] 处理失败 - customSku: {}, 耗时: {}ms, 错误: {}",
+                log.error("[PDF提取] 处理失败 - customSku: {}, 耗时: {}ms, 错误: {}", 
                         customSku, (endTime - startTime), e.getMessage(), e);
                 return null;
             }

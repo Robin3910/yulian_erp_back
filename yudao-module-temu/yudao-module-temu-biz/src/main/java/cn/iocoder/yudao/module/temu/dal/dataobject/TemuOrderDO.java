@@ -168,4 +168,9 @@ public class TemuOrderDO extends BaseDO {
 	 */
 	private Integer isReturnOrder;
 	
+	/**
+	 * 商品条码编号
+	 */
+	private String goodsSnNo;
+
 }
