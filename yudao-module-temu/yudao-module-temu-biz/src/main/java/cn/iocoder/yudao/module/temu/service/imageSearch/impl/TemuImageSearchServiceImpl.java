@@ -1,8 +1,13 @@
 package cn.iocoder.yudao.module.temu.service.imageSearch.impl;
 
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageAddReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchOrderRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchRespVO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.service.imageSearch.TemuImageSearchService;
 import cn.iocoder.yudao.module.temu.config.TemuImageSearchConfig;
 import com.aliyun.imagesearch20201214.Client;
@@ -19,6 +24,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,7 +36,13 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
     @Resource
     private TemuImageSearchConfig imageSearchConfig;
 
-    //上传图片到阿里云图库
+    @Resource
+    private TemuOrderMapper temuOrderMapper;
+
+    @Resource
+    private ConfigApi configApi;
+
+    // 上传图片到阿里云图库
     @Override
     public AddImageResponse addImage(TemuImageAddReqVO reqVO) {
         try {
@@ -67,19 +79,34 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
         }
     }
 
-    //图片搜索阿里云图库（返回最高分结果）
+    // 图片搜索阿里云图库
     @Override
-    public List<TemuImageSearchRespVO> searchImageByPicWithHighestScore(TemuImageSearchReqVO reqVO) {
+    public List<TemuImageSearchOrderRespVO> searchImageByPicWithHighestScore(TemuImageSearchReqVO reqVO) {
         try {
             // 创建新的搜索请求对象（避免修改原始请求参数）
             TemuImageSearchReqVO searchReqVO = new TemuImageSearchReqVO();
 
             // 复制原始请求参数
-            searchReqVO.setFile(reqVO.getFile());  // 设置搜索图片文件（Base64/URL格式）
+            searchReqVO.setFile(reqVO.getFile()); // 设置搜索图片文件（Base64/URL格式）
             searchReqVO.setCategoryId(reqVO.getCategoryId()); // 设置图像库的类目ID（限定搜索范围）
-            searchReqVO.setNum(10); // 设置返回相同分数结果数量上限（确保获取所有可能结果）
-            searchReqVO.setCrop(reqVO.getCrop()); //是否开启主体识别（true/false）
+            searchReqVO.setCrop(reqVO.getCrop()); // 是否开启主体识别（true/false）
             searchReqVO.setRegion(reqVO.getRegion()); // 指定图片主体区域坐标（格式：x1,x2,y1,y2）
+
+            // 从配置中获取返回结果数量
+            String numStr = configApi.getConfigValueByKey("temu.image_search.result_num");
+            log.info("图片搜索返回结果数量配置值: {}", numStr);
+            int num = 10; // 默认值
+            if (StrUtil.isNotEmpty(numStr)) {
+                try {
+                    num = Integer.parseInt(numStr);
+                    if (num <= 0) {
+                        num = 10;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("图片搜索返回结果数量配置格式错误，使用默认值");
+                }
+            }
+            searchReqVO.setNum(num);
 
             // 调用基础搜索方法（执行阿里云图像搜索API）
             SearchImageByPicResponse response = searchImageByPic(searchReqVO);
@@ -93,29 +120,42 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                 return new ArrayList<>();
             }
 
-            // 遍历结果集计算最高分
-            float maxScore = 0;
-            for (SearchImageByPicResponseBody.SearchImageByPicResponseBodyAuctions auction : auctions) {
-                // 更新当前最高分（Score为阿里云返回的相似度分值，范围0-10）
-                if (auction.getScore() > maxScore) {
-                    maxScore = auction.getScore();
-                }
+            // 获取所有结果的productId 对应订单的定制sku
+            List<String> customSkus = auctions.stream()
+                    .map(SearchImageByPicResponseBody.SearchImageByPicResponseBodyAuctions::getProductId)
+                    .collect(Collectors.toList());
+
+            // 如果没有找到匹配的图片，返回空列表
+            if (customSkus.isEmpty()) {
+                return new ArrayList<>();
             }
 
-            // 筛选所有最高分结果
-            List<TemuImageSearchRespVO> result = new ArrayList<>();
-            for (SearchImageByPicResponseBody.SearchImageByPicResponseBodyAuctions auction : auctions) {
-                // 匹配当前结果分值与最高分
-                if (auction.getScore() == maxScore) {
-                    // 封装返回对象（定制sku+相似度分数）
-                    result.add(new TemuImageSearchRespVO(
-                            auction.getProductId(),  // 定制sku
-                            auction.getScore()));   // 相似度分数
+            // 直接使用TemuOrderMapper查询订单信息
+            List<TemuOrderDO> orderList = temuOrderMapper.selectListByCustomSku(customSkus);
+            
+            // 创建返回结果列表
+            List<TemuImageSearchOrderRespVO> resultList = new ArrayList<>();
+            
+            // 遍历订单列表，匹配对应的productId和score
+            for (TemuOrderDO order : orderList) {
+                TemuImageSearchOrderRespVO respVO = new TemuImageSearchOrderRespVO();
+                // 复制订单信息
+                BeanUtils.copyProperties(order, respVO);
+                
+                // 查找对应的auction记录
+                for (SearchImageByPicResponseBody.SearchImageByPicResponseBodyAuctions auction : auctions) {
+                    if (auction.getProductId().equals(order.getCustomSku())) {
+                        respVO.setProductId(auction.getProductId());
+                        respVO.setScore(auction.getScore());
+                        break;
+                    }
                 }
+                resultList.add(respVO);
+                log.info("[searchImageByPicWithHighestScore][搜索结果：{}]", respVO);
             }
-
-            return result;
-
+            
+            return resultList;
+            
         } catch (Exception e) {
             log.error("[searchImageByPicWithHighestScore][类目({}) 搜索失败]",
                     reqVO.getCategoryId(), e);
@@ -125,6 +165,7 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
 
     /**
      * 执行阿里云图像搜索（以图搜图）核心方法
+     * 
      * @param reqVO 搜索请求参数封装对象
      * @return 阿里云API返回的搜索结果响应体
      */
@@ -141,8 +182,8 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                 request.categoryId = reqVO.getCategoryId();
             }
 
-            // 设置返回结果数量（默认10条）
-            request.num = reqVO.getNum() != null ? reqVO.getNum() : 10;
+            // 设置返回结果数量
+            request.num = reqVO.getNum();
 
             // 启用主体识别功能（默认开启）
             // 说明：自动裁剪背景，聚焦图片主体提升搜索准确率
@@ -176,6 +217,5 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
             throw new RuntimeException(e);
         }
     }
-
 
 }

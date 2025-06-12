@@ -14,9 +14,6 @@ public class TemuImageSearchReqVO {
     @NotNull(message = "图片文件不能为空")
     private MultipartFile file;
 
-    @Schema(description = "是否只返回最高分结果，默认为ture")
-    private Boolean returnHighestOnly = true;
-
     @Schema(description = "返回结果数量，默认10")
     private Integer num;
 

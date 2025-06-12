@@ -21,7 +21,8 @@ public class TemuImageAddReqVO {
     @Size(max = 256, message = "定制sku不能超过256个字符")
     private String productId;
 
-    @Schema(description = "图片名称，最多256个字符", required = true, example = "51978533533490_1_20250611.jpg")
+
+    @Schema(description = "图片名称，最多256个字符", required = true, example = "51978533533490_1_20250611")
     @NotBlank(message = "图片名称不能为空")
     @Size(max = 256, message = "图片名称不能超过256个字符")
     private String picName;

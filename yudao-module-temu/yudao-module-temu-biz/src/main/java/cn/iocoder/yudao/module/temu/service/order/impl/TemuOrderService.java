@@ -79,29 +79,29 @@ public class TemuOrderService implements ITemuOrderService {
 	private TemuOrderMapper temuOrderMapper;
 	@Resource
 	private TemuShopMapper temuShopMapper;
-
+	
 	@Resource
 	TemuUserShopMapper temuUserShopMapper;
-
+	
 	@Resource
 	private TemuOrderBatchRelationMapper temuOrderBatchRelationMapper;
 
 	@Resource
 	private WeiXinProducer weiXinProducer;
-
+	
 	@Resource
 	TemuProductCategoryMapper temuProductCategoryMapper;
 	@Resource
 	private TemuProductCategorySkuMapper temuProductCategorySkuMapper;
 	@Resource
 	private TemuShopOldTypeSkcMapper temuShopOldTypeSkcMapper;
-
+	
 	@Resource
 	private TemuOssService temuOssService;
-
+	
 	@Resource
 	private AsyncPdfProcessService asyncPdfService;
-
+	
 	@Resource
 	private DictTypeMapper dictTypeMapper;
 	@Resource
@@ -109,18 +109,18 @@ public class TemuOrderService implements ITemuOrderService {
 
 	@Resource
 	private TemuOrderBatchCategoryService temuOrderBatchCategoryService;
-
-
+	
+	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.selectPage(temuOrderRequestVO);
 	}
-
+	
 	@Override
 	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO) {
 		return temuOrderMapper.statistics(temuOrderRequestVO);
 	}
-
+	
 	@Override
 	public TemuOrderStatisticsRespVO statistics(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
 		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
@@ -132,9 +132,9 @@ public class TemuOrderService implements ITemuOrderService {
 			return temuOrderMapper.statistics(temuOrderRequestVO, shopIdList);
 		}
 		return new TemuOrderStatisticsRespVO();
-
+		
 	}
-
+	
 	/**
 	 * 根据给定的查询条件和用户ID，分页查询Temu订单详情列表。
 	 *
@@ -144,7 +144,7 @@ public class TemuOrderService implements ITemuOrderService {
 	 */
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO, Long userId) {
-
+		
 		List<TemuUserShopDO> list = temuUserShopMapper.selectList(TemuUserShopDO::getUserId, userId);
 		ArrayList<String> shopIdList = new ArrayList<>();
 		if (!list.isEmpty()) {
@@ -155,9 +155,9 @@ public class TemuOrderService implements ITemuOrderService {
 		} else {
 			return new PageResult<>();
 		}
-
+		
 	}
-
+	
 	@Override
 	@Transactional
 	@LogRecord(
@@ -205,7 +205,7 @@ public class TemuOrderService implements ITemuOrderService {
 		LogRecordContext.putVariable("orderString", JsonUtils.toJsonString(stringStringHashMap));
 		return result;
 	}
-
+	
 	@Override
 	public int saveOrders(String shopId, String shopName, List<Map<String, Object>> ordersList, String originalJson) {
 		if (ordersList == null || ordersList.isEmpty()) {
@@ -238,13 +238,13 @@ public class TemuOrderService implements ITemuOrderService {
 
 		int count = 0;
 		Long shopIdLong = Long.parseLong(shopId);
-
+		
 		// 1. 收集所有的SKC
 		Set<String> skcSet = ordersList.stream()
 				.map(orderMap -> convertToString(orderMap.get("skc")))
 				.filter(skc -> !skc.isEmpty())
 				.collect(Collectors.toSet());
-
+		
 		// 2. 批量查询合规单URL
 		Map<String, TemuShopOldTypeSkcDO> skcToOldTypeMap = new HashMap<>();
 		if (!skcSet.isEmpty()) {
@@ -255,11 +255,11 @@ public class TemuOrderService implements ITemuOrderService {
 			skcToOldTypeMap = oldTypeSkcList.stream()
 					.collect(Collectors.toMap(TemuShopOldTypeSkcDO::getSkc, oldType -> oldType));
 		}
-
+		
 		for (Map<String, Object> orderMap : ordersList) {
 			try {
 				TemuOrderDO order = new TemuOrderDO();
-
+				
 				// 设置基本信息
 				order.setShopId(shopIdLong);
 				order.setOrderNo(convertToString(orderMap.get("orderId")));
@@ -270,7 +270,7 @@ public class TemuOrderService implements ITemuOrderService {
 				// 设置SKU相关信息
 				String skc = convertToString(orderMap.get("skc"));
 				order.setSkc(skc);
-
+				
 				// 设置合规单URL
 				if (!skc.isEmpty()) {
 					TemuShopOldTypeSkcDO oldTypeSkcDO = skcToOldTypeMap.get(skc);
@@ -279,7 +279,7 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setComplianceImageUrl(oldTypeSkcDO.getOldTypeImageUrl());
 					}
 				}
-
+				
 				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
 				String sku = "";
 				String properties = "";
@@ -290,14 +290,14 @@ public class TemuOrderService implements ITemuOrderService {
 					properties = convertToString(skusMap.get("property"));
 					order.setProductProperties(properties);
 				}
-
+				
 				// 如果没有SKU信息，查询历史订单
 				if (sku.isEmpty() && !properties.isEmpty()) {
 					LambdaQueryWrapper<TemuOrderDO> queryWrapper = new LambdaQueryWrapper<>();
 					queryWrapper.eq(TemuOrderDO::getShopId, shopIdLong)
 							.eq(TemuOrderDO::getProductProperties, properties)
 							.last("LIMIT 1"); // 只取一条记录
-
+					
 					TemuOrderDO historicalOrder = temuOrderMapper.selectOne(queryWrapper);
 					if (historicalOrder != null && historicalOrder.getSku() != null) {
 						// 将历史订单的SKU信息赋值给当前订单
@@ -305,7 +305,7 @@ public class TemuOrderService implements ITemuOrderService {
 						sku = historicalOrder.getSku(); // 更新sku变量，用于后续的分类查询
 					}
 				}
-
+				
 				// 查询商品分类信息
 				if (!sku.isEmpty()) {
 					HashMap<String, Object> queryMap = MapUtil.of("sku", sku);
@@ -317,14 +317,14 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setCategoryName(categorySku.getCategoryName());
 					}
 				}
-
+				
 				// 设置商品条形码图片URL到goods_sn字段
 				order.setGoodsSn(convertToString(orderMap.get("barcode_image_url")));
 				// 新增PDF合并逻辑（确保customSku已赋值）
 				String complianceUrl = order.getComplianceUrl();
 				String goodsSnUrl = order.getGoodsSn();
 				String currentCustomSku = order.getCustomSku();
-
+				
 				// 若customSku为空但查询到历史订单的sku，用历史sku补充
 				if (StrUtil.isBlank(currentCustomSku) && StrUtil.isNotBlank(sku)) {
 					currentCustomSku = sku;
@@ -366,46 +366,46 @@ public class TemuOrderService implements ITemuOrderService {
 							updateOrderGoodsSn(order.getId(), null);
 						}
 					});
-				}
+				} 
 
 				// 设置价格和数量
 				order.setSalePrice(new BigDecimal(convertToString(orderMap.get("price"))));
 				order.setQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
 				order.setOriginalQuantity(Integer.valueOf(convertToString(orderMap.get("quantity"))));
-
-
+				
+				
 				// 设置订单状态
 				// todo 前端上传上来使用枚举值，不要使用string
 				String status = convertToString(orderMap.get("status"));
 				if ("待发货".equals(status)) {
 					order.setOrderStatus(0);
 				}
-
+				
 				// 设置时间
 				String creationTime = convertToString(orderMap.get("creationTime"));
 				if (creationTime != null && !creationTime.isEmpty()) {
 					order.setBookingTime(parseDateTime(creationTime));
 				}
-
+				
 				// 处理自定义图片和文字
 				List<String> customImages = (List<String>) orderMap.get("customImages");
 				if (customImages != null && !customImages.isEmpty()) {
 					order.setCustomImageUrls(String.join(",", customImages));
 				}
-
+				
 				List<String> customTexts = (List<String>) orderMap.get("customTexts");
 				if (customTexts != null && !customTexts.isEmpty()) {
 					order.setCustomTextList(String.join(",", customTexts));
 				}
-
+				
 				// 处理物流信息
 				if (orderMap.get("shippingInfo") != null) {
 					order.setShippingInfo(JSONUtil.toJsonStr(orderMap.get("shippingInfo")));
 				}
-
+				
 				// 保存原始信息
 				order.setOriginalInfo(JSONUtil.toJsonStr(orderMap));
-
+				
 				// 检查订单是否已存在
 				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				// 返单的订单，备货单ID会不一样
@@ -414,9 +414,9 @@ public class TemuOrderService implements ITemuOrderService {
 					for (TemuOrderDO tempOrder : existingOrders) {
 						if (!tempOrder.getOrderNo().equals(order.getOrderNo())) {
 							// 发送企业微信告警，提醒返单
-							String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s",
-									order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
-									tempOrder.getBookingTime(), order.getBookingTime(), shopName);
+							String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
+								order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
+								tempOrder.getBookingTime(), order.getBookingTime(), shopName);
 							TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
 							// bookingTime更晚的订单，为返单
 							if (order.getBookingTime() != null && order.getBookingTime().isAfter(tempOrder.getBookingTime())) {
@@ -436,7 +436,7 @@ public class TemuOrderService implements ITemuOrderService {
 					order.setId(existingOrder.getId());
 					// 订单的状态不能随意更新，保持原有状态
 					order.setOrderStatus(existingOrder.getOrderStatus());
-
+					
 					// 比对并填充字段
 					if (!StringUtils.hasText(order.getOrderNo())) order.setOrderNo(existingOrder.getOrderNo());
 					if (!StringUtils.hasText(order.getProductTitle()))
@@ -445,11 +445,11 @@ public class TemuOrderService implements ITemuOrderService {
 					if (!StringUtils.hasText(order.getSkc())) order.setSkc(existingOrder.getSkc());
 					if (order.getSalePrice() == null) order.setSalePrice(existingOrder.getSalePrice());
 					if (!StringUtils.hasText(order.getCustomSku())) order.setCustomSku(existingOrder.getCustomSku());
-
+					
 					// 先保存原始订单数量，用于后续判断是否为返单
 					// Integer newOrderQuantity = order.getQuantity();
 					// Integer newOrderOriginalQuantity = order.getOriginalQuantity();
-
+					
 					if (existingOrder.getQuantity() != null && existingOrder.getQuantity() > 0) {
 						// 如果数据库现存的order中quantity存在且大于0,则保持原值不更新
 						order.setQuantity(existingOrder.getQuantity());
@@ -463,7 +463,7 @@ public class TemuOrderService implements ITemuOrderService {
 
 					// 标记是否为返单
 					// boolean isReturnOrder = false;
-
+					
 					// 如果bookingTime不一样，说明是返单
 					// if (order.getBookingTime() != null && order.getBookingTime().isAfter(existingOrder.getBookingTime())) {
 					// 	// 标记为返单
@@ -480,11 +480,11 @@ public class TemuOrderService implements ITemuOrderService {
 					// 	if (newOrderOriginalQuantity != null) {
 					// 		order.setOriginalQuantity(newOrderOriginalQuantity);
 					// 	}
-
+						
 					// 	// 将作图完成和生产完成状态回退为未完成
 					// 	order.setIsCompleteDrawTask(0);
 					// 	order.setIsCompleteProducerTask(0);
-
+						
 					// 	// 确保使用新订单的价格信息
 					// 	// 先将价格明确设置为0，而不是null，确保能覆盖数据库中的旧值
 					// 	// 后续batchSaveOrder时会根据订单数量重新计算价格
@@ -492,9 +492,9 @@ public class TemuOrderService implements ITemuOrderService {
 					// 	order.setTotalPrice(BigDecimal.ZERO);
 
 					// 	// 发送企业微信消息
-					// 	String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s",
+					// 	String message = String.format("店铺：%s 订单：%s 定制SKU：%s 发生返单，原预约时间: %s, 新预约时间: %s", 
 					// 		shopName,
-					// 		order.getOrderNo(),
+					// 		order.getOrderNo(),	
 					// 		order.getCustomSku(),
 					// 		DateUtil.format(existingOrder.getBookingTime(), "yyyy-MM-dd HH:mm:ss"),
 					// 		DateUtil.format(order.getBookingTime(), "yyyy-MM-dd HH:mm:ss"));
@@ -526,13 +526,13 @@ public class TemuOrderService implements ITemuOrderService {
 						order.setEffectiveImgUrl(existingOrder.getEffectiveImgUrl());
 					if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
-
+					
 					// 如果不是返单，才从旧订单中填充价格信息
 					// if (!isReturnOrder) {
 					// 	if (order.getUnitPrice() == null) order.setUnitPrice(existingOrder.getUnitPrice());
 					// 	if (order.getTotalPrice() == null) order.setTotalPrice(existingOrder.getTotalPrice());
 					// }
-
+					
 					if (order.getGoodsSn() == null) order.setGoodsSn(existingOrder.getGoodsSn());
 					if (order.getComplianceUrl() == null) order.setComplianceUrl(existingOrder.getComplianceUrl());
 					if (order.getComplianceImageUrl() == null)
@@ -547,19 +547,19 @@ public class TemuOrderService implements ITemuOrderService {
 					temuOrderMapper.insert(order);
 				}
 				count++;
-
+				
 			} catch (Exception e) {
 				log.error("保存订单失败: {}", e.getMessage(), e);
 				// 继续处理下一个订单
 			}
 		}
-
+		
 		// 同时保存或更新店铺信息
 		saveShopInfo(shopIdLong, shopName);
-
+		
 		return count;
 	}
-
+	
 	@Override
 	public int updateCategory(TemuOrderUpdateCategoryReqVo requestVO) {
 		//根据查询订单是否存在
@@ -597,7 +597,7 @@ public class TemuOrderService implements ITemuOrderService {
 		temuOrderDO.setCategoryName(list.get(0).getCategoryName());
 		return temuOrderMapper.updateById(temuOrderDO);
 	}
-
+	
 	/**
 	 * 批量保存订单信息，并根据订单数量匹配相应的价格规则。
 	 * 该函数会遍历传入的订单列表，检查每个订单是否存在，并根据订单的分类信息获取价格规则。
@@ -677,7 +677,7 @@ public class TemuOrderService implements ITemuOrderService {
 
 		return processCount;
 	}
-
+	
 	private void payOrderBatch(ArrayList<TemuOrderDO> temuOrderDOList) {
 		//检查当前订单是否允许被支付
 		DictTypeDO dictTypeDO = dictTypeMapper.selectByType("temu_order_batch_pay_order_status");
@@ -703,9 +703,9 @@ public class TemuOrderService implements ITemuOrderService {
 				payWalletService.reduceWalletBalance(wallet.getId(), temuOrderDO.getId(), PayWalletBizTypeEnum.PAYMENT_TEMU_ORDER, temuOrderDO.getTotalPrice().multiply(new BigDecimal(100)).intValue());
 			});
 		}
-
+		
 	}
-
+	
 	@Override
 	public TemuOrderExtraInfoRespVO getOrderExtraInfo(String orderId) {
 		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(orderId);
@@ -724,10 +724,10 @@ public class TemuOrderService implements ITemuOrderService {
 		}
 		//根据分类类型匹配合规单
 		Map<String, Object> oldTypeUrl = temuShopDO.getOldTypeUrl();
-
+		
 		return new TemuOrderExtraInfoRespVO(temuOrderDO.getGoodsSn(), oldTypeUrl != null ? convertToString(oldTypeUrl.get(temuProductCategoryDO.getOldType())) : "");
 	}
-
+	
 	@Override
 	public Boolean saveOrderRemark(TemuOrderSaveOrderRemarkReqVO requestVO) {
 		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getOrderId());
@@ -737,7 +737,7 @@ public class TemuOrderService implements ITemuOrderService {
 		temuOrderDO.setRemark(requestVO.getRemark());
 		return temuOrderMapper.updateById(temuOrderDO) > 0;
 	}
-
+	
 	@Override
 	public Boolean updateOrderCustomImages(Long orderId, String customImageUrls) {
 		TemuOrderDO temuOrderDO = new TemuOrderDO();
@@ -745,11 +745,11 @@ public class TemuOrderService implements ITemuOrderService {
 		temuOrderDO.setCustomImageUrls(customImageUrls);
 		return temuOrderMapper.updateById(temuOrderDO) > 0;
 	}
-
+	
 	private String convertToString(Object obj) {
 		return obj == null ? "" : obj.toString();
 	}
-
+	
 	private LocalDateTime parseDateTime(String dateTimeStr) {
 		try {
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -758,11 +758,11 @@ public class TemuOrderService implements ITemuOrderService {
 			return null;
 		}
 	}
-
+	
 	private void saveShopInfo(Long shopId, String shopName) {
 		// 检查店铺是否已存在
 		TemuShopDO existingShop = temuShopMapper.selectByShopId(shopId);
-
+		
 		if (existingShop == null) {
 			// 创建新店铺记录
 			TemuShopDO shop = new TemuShopDO();
@@ -775,7 +775,7 @@ public class TemuOrderService implements ITemuOrderService {
 			temuShopMapper.updateById(existingShop);
 		}
 	}
-
+	
 	@Async
 	public void updateOrderMergedUrl(Long orderId, String url) {
 		if (orderId == null || url == null) {
@@ -787,7 +787,7 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderMapper.updateById(order);
 		}
 	}
-
+	
 	@Async
 	public void updateOrderGoodsSn(Long orderId, String url) {
 		if (orderId == null || url == null) {
@@ -799,5 +799,5 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderMapper.updateById(order);
 		}
 	}
-
+	
 }
