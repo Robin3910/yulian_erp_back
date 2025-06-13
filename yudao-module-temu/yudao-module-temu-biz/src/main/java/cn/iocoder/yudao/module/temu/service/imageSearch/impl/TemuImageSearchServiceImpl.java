@@ -7,7 +7,11 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageAdd
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchOrderRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.service.imageSearch.TemuImageSearchService;
 import cn.iocoder.yudao.module.temu.config.TemuImageSearchConfig;
 import com.aliyun.imagesearch20201214.Client;
@@ -24,6 +28,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -41,6 +46,12 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
 
     @Resource
     private ConfigApi configApi;
+
+    @Resource
+    private TemuOrderShippingMapper temuOrderShippingMapper;
+
+    @Resource
+    private TemuShopMapper temuShopMapper;
 
     // 上传图片到阿里云图库
     @Override
@@ -130,8 +141,18 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                 return new ArrayList<>();
             }
 
-            // 直接使用TemuOrderMapper查询订单信息
+            // 直接使用TemuOrderMapper 查询 所有对应的订单信息
             List<TemuOrderDO> orderList = temuOrderMapper.selectListByCustomSku(customSkus);
+            
+            // 预先查询 所有店铺信息
+            List<Long> shopIds = orderList.stream().map(TemuOrderDO::getShopId).collect(Collectors.toList());
+            Map<Long, TemuShopDO> shopMap = temuShopMapper.selectByShopIds(shopIds).stream()
+                    .collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop));
+            
+            // 预先查询 所有物流信息
+            List<String> orderNos = orderList.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.toList());
+            Map<String, TemuOrderShippingInfoDO> shippingMap = temuOrderShippingMapper.selectListByOrderNos(orderNos).stream()
+                    .collect(Collectors.toMap(TemuOrderShippingInfoDO::getOrderNo, shipping -> shipping));
             
             // 创建返回结果列表
             List<TemuImageSearchOrderRespVO> resultList = new ArrayList<>();
@@ -150,6 +171,23 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                         break;
                     }
                 }
+
+                // 设置店铺相关字段
+                TemuShopDO shop = shopMap.get(order.getShopId());
+                if (shop != null) {
+                    respVO.setShopName(shop.getShopName());
+                    respVO.setAliasName(shop.getAliasName());
+                }
+
+                // 设置物流相关字段
+                TemuOrderShippingInfoDO shipping = shippingMap.get(order.getOrderNo());
+                if (shipping != null) {
+                    respVO.setTrackingNumber(shipping.getTrackingNumber());
+                    respVO.setExpressImageUrl(shipping.getExpressImageUrl());
+                    respVO.setExpressOutsideImageUrl(shipping.getExpressOutsideImageUrl());
+                    respVO.setExpressSkuImageUrl(shipping.getExpressSkuImageUrl());
+                }
+
                 resultList.add(respVO);
                 log.info("[searchImageByPicWithHighestScore][搜索结果：{}]", respVO);
             }

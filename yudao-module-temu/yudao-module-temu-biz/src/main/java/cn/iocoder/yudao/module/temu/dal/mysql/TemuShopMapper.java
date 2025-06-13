@@ -14,6 +14,8 @@ import org.apache.ibatis.annotations.Select;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 
 @Mapper
 public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
@@ -72,5 +74,16 @@ public interface TemuShopMapper extends BaseMapperX<TemuShopDO> {
 				.eq(TemuUserShopDO::getUserId, userId);
 		return selectJoinPage(pageParam, TemuShopDO.class,temuShopDOMPJLambdaWrapper);
 	}
+
+    /**
+     * 根据店铺ID列表查询店铺信息
+     *
+     * @param shopIds 店铺ID列表
+     * @return 店铺信息列表
+     */
+    default List<TemuShopDO> selectByShopIds(Collection<Long> shopIds) {
+        return selectList(new LambdaQueryWrapperX<TemuShopDO>()
+                .in(TemuShopDO::getShopId, shopIds));
+    }
 	
 } 
