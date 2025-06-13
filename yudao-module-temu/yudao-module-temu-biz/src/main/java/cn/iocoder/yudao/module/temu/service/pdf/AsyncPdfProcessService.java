@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
 import cn.iocoder.yudao.module.temu.utils.pdf.PdfMergeUtil;
 import cn.iocoder.yudao.module.temu.utils.pdf.PdfToImageUtil;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Result;
@@ -31,6 +32,9 @@ public class AsyncPdfProcessService {
 
     @Resource
     private TemuOrderMapper temuOrderMapper;
+
+    @Resource
+    private ConfigApi configApi;
 
     /**
      * 异步合并PDF文件并上传至OSS
@@ -96,25 +100,33 @@ public class AsyncPdfProcessService {
                     String imageUrl = PdfToImageUtil.getImageUrl(extractedPdfUrl, "barcode", temuOssService);
                     
                     if (StrUtil.isNotBlank(imageUrl)) {
-                        try {
-                            // 下载图片并使用ZXing解析条码
-                            BufferedImage image = ImageIO.read(new URL(imageUrl).openStream());
-                            if (image != null) {
-                                BufferedImageLuminanceSource source = new BufferedImageLuminanceSource(image);
-                                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-                                Result result = new MultiFormatReader().decode(bitmap);
-                                
-                                if (result != null) {
-                                    String barcodeValue = result.getText();
-                                    if (StrUtil.isNotBlank(barcodeValue)) {
-                                        // 更新订单的条码值
-                                        temuOrderMapper.updateGoodsSnNoByCustomSku(customSku, barcodeValue);
-                                        log.info("[条码解析] 成功解析条码 - customSku: {}, barcodeValue: {}", customSku, barcodeValue);
+                        // 检查是否启用条码解析功能
+                        String enableBarcodeStr = configApi.getConfigValueByKey("yulian.barcode_parse.enabled");
+                        boolean enableBarcode = Boolean.parseBoolean(enableBarcodeStr);
+                        
+                        if (enableBarcode) {
+                            try {
+                                // 下载图片并使用ZXing解析条码
+                                BufferedImage image = ImageIO.read(new URL(imageUrl).openStream());
+                                if (image != null) {
+                                    BufferedImageLuminanceSource source = new BufferedImageLuminanceSource(image);
+                                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                                    Result result = new MultiFormatReader().decode(bitmap);
+                                    
+                                    if (result != null) {
+                                        String barcodeValue = result.getText();
+                                        if (StrUtil.isNotBlank(barcodeValue)) {
+                                            // 更新订单的条码值
+                                            temuOrderMapper.updateGoodsSnNoByCustomSku(customSku, barcodeValue);
+                                            log.info("[条码解析] 成功解析条码 - customSku: {}, barcodeValue: {}", customSku, barcodeValue);
+                                        }
                                     }
                                 }
+                            } catch (Exception e) {
+                                log.error("[条码解析] 解析失败 - customSku: {}, error: {}", customSku, e.getMessage(), e);
                             }
-                        } catch (Exception e) {
-                            log.error("[条码解析] 解析失败 - customSku: {}, error: {}", customSku, e.getMessage(), e);
+                        } else {
+                            log.info("[条码解析] 功能未启用 - customSku: {}", customSku);
                         }
                     }
                 }
