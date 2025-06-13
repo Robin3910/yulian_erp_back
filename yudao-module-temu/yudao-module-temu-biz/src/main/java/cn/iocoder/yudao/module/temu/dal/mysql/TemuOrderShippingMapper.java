@@ -71,4 +71,14 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
     })
     int insertBatch(@Param("list") List<TemuOrderShippingInfoDO> list);
 
+    /**
+     * 根据订单号列表查询物流信息
+     * @param orderNos 订单号列表
+     * @return 物流信息列表
+     */
+    default List<TemuOrderShippingInfoDO> selectListByOrderNos(@Param("orderNos") Collection<String> orderNos) {
+        return selectList(new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+                .in(TemuOrderShippingInfoDO::getOrderNo, orderNos));
+    }
+
 }

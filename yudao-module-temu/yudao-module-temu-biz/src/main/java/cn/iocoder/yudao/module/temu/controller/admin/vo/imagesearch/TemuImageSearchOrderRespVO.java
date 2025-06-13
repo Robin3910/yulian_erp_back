@@ -17,4 +17,24 @@ public class TemuImageSearchOrderRespVO extends TemuOrderDO {
 
     @Schema(description = "相似度得分", required = true, example = "0.98")
     private Float score;
+
+    //店铺名称
+    private String shopName;
+
+    //店铺别名
+    private String aliasName;
+
+    //物流单号
+    private String trackingNumber;
+
+    //加急单URL
+    private String expressImageUrl;
+
+    //面单URL
+    private String expressOutsideImageUrl;
+
+    //条码URL
+    private String expressSkuImageUrl;
+
+
 }
