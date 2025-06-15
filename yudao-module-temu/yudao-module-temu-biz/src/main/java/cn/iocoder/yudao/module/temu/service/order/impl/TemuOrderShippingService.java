@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderL
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
+import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
 import com.aliyun.oss.ServiceException;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
@@ -29,6 +30,8 @@ import cn.hutool.core.collection.CollUtil;
 
 import java.util.Objects;
 
+import javax.annotation.Resource;
+
 /**
  * Temu订单物流 Service 实现类
  */
@@ -42,6 +45,12 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	private final TemuShopMapper shopMapper;
 	private final TemuProductCategoryMapper categoryMapper;
 	private final TemuUserShopMapper userShopMapper;
+	
+	@Resource
+	private TemuShopMapper temuShopMapper;
+	
+	@Resource
+	private WeiXinProducer weiXinProducer;
 	
 	// 分页查询用户店铺待发货列表
 	@Override
@@ -207,8 +216,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		return new PageResult<>(voList, total, pageVO.getPageNo(), pageVO.getPageSize());
 	}
 	
-	//
-	
 	/**
 	 * 物流单号可以重复
 	 * 已发货状态的记录都会被保留
@@ -238,6 +245,26 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			}
 			if (saveRequestVO.getTrackingNumber() == null) {
 				throw new IllegalArgumentException("物流单号不能为空");
+			}
+			
+			// 检查是否为加急订单，如果是则发送企业微信通知
+			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
+				// 获取shopId为88888888的店铺webhook地址
+				TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+				if (shop != null && shop.getWebhook() != null) {
+					String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ? 
+						temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
+					
+					String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！", 
+						saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
+					
+					try {
+						weiXinProducer.sendMessage(shop.getWebhook(), message);
+						log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
+					} catch (Exception e) {
+						log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
+					}
+				}
 			}
 		}
 
@@ -314,6 +341,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
 						info.setShopId(vo.getShopId());
 						info.setShippingStatus(0); // 新保存的记录默认为未发货状态
+						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
 						if (vo.getShippingTime() != null) {
 							info.setCreateTime(LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 						} else {
@@ -481,6 +509,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// 处理物流单号
 		if (StringUtils.hasText(pageVO.getTrackingNumber())) {
 			subQuery.append(" AND tracking_number LIKE '%").append(pageVO.getTrackingNumber()).append("%'");
+		}
+		
+		// 处理是否加急条件
+		if (pageVO.getIsUrgent() != null) {
+			subQuery.append(" AND is_urgent = ").append(pageVO.getIsUrgent() ? "1" : "0");
 		}
 		
 		// 处理创建时间条件

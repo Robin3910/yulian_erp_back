@@ -57,6 +57,11 @@ public class TemuOrderShippingInfoDO extends BaseDO {
     @TableField("shipping_status")
     private Integer shippingStatus;
     /**
+     * 是否加急
+     */
+    @TableField("is_urgent")
+    private Boolean isUrgent;
+    /**
      * 创建时间
      */
     @TableField("create_time")

@@ -30,6 +30,9 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "发货状态（0：未发货；1：已发货）")
     private Integer shippingStatus;
 
+    @Schema(description = "是否加急")
+    private Boolean isUrgent;
+
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 
@@ -60,5 +63,8 @@ public class TemuOrderShippingRespVO {
 
         @Schema(description = "物流发货时间")
         private String shippingTime;
+
+        @Schema(description = "是否加急", required = true)
+        private Boolean isUrgent;
     }
 }
