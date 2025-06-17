@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pay.dal.dataobject.wallet;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -30,6 +31,13 @@ public class PayWalletDO extends BaseDO {
      * 关联 AdminUserDO 的 id 编号
      */
     private Long userId;
+    
+    /**
+     * 用户昵称
+     */
+    @TableField(exist = false)
+    private String nickname;
+    
     /**
      * 用户类型, 预留 多商户转帐可能需要用到
      *

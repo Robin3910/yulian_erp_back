@@ -1,12 +1,12 @@
 package cn.iocoder.yudao.module.pay.dal.mysql.wallet;
 
-
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.pay.controller.admin.wallet.vo.wallet.PayWalletPageReqVO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.wallet.PayWalletDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
@@ -18,11 +18,28 @@ public interface PayWalletMapper extends BaseMapperX<PayWalletDO> {
     }
 
     default PageResult<PayWalletDO> selectPage(PayWalletPageReqVO reqVO) {
-        return selectPage(reqVO, new LambdaQueryWrapperX<PayWalletDO>()
-                .eqIfPresent(PayWalletDO::getUserId, reqVO.getUserId())
-                .eqIfPresent(PayWalletDO::getUserType, reqVO.getUserType())
-                .betweenIfPresent(PayWalletDO::getCreateTime, reqVO.getCreateTime())
-                .orderByDesc(PayWalletDO::getId));
+        // 创建 MPJLambdaWrapper 用于连表查询
+        MPJLambdaWrapper<PayWalletDO> wrapper = new MPJLambdaWrapper<PayWalletDO>()
+                .selectAll(PayWalletDO.class) // 查询钱包表全部字段
+                .select("u.nickname") // 查询用户昵称
+                .leftJoin("system_users u on t.user_id = u.id"); // 左连接用户表
+                
+        // 添加查询条件
+        if (reqVO.getUserId() != null) {
+            wrapper.eq(PayWalletDO::getUserId, reqVO.getUserId());
+        }
+        if (reqVO.getUserType() != null) {
+            wrapper.eq(PayWalletDO::getUserType, reqVO.getUserType());
+        }
+        if (reqVO.getCreateTime() != null && reqVO.getCreateTime().length == 2) {
+            wrapper.between(PayWalletDO::getCreateTime, 
+                    reqVO.getCreateTime()[0], 
+                    reqVO.getCreateTime()[1]);
+        }
+        
+        wrapper.orderByDesc(PayWalletDO::getId);
+                
+        return selectJoinPage(reqVO, PayWalletDO.class, wrapper);
     }
 
     /**

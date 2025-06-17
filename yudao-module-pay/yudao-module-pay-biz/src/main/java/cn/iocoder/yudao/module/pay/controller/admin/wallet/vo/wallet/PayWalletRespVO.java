@@ -16,6 +16,9 @@ public class PayWalletRespVO extends PayWalletBaseVO {
     @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "29528")
     private Long id;
 
+    @Schema(description = "用户昵称", example = "张三")
+    private String nickname;
+
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 
