@@ -71,6 +71,10 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 					break;
 			}
 		}
+		// 是否为返单查询
+		if (temuOrderRequestVO.getIsReturnOrder() != null) {
+			wrapper.eq(TemuOrderDO::getIsReturnOrder, temuOrderRequestVO.getIsReturnOrder());
+		}
 		return wrapper;
 	}
 	

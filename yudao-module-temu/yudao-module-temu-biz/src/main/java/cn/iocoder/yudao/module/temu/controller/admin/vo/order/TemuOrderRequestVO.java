@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import javax.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
@@ -25,4 +27,7 @@ public class TemuOrderRequestVO extends PageParam {
 	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
 	private LocalDateTime[] bookingTime;
 	private String orderNo;
+
+	@Schema(description = "是否为返单")
+	private Integer isReturnOrder;
 }
