@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.vo.order;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import lombok.AllArgsConstructor;
+import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,6 +28,8 @@ public class TemuOrderRequestVO extends PageParam {
 	@DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
 	private LocalDateTime[] bookingTime;
 	private String orderNo;
+	@Schema(description = "定制SKU列表")
+    private List<String> customSkuList;
 
 	@Schema(description = "是否为返单")
 	private Integer isReturnOrder;

@@ -46,6 +46,10 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 				.likeIfExists(TemuOrderDO::getOrderNo, temuOrderRequestVO.getOrderNo());//  订单编号
 				//.eqIfExists(TemuOrderDO::getCategoryId, temuOrderRequestVO.getCategoryId())// 分类ID
 				//.eqIfExists(TemuShopDO::getShopId, temuOrderRequestVO.getShopId());// 店铺ID
+		// 定制SKU列表查询
+    	if (temuOrderRequestVO.getCustomSkuList() != null && !temuOrderRequestVO.getCustomSkuList().isEmpty()) {
+        	wrapper.in(TemuOrderDO::getCustomSku, temuOrderRequestVO.getCustomSkuList());
+    	}
 		//多店铺查询
 		if (temuOrderRequestVO.getShopId() != null && temuOrderRequestVO.getShopId().length > 0) {
 			wrapper.in(TemuOrderDO::getShopId, Arrays.asList(temuOrderRequestVO.getShopId()));
