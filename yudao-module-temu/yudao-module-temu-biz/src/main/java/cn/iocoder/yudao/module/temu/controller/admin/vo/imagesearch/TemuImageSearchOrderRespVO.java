@@ -36,5 +36,8 @@ public class TemuImageSearchOrderRespVO extends TemuOrderDO {
     //条码URL
     private String expressSkuImageUrl;
 
+    //物流单序号
+    private Integer dailySequence;
+
 
 }
