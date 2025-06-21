@@ -41,4 +41,13 @@ public interface ITemuOrderShippingService {
      * @return 待发货订单分页结果
      */
     PageResult<TemuOrderShippingRespVO> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO, Long userId);
+
+    /**
+     * 测试方法
+     * 批量保存发货面单信息（附带编号）
+     *
+     * @param saveRequestVOs
+     * @return
+     */
+    int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs);
 }
