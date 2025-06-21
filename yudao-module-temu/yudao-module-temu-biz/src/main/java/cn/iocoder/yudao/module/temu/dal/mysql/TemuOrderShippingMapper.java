@@ -60,12 +60,12 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
     @Insert({
             "<script>",
             "INSERT INTO temu_order_shipping_info ",
-            "(order_no, tracking_number, express_image_url, express_outside_image_url, express_sku_image_url, shop_id, shipping_status, is_urgent, create_time, update_time) ",
+            "(order_no, tracking_number, express_image_url, express_outside_image_url, express_sku_image_url, shop_id, shipping_status, is_urgent, create_time, update_time, daily_sequence) ",
             "VALUES ",
             "<foreach collection='list' item='item' separator=','>",
             "(#{item.orderNo}, #{item.trackingNumber}, #{item.expressImageUrl}, ",
             "#{item.expressOutsideImageUrl}, #{item.expressSkuImageUrl}, #{item.shopId}, #{item.shippingStatus}, #{item.isUrgent}, ",
-            "#{item.createTime}, #{item.updateTime})",
+            "#{item.createTime}, #{item.updateTime}, #{item.dailySequence})",
             "</foreach>",
             "</script>"
     })

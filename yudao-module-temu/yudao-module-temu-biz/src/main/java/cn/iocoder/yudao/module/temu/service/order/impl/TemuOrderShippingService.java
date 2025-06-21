@@ -19,10 +19,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -734,6 +736,210 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			}
 		}
 		return voList;
+	}
+
+	/**
+	 * 测试方法：
+	 * 批量保存物流单号新增序号
+	 * @param saveRequestVOs
+	 * @return
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+		if (CollectionUtils.isEmpty(saveRequestVOs)) {
+			return 0;
+		}
+		// 1. 参数校验（强制要求 trackingNumber 非空）
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			if (saveRequestVO == null) {
+				throw new IllegalArgumentException("待发货订单信息不能为空");
+			}
+			if (saveRequestVO.getOrderNo() == null) {
+				throw new IllegalArgumentException("订单编号不能为空");
+			}
+			if (saveRequestVO.getShopId() == null) {
+				throw new IllegalArgumentException("店铺ID不能为空");
+			}
+			if (saveRequestVO.getTrackingNumber() == null) {
+				throw new IllegalArgumentException("物流单号不能为空");
+			}
+
+			// 检查是否为加急订单，如果是则发送企业微信通知
+			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
+				// 获取shopId为88888888的店铺webhook地址
+				TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+				if (shop != null && shop.getWebhook() != null) {
+					String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
+							temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
+
+					String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！",
+							saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
+
+					try {
+						weiXinProducer.sendMessage(shop.getWebhook(), message);
+						log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
+					} catch (Exception e) {
+						log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
+					}
+				}
+			}
+		}
+
+		// ================== 2. 生成物流序号映射 ==================
+		// Map<物流单号, Map<日期, 当天的序号>>
+		// 用于给相同物流单号在同一天创建的记录生成自增序号
+		Map<String, Map<LocalDate, Integer>> trackingNumberToSequence = getTrackingNumberSequences(saveRequestVOs);
+
+		// ================== 3. 清理历史记录 ==================
+		// 特殊场景处理：平台物流重新预约（相同shopId+orderNo使用新物流单号）
+		// 删除所有匹配的历史记录（包括已发货状态），确保数据最新
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			shippingInfoMapper.delete(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
+							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
+					//.eq(TemuOrderShippingInfoDO::getShippingStatus, 0) // 只删除未发货的记录
+			);
+		}
+
+		// ================== 4. 准备新数据 ==================
+		// 检查是否还有需要保存的记录
+		if (!saveRequestVOs.isEmpty()) {
+			// 转换VO为DO对象
+			LocalDateTime now = LocalDateTime.now();
+			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
+					.map(vo -> {
+						// 创建实体对象
+						TemuOrderShippingInfoDO info = new TemuOrderShippingInfoDO();
+						// 设置基础字段
+						info.setOrderNo(vo.getOrderNo());
+						info.setTrackingNumber(vo.getTrackingNumber());
+						info.setExpressImageUrl(vo.getExpressImageUrl());
+						info.setExpressOutsideImageUrl(vo.getExpressOutsideImageUrl());
+						info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
+						info.setShopId(vo.getShopId());
+						info.setShippingStatus(0); // 新保存的记录默认为未发货状态
+						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
+
+						// 确定物流信息的创建时间： 优先使用VO中的发货时间 / 无发货时间则使用当前系统时间
+						LocalDateTime createTime;
+						if (vo.getShippingTime() != null) {
+							createTime = LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+						} else {
+							createTime = now;
+						}
+						info.setCreateTime(createTime);
+						info.setUpdateTime(now);
+
+						// ===== 设置物流单号的每日序号 =====
+						// 从映射中获取该物流单号对应的日期序号表
+						Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence.get(vo.getTrackingNumber());
+						if (dateSequenceMap != null) {
+							// 设置当前物流单号的序号	key=日期，value=序号
+							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
+						}
+
+						return info;
+					})
+					.collect(Collectors.toList());
+
+			// ================== 5. 批量保存 ==================
+			try {
+				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
+				log.info("批量保存成功，数量：{}", affectedRows);
+				return affectedRows;
+			} catch (Exception e) {
+				log.error("批量保存失败", e);
+				throw new ServiceException("批量保存失败：" + e.getMessage());
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * 获取物流单号在每日的序号映射
+	 * 1. 为每个物流单号在每天分配唯一递增的每日序号
+	 * 2. 序号分配规则：
+	 *    - 已有物流记录：使用数据库当天已有的序号
+	 *    - 新记录：在当日最大序号基础上自增后再分配
+	 * @param saveRequestVOs 待保存的发货信息列表
+	 * @return 双层映射结构：Map<物流单号, Map<日期, 该日序号>>
+	 */
+	private Map<String, Map<LocalDate, Integer>> getTrackingNumberSequences(
+			List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+		// ============ 1. 提取关键数据 ============
+		// 获取所有待处理物流单号（去重）
+		Set<String> trackingNumbers = saveRequestVOs.stream()
+				.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
+				.collect(Collectors.toSet());
+
+		// 获取所有待保存物流记录关联的日期（基于发货时间）
+		Set<LocalDate> saveDates = saveRequestVOs.stream()
+				.map(vo -> {
+					if (vo.getShippingTime() != null) {
+						// 解析请求中的发货时间为日期
+						return LocalDateTime.parse(vo.getShippingTime(),
+								DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).toLocalDate();
+					}
+					// 无发货时间默认为当日
+					return LocalDate.now();
+				})
+				.collect(Collectors.toSet());
+
+		// ============ 2. 查询数据库已有记录 ============
+		// 查询条件：物流单号匹配 OR 日期匹配（两者条件满足其一）
+		List<TemuOrderShippingInfoDO> existingShippings = shippingInfoMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+						.and(w -> w.in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers)
+								.or()
+								.apply(saveDates.stream()
+										.map(date -> String.format("DATE(create_time) = '%s'", date))
+										.collect(Collectors.joining(" OR ", "(", ")")
+										))
+						));
+
+		// ============ 3. 构建初始映射结构 ============
+		// 映射1：记录每日的最大序号（用于新序号分配）
+		Map<LocalDate, AtomicInteger> dateToMaxSequence = new HashMap<>();
+
+		// 映射2：核心返回值-记录物流单号在每个日期的序号
+		Map<String, Map<LocalDate, Integer>> trackingNumberToSequence = new HashMap<>();
+
+		// ============ 4. 处理数据库已有记录 ============
+		if (!existingShippings.isEmpty()) {
+			for (TemuOrderShippingInfoDO existing : existingShippings) {
+				if (existing.getCreateTime() != null && existing.getDailySequence() != null) {
+					LocalDate createDate = existing.getCreateTime().toLocalDate();
+					// 更新该日期最大序号（比较当前记录序号与历史最大值）
+					dateToMaxSequence.computeIfAbsent(createDate, k -> new AtomicInteger(0))
+							.updateAndGet(current -> Math.max(current, existing.getDailySequence()));
+					// 记录该物流单号在特定日期的序号（保留数据库现有值）
+					trackingNumberToSequence
+							.computeIfAbsent(existing.getTrackingNumber(), k -> new HashMap<>())
+							.putIfAbsent(createDate, existing.getDailySequence());
+				}
+			}
+		}
+
+		// ============ 5. 为新的物流单号分配序号 ============
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
+			// 确定当前记录的日期（优先使用请求中的发货日期）
+			LocalDate createDate = vo.getShippingTime() != null ?
+					LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).toLocalDate() :
+					LocalDate.now();
+			// 获取当前物流单号的日期-序号映射
+			Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence
+					.computeIfAbsent(vo.getTrackingNumber(), k -> new HashMap<>());
+			// 当日首次出现该物流单号：分配新序号
+			if (!dateSequenceMap.containsKey(createDate)) {
+				// 获取或初始化该日期的序号计数器
+				AtomicInteger maxSequence = dateToMaxSequence.computeIfAbsent(createDate, k -> new AtomicInteger(0));
+				// 分配新序号（当日序号+1）
+				dateSequenceMap.put(createDate, maxSequence.incrementAndGet());
+			}
+		}
+
+		return trackingNumberToSequence;
 	}
 	
 }

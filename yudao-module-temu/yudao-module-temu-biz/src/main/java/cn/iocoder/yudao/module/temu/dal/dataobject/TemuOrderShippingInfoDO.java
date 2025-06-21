@@ -71,4 +71,9 @@ public class TemuOrderShippingInfoDO extends BaseDO {
      */
     @TableField("update_time")
     private LocalDateTime updateTime;
+    /**
+     * 每日序号 - 每天从1开始
+     */
+    @TableField("daily_sequence")
+    private Integer dailySequence;
 }

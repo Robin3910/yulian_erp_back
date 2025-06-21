@@ -39,6 +39,9 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "更新时间")
     private LocalDateTime updateTime;
 
+    @Schema(description = "物流单的序号")
+    private Integer dailySequence;
+
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
     public static class TemuOrderShippingSaveRequestVO {
