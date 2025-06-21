@@ -38,9 +38,11 @@ public class LogAspect {
 
     /**
      * 拦截 temu 目录下的所有 controller 方法，以及 pay 模块中的充值相关方法
+     * 排除获取钱包方法
      */
-    @Around("execution(* cn.iocoder.yudao.module.temu.controller..*.*(..)) || " +
-            "execution(* cn.iocoder.yudao.module.pay.controller..*.*(..))")
+    @Around("(execution(* cn.iocoder.yudao.module.temu.controller..*.*(..)) || " +
+            "execution(* cn.iocoder.yudao.module.pay.controller..*.*(..))) && " +
+            "!execution(* *.getPayWallet(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();
         Object result = null;
@@ -50,8 +52,8 @@ public class LogAspect {
         String operationType = "";
         
         try {
-            // 获取请求参数
-            requestParams = JsonUtils.toJsonString(joinPoint.getArgs());
+            // 获取请求参数（处理特殊类型）
+            requestParams = getRequestParams(joinPoint.getArgs());
             
             // 获取方法信息
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
@@ -83,6 +85,96 @@ public class LogAspect {
                 log.error("记录操作日志失败", e);
             }
         }
+    }
+
+    /**
+     * 获取请求参数，处理特殊类型如 MultipartFile
+     */
+    private String getRequestParams(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "[]";
+        }
+        
+        try {
+            Object[] processedArgs = new Object[args.length];
+            for (int i = 0; i < args.length; i++) {
+                Object arg = args[i];
+                if (arg == null) {
+                    processedArgs[i] = null;
+                } else if (arg instanceof org.springframework.web.multipart.MultipartFile) {
+                    // 处理 MultipartFile 类型
+                    org.springframework.web.multipart.MultipartFile file = (org.springframework.web.multipart.MultipartFile) arg;
+                    processedArgs[i] = new FileInfo(file.getOriginalFilename(), file.getSize(), file.getContentType());
+                } else if (arg instanceof org.springframework.web.multipart.MultipartFile[]) {
+                    // 处理 MultipartFile 数组
+                    org.springframework.web.multipart.MultipartFile[] files = (org.springframework.web.multipart.MultipartFile[]) arg;
+                    FileInfo[] fileInfos = new FileInfo[files.length];
+                    for (int j = 0; j < files.length; j++) {
+                        if (files[j] != null) {
+                            fileInfos[j] = new FileInfo(files[j].getOriginalFilename(), files[j].getSize(), files[j].getContentType());
+                        }
+                    }
+                    processedArgs[i] = fileInfos;
+                } else if (arg instanceof javax.servlet.http.HttpServletRequest) {
+                    // 处理 HttpServletRequest
+                    processedArgs[i] = "HttpServletRequest";
+                } else if (arg instanceof javax.servlet.http.HttpServletResponse) {
+                    // 处理 HttpServletResponse
+                    processedArgs[i] = "HttpServletResponse";
+                } else if (arg instanceof java.io.InputStream) {
+                    // 处理 InputStream
+                    processedArgs[i] = "InputStream";
+                } else if (arg instanceof java.io.OutputStream) {
+                    // 处理 OutputStream
+                    processedArgs[i] = "OutputStream";
+                } else if (arg instanceof java.io.Reader) {
+                    // 处理 Reader
+                    processedArgs[i] = "Reader";
+                } else if (arg instanceof java.io.Writer) {
+                    // 处理 Writer
+                    processedArgs[i] = "Writer";
+                } else {
+                    // 其他类型直接使用原对象
+                    processedArgs[i] = arg;
+                }
+            }
+            
+            return JsonUtils.toJsonString(processedArgs);
+        } catch (Exception e) {
+            log.warn("序列化请求参数失败，使用简化信息: {}", e.getMessage());
+            // 如果序列化失败，返回简化信息
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < args.length; i++) {
+                if (i > 0) sb.append(", ");
+                if (args[i] == null) {
+                    sb.append("null");
+                } else {
+                    sb.append(args[i].getClass().getSimpleName());
+                }
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+    }
+
+    /**
+     * 文件信息类，用于记录文件上传信息
+     */
+    private static class FileInfo {
+        private String originalFilename;
+        private long size;
+        private String contentType;
+        
+        public FileInfo(String originalFilename, long size, String contentType) {
+            this.originalFilename = originalFilename;
+            this.size = size;
+            this.contentType = contentType;
+        }
+        
+        // Getters
+        public String getOriginalFilename() { return originalFilename; }
+        public long getSize() { return size; }
+        public String getContentType() { return contentType; }
     }
 
     /**
