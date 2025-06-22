@@ -18,11 +18,14 @@ public interface TemuOperationLogMapper extends BaseMapperX<TemuOperationLogDO> 
     default PageResult<TemuOperationLogDO> selectPage(TemuOperationLogPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TemuOperationLogDO>()
                 .likeIfPresent(TemuOperationLogDO::getUserName, reqVO.getUserName())
+                .likeIfPresent(TemuOperationLogDO::getUserId, reqVO.getUserId())
                 .betweenIfPresent(TemuOperationLogDO::getOperationTime, reqVO.getOperationTime())
                 .likeIfPresent(TemuOperationLogDO::getModule, reqVO.getModule())
+                .likeIfPresent(TemuOperationLogDO::getOperationType, reqVO.getOperationType())
                 .likeIfPresent(TemuOperationLogDO::getIpAddress, reqVO.getIpAddress())
                 .likeIfPresent(TemuOperationLogDO::getClassName, reqVO.getClassName())
                 .likeIfPresent(TemuOperationLogDO::getMethodName, reqVO.getMethodName())
+                .likeIfPresent(TemuOperationLogDO::getRequestParams, reqVO.getRequestParams())
                 .orderByDesc(TemuOperationLogDO::getId));
     }
 

@@ -10,6 +10,10 @@ import com.alibaba.excel.annotation.*;
 @ExcelIgnoreUnannotated
 public class TemuOperationLogRespVO {
 
+    @Schema(description = "用户ID", example = "123")
+    @ExcelProperty("用户ID")
+    private String userId;
+
     @Schema(description = "用户名", example = "张三")
     @ExcelProperty("用户名")
     private String userName;
@@ -37,5 +41,13 @@ public class TemuOperationLogRespVO {
     @Schema(description = "方法名", example = "list")
     @ExcelProperty("方法名")
     private String methodName;
+
+    @Schema(description = "请求参数", example = "{\"orderNo\":\"123456\"}")
+    @ExcelProperty("请求参数")
+    private String requestParams;
+
+    @Schema(description = "响应结果", example = "{\"code\":200,\"data\":{}}")
+    @ExcelProperty("响应结果")
+    private String responseResult;
 
 }

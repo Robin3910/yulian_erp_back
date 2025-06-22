@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.temu.service.operationlog.TemuOperationLogService;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -36,14 +37,39 @@ public class LogAspect {
     @Resource
     private AdminUserApi adminUserApi;
 
+    @Resource
+    private ConfigApi configApi;
+
     /**
-     * 拦截 temu 目录下的所有 controller 方法，以及 pay 模块中的充值相关方法
-     * 排除获取钱包方法
+     * 拦截 AdminTemuCategoryController 下的 createCategory，deleteProductCategory 和 updateProductCategory 方法
+     * 以及 AdminTemuOrderShippingController 下的 batchUpdateOrderStatus 方法
+     * 以及 AdminTemuOrderBatchController 下的 dispatchTask、completeBatchOrderTaskByAdmin、completeBatchOrderTask、updateStatus、updateStatusByTask 方法
+     * 以及 AdminTemuOrderController 下的 beatchUpdateStatus、batchSave 方法
+     * 以及 PayWalletController 下的 createWalletRecharge、submitPayOrder 方法
      */
-    @Around("(execution(* cn.iocoder.yudao.module.temu.controller..*.*(..)) || " +
-            "execution(* cn.iocoder.yudao.module.pay.controller..*.*(..))) && " +
-            "!execution(* *.getPayWallet(..))")
+    @Around("execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuCategoryController.createCategory(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuCategoryController.updateProductCategory(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuCategoryController.deleteProductCategory(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderShippingController.batchUpdateOrderStatus(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderBatchController.dispatchTask(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderBatchController.completeBatchOrderTaskByAdmin(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderBatchController.completeBatchOrderTask(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderBatchController.updateStatus(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderBatchController.updateStatusByTask(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderController.beatchUpdateStatus(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderController.batchSave(..)) || " +
+            "execution(* cn.iocoder.yudao.module.pay.controller.admin.wallet.PayWalletController.createWalletRecharge(..)) || " +
+            "execution(* cn.iocoder.yudao.module.pay.controller.admin.wallet.PayWalletController.submitPayOrder(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        // 检查是否启用操作日志功能
+        String enableLogStr = configApi.getConfigValueByKey("yulian.operation_log.enabled");
+        boolean enableLog = Boolean.parseBoolean(enableLogStr);
+        
+        if (!enableLog) {
+            log.debug("操作日志功能未启用，跳过日志记录");
+            return joinPoint.proceed();
+        }
+
         long startTime = System.currentTimeMillis();
         Object result = null;
         String requestParams = "";

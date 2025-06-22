@@ -17,12 +17,18 @@ public class TemuOperationLogPageReqVO extends PageParam {
     @Schema(description = "用户名", example = "张三")
     private String userName;
 
+    @Schema(description = "用户ID", example = "123")
+    private String userId;
+
     @Schema(description = "操作时间")
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] operationTime;
 
     @Schema(description = "操作模块 ", example = "用户管理")
     private String module;
+
+    @Schema(description = "操作类型", example = "保存订单")
+    private String operationType;
 
     @Schema(description = "操作 IP 地址", example = "113.46.66.33")
     private String ipAddress;
@@ -32,5 +38,8 @@ public class TemuOperationLogPageReqVO extends PageParam {
 
     @Schema(description = "方法名", example = "list")
     private String methodName;
+
+    @Schema(description = "请求参数", example = "{\"orderNo\":\"123456\"}")
+    private String requestParams;
 
 }
