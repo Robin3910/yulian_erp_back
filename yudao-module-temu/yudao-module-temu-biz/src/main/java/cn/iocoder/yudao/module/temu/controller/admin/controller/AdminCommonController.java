@@ -35,11 +35,12 @@ public class AdminCommonController {
 	public CommonResult<?> shopList() {
 		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
 		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin");
-		if (isAdmin) {
-			return CommonResult.success(commonService.listShop());
-		} else {
-			return CommonResult.success(commonService.listShop(loginUserId));
-		}
+		return CommonResult.success(commonService.listShop());
+//		if (isAdmin) {
+//			return CommonResult.success(commonService.listShop());
+//		} else {
+//			return CommonResult.success(commonService.listShop(loginUserId));
+//		}
 	}
 	
 	//根据角色标识获取角色下所有用户
