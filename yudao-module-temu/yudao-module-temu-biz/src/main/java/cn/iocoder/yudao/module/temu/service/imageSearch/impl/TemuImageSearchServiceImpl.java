@@ -187,6 +187,7 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                     respVO.setExpressOutsideImageUrl(shipping.getExpressOutsideImageUrl());
                     respVO.setExpressSkuImageUrl(shipping.getExpressSkuImageUrl());
                     respVO.setDailySequence(shipping.getDailySequence());
+                    respVO.setShippingTime(shipping.getCreateTime());
                 }
 
                 resultList.add(respVO);

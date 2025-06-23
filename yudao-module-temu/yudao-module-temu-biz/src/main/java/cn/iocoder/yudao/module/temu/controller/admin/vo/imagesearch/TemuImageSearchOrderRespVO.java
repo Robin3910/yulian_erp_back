@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Schema(description = "管理后台 - 图片搜索结果 Response VO")
 @Data
 @AllArgsConstructor
@@ -38,6 +40,9 @@ public class TemuImageSearchOrderRespVO extends TemuOrderDO {
 
     //物流单序号
     private Integer dailySequence;
+
+    //物流单发货时间
+    private LocalDateTime shippingTime;
 
 
 }
