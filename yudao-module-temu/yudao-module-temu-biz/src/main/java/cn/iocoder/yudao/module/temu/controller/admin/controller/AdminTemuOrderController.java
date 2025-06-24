@@ -122,4 +122,14 @@ public class AdminTemuOrderController {
 	public CommonResult<Boolean> updateOrderCustomImages(@Valid @RequestBody TemuOrderUpdateCustomImagesReqVO reqVO) {
 		return success(temuOrderService.updateOrderCustomImages(reqVO.getOrderId(), reqVO.getCustomImageUrls()));
 	}
+	/**
+	 * 批量更新订单状态
+	 * @param reqVOList 请求VO列表
+	 * @return 更新结果
+	 */
+	@PostMapping("/update-order-status")
+	@Operation(summary = "批量更新订单状态")
+	public CommonResult<Boolean> updateOrderStatus(@Valid @RequestBody List<TemuOrderDO> reqVOList) {
+		return success(temuOrderService.updateOrderStatus(reqVOList));
+	}
 }

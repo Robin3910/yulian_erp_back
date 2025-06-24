@@ -745,7 +745,47 @@ public class TemuOrderService implements ITemuOrderService {
 		temuOrderDO.setCustomImageUrls(customImageUrls);
 		return temuOrderMapper.updateById(temuOrderDO) > 0;
 	}
-	
+
+	//批量更新订单状态
+	@Override
+	@Transactional
+	@LogRecord(
+			success = "批量更新订单状态，更新数量：{{#reqVOList.size()}}",
+			type = "TEMU订单操作", bizNo = "{{#reqVOList[0].id}}")
+	public Boolean updateOrderStatus(List<TemuOrderDO> reqVOList) {
+		if (CollUtil.isEmpty(reqVOList)) {
+			return true;
+		}
+
+		// 1. 参数校验
+		List<Long> orderIds = reqVOList.stream()
+				.map(TemuOrderDO::getId)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+		
+		if (CollUtil.isEmpty(orderIds)) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+
+		// 2. 校验订单是否存在
+		List<TemuOrderDO> existOrders = temuOrderMapper.selectBatchIds(orderIds);
+		if (CollUtil.isEmpty(existOrders) || existOrders.size() != orderIds.size()) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+
+		// 3. 批量更新订单状态
+		List<TemuOrderDO> updateOrders = reqVOList.stream()
+				.map(reqVO -> {
+					TemuOrderDO updateOrder = new TemuOrderDO();
+					updateOrder.setId(reqVO.getId());
+					updateOrder.setOrderStatus(reqVO.getOrderStatus());
+					return updateOrder;
+				})
+				.collect(Collectors.toList());
+
+		return temuOrderMapper.updateBatch(updateOrders);
+	}
+
 	private String convertToString(Object obj) {
 		return obj == null ? "" : obj.toString();
 	}

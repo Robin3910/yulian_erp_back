@@ -75,4 +75,11 @@ public interface ITemuOrderService {
 	 * @return 更新是否成功
 	 */
 	Boolean updateOrderCustomImages(Long orderId, String customImageUrls);
+
+	/**
+	 * 批量更新订单状态
+	 * @param reqVOList 订单列表，包含订单ID和新的状态
+	 * @return 更新是否成功
+	 */
+	Boolean updateOrderStatus(List<TemuOrderDO> reqVOList);
 }
