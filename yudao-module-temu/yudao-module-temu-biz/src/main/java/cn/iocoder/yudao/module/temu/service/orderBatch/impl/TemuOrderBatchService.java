@@ -849,7 +849,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 					return temuOrderDO;
 				}).collect(Collectors.toList());
 				//初始化任务完成状态
-				temuOrderMapper.updateBatch(collect);
+//				temuOrderMapper.updateBatch(collect);
 			}
 			//设置批次分配状态
 			temuOrderBatchDO.setIsDispatchTask(DISPATCH_TASK);
