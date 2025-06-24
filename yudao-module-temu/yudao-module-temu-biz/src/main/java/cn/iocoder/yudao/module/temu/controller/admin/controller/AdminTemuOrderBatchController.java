@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderBatch.*;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +16,9 @@ import javax.validation.Valid;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper.log;
+
 @Tag(name = "Temu管理 - 批次管理")
 @RestController
 @RequestMapping("/temu/order-batch")
@@ -22,6 +27,9 @@ import org.springframework.web.bind.annotation.*;
 public class AdminTemuOrderBatchController {
 	@Resource
 	private ITemuOrderBatchService temuOrderBatchService;
+
+	@Resource
+	private ConfigApi configApi;
 	
 	/**
 	 * 创建批次
@@ -118,7 +126,23 @@ public class AdminTemuOrderBatchController {
 	@PostMapping("/dispatch-task")
 	@Operation(summary = "批量分配批次订单任务")
 	public CommonResult<?> dispatchTask(@Valid @RequestBody TemuOrderBatchDispatchTaskVO requestVO) {
-		return CommonResult.success(temuOrderBatchService.dispatchTask(requestVO));
+		// 从配置中获取是否开启 分配任务的新方法
+		String isNewDrawProdTask = configApi.getConfigValueByKey("temu_new_draw_prod_task");
+		log.info("批量分配批次订单任务是否开启新方法的配置值: {}", isNewDrawProdTask);
+		boolean flag = false; // 默认值
+		if (StrUtil.isNotEmpty(isNewDrawProdTask)) {
+			try {
+				flag = Boolean.parseBoolean(isNewDrawProdTask);
+			} catch (Exception e) {
+				log.warn("批量分配批次订单任务是否开启新方法的配置值配置格式错误，使用默认值false");
+			}
+		}
+		if(flag){
+			return  success(temuOrderBatchService.dispatchDrawProductTask(requestVO));
+		}else{
+			return success(temuOrderBatchService.dispatchTask(requestVO));
+		}
+
 	}
 	
 	//完成单个批次任务中的单个订单任务

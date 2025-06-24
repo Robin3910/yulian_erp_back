@@ -15,10 +15,10 @@ public class TemuOrderBatchDispatchTaskVO {
 	@NotNull
 	@Schema(description = "订单ID", requiredMode = Schema.RequiredMode.REQUIRED)
 	private Long[] orderIds;
-	@NotNull
+//	@NotNull
 	@Schema(description = "作图人员ID", requiredMode = Schema.RequiredMode.REQUIRED)
 	private Long artStaffUserId;
-	@NotNull
+//	@NotNull
 	@Schema(description = "生产人员ID", requiredMode = Schema.RequiredMode.REQUIRED)
 	private Long productionStaffUserId;
 }

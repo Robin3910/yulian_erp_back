@@ -803,5 +803,124 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		return new PageResult<>(resultList, batchPageResult.getTotal(),
 				temuOrderBatchPageVO.getPageNo(), temuOrderBatchPageVO.getPageSize());
 	}
+
+	//分配批次作图员和生产员
+	@Override
+	@Transactional
+	public Boolean dispatchDrawProductTask(TemuOrderBatchDispatchTaskVO requestVO) {
+		//检查批次订单是否存在
+		if (requestVO.getOrderIds() == null || requestVO.getOrderIds().length == 0) {
+			throw exception(ORDER_BATCH_NOT_EXISTS);
+		}
+		//检查用户是否存在
+		if(requestVO.getArtStaffUserId() != null) {
+			AdminUserDO artStaffUserDO = adminUserMapper.selectById(requestVO.getArtStaffUserId());
+			if (artStaffUserDO == null) {
+				throw exception(USER_NOT_EXISTS);
+			}
+		}
+		if (requestVO.getProductionStaffUserId() != null) {
+			AdminUserDO productionStaffUserDO = adminUserMapper.selectById(requestVO.getProductionStaffUserId());
+			if (productionStaffUserDO == null) {
+				throw exception(USER_NOT_EXISTS);
+			}
+		}
+		List<TemuOrderBatchTaskDO> temuOrderBatchTaskDOList = new ArrayList<>();
+		List<TemuOrderBatchDO> temuOrderBatchDOList = new ArrayList<>();
+		// 只要状态为待生产即可，不再校验是否已分配
+		for (Long orderId : requestVO.getOrderIds()) {
+			TemuOrderBatchDO temuOrderBatchDO = temuOrderBatchMapper.selectById(orderId);
+			if (temuOrderBatchDO == null) {
+				throw exception(ORDER_BATCH_NOT_EXISTS);
+			}
+			// 只要状态为待生产即可，不再校验是否已分配
+			if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+				throw exception(ORDER_BATCH_STATUS_ERROR);
+			}
+
+			//批量修改批次下订单的任务状态
+			List<TemuOrderBatchRelationDO> temuOrderBatchRelationList = temuOrderBatchRelationMapper.selectList(TemuOrderBatchRelationDO::getBatchId, orderId);
+			if (temuOrderBatchRelationList != null && !temuOrderBatchRelationList.isEmpty()) {
+				List<TemuOrderDO> collect = temuOrderBatchRelationList.stream().map(temuOrderBatchRelationDO -> {
+					TemuOrderDO temuOrderDO = new TemuOrderDO();
+					temuOrderDO.setId(temuOrderBatchRelationDO.getOrderId());
+					temuOrderDO.setIsCompleteDrawTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+					temuOrderDO.setIsCompleteProducerTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+					return temuOrderDO;
+				}).collect(Collectors.toList());
+				//初始化任务完成状态
+				temuOrderMapper.updateBatch(collect);
+			}
+			//设置批次分配状态
+			temuOrderBatchDO.setIsDispatchTask(DISPATCH_TASK);
+			temuOrderBatchDOList.add(temuOrderBatchDO);
+
+			//1.检查当前订单是否已存在作图员任务
+			TemuOrderBatchTaskDO artTask = orderBatchTaskMapper.selectOne(
+					new QueryWrapper<TemuOrderBatchTaskDO>()
+							.eq("batch_order_id", orderId)
+							.eq("type", TASK_TYPE_ART)
+			);
+
+			//处理作图员任务
+			if (artTask != null) {
+				// ▶ 存在任务：更新作图员任务数据
+				artTask.setUserId(requestVO.getArtStaffUserId());
+				artTask.setStatus(TASK_STATUS_WAIT);
+				artTask.setNextTaskType(TASK_TYPE_PRODUCTION);
+				temuOrderBatchTaskDOList.add(artTask);
+			} else {
+				// ▶ 不存在任务：创建新的作图员任务实体
+				temuOrderBatchTaskDOList.add(TemuOrderBatchTaskDO.builder()
+						.batchOrderId(orderId)
+						.userId(requestVO.getArtStaffUserId())
+						.type(TASK_TYPE_ART)
+						.status(TASK_STATUS_WAIT)
+						.nextTaskType(TASK_TYPE_PRODUCTION)
+						.build());
+			}
+
+			// 2. 检查是否已存在生产员任务
+			TemuOrderBatchTaskDO productionTask = orderBatchTaskMapper.selectOne(
+					new QueryWrapper<TemuOrderBatchTaskDO>()
+							.eq("batch_order_id", orderId)
+							.eq("type", TASK_TYPE_PRODUCTION)
+			);
+			// 处理生产员任务
+			if (productionTask != null) {
+				// ▶ 存在任务：更新生产员任务数据
+				productionTask.setUserId(requestVO.getProductionStaffUserId());
+				productionTask.setStatus(TASK_STATUS_WAIT);
+				temuOrderBatchTaskDOList.add(productionTask);
+			} else {
+				// ▶ 不存在任务：创建新的生产任务实体
+				temuOrderBatchTaskDOList.add(TemuOrderBatchTaskDO.builder()
+						.batchOrderId(orderId)
+						.userId(requestVO.getProductionStaffUserId())
+						.status(TASK_STATUS_WAIT)
+						.type(TASK_TYPE_PRODUCTION)
+						.build());
+			}
+		}
+		// 批量更新订单批次表数据
+		temuOrderBatchMapper.updateBatch(temuOrderBatchDOList);
+
+		// 根据ID是否为空区分需要更新和插入的任务
+		List<TemuOrderBatchTaskDO> toUpdate = temuOrderBatchTaskDOList.stream()
+				.filter(task -> task.getId() != null)
+				.collect(Collectors.toList());
+		List<TemuOrderBatchTaskDO> toInsert = temuOrderBatchTaskDOList.stream()
+				.filter(task -> task.getId() == null)
+				.collect(Collectors.toList());
+
+		if (!toUpdate.isEmpty()) {
+			orderBatchTaskMapper.updateBatch(toUpdate);
+		}
+		if (!toInsert.isEmpty()) {
+			orderBatchTaskMapper.insertBatch(toInsert);
+		}
+
+		return true;
+	}
 	
 }

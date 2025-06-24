@@ -29,5 +29,7 @@ public interface ITemuOrderBatchService {
 	
 	int completeBatchOrderTaskByAdmin(TemuOrderBatchCompleteOrderTaskByAdminVO requestVO);
 
+	Boolean dispatchDrawProductTask(TemuOrderBatchDispatchTaskVO requestVO);
+
 	
 }
