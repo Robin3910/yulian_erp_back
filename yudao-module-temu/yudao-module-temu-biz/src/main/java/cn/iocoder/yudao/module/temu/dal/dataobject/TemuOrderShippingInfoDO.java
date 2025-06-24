@@ -76,4 +76,9 @@ public class TemuOrderShippingInfoDO extends BaseDO {
      */
     @TableField("daily_sequence")
     private Integer dailySequence;
+    /**
+     * 发货操作人ID
+     */
+    @TableField("shipped_operator_id")
+    private Long shippedOperatorId;
 }

@@ -42,6 +42,12 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "物流单的序号")
     private Integer dailySequence;
 
+    @Schema(description = "发货操作人ID")
+    private Long shippedOperatorId;
+
+    @Schema(description = "发货操作人昵称")
+    private String shippedOperatorNickname;
+
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
     public static class TemuOrderShippingSaveRequestVO {

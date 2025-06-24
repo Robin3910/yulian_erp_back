@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderListRespVO;
@@ -53,6 +55,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	
 	@Resource
 	private WeiXinProducer weiXinProducer;
+
+	@Resource
+	private AdminUserMapper adminUserMapper;
 	
 	// 分页查询用户店铺待发货列表
 	@Override
@@ -206,6 +211,26 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		long step6StartTime = System.currentTimeMillis();
 		List<TemuOrderShippingRespVO> voList = buildOrderShippingRespList(allRelatedShippings, orderMap, shopMap,
 				categoryMap);
+
+		// 新增：批量查询shippedOperatorId对应的昵称
+		Set<Long> operatorIds = voList.stream()
+			.map(TemuOrderShippingRespVO::getShippedOperatorId)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toSet());
+		Map<Long, String> operatorNicknameMap = new HashMap<>();
+		if (!operatorIds.isEmpty()) {
+			List<AdminUserDO> userList = adminUserMapper.selectBatchIds(operatorIds);
+			operatorNicknameMap = userList.stream().collect(Collectors.toMap(
+				AdminUserDO::getId,
+				AdminUserDO::getNickname
+			));
+		}
+		for (TemuOrderShippingRespVO vo : voList) {
+			if (vo.getShippedOperatorId() != null) {
+				vo.setShippedOperatorNickname(operatorNicknameMap.get(vo.getShippedOperatorId()));
+			}
+		}
+
 		log.info("[getOrderShippingPage] [步骤6] 组装结果: 耗时={}ms, 结果数量={}",
 				System.currentTimeMillis() - step6StartTime, voList.size());
 		
@@ -416,10 +441,25 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						.collect(Collectors.toSet());
 				log.info("[batchUpdateOrderStatus] 待更新的订单编号: {}", orderNos);
 				
+				// 获取当前操作人ID
+				Long operatorId = null;
+				try {
+					operatorId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+					log.info("[batchUpdateOrderStatus] 获取到操作人ID: {}", operatorId);
+				} catch (Exception e) {
+					log.warn("[batchUpdateOrderStatus] 获取操作人ID失败: {}", e.getMessage());
+				}
+				
 				// 更新物流订单发货状态
 				TemuOrderShippingInfoDO updateShipping = new TemuOrderShippingInfoDO();
 				updateShipping.setShippingStatus(1); // 设置为已发货
 				updateShipping.setUpdateTime(LocalDateTime.now());
+				
+				// 如果获取到操作人ID，则设置shippedOperatorId字段
+				if (operatorId != null) {
+					updateShipping.setShippedOperatorId(operatorId);
+					log.info("[batchUpdateOrderStatus] 设置shippedOperatorId: {}", operatorId);
+				}
 				
 				// 先查询符合条件的记录
 				List<TemuOrderShippingInfoDO> matchingRecords = shippingInfoMapper.selectList(
@@ -436,7 +476,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 									.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
 									.in(TemuOrderShippingInfoDO::getOrderNo, orderNos));
 					
-					log.info("[batchUpdateOrderStatus] 物流订单状态更新完成, 更新数量: {}", shippingUpdateCount);
+					log.info("[batchUpdateOrderStatus] 物流订单状态更新完成, 更新数量: {}, 操作人ID: {}", 
+							shippingUpdateCount, operatorId);
 				} else {
 					log.warn("[batchUpdateOrderStatus] 未找到匹配的物流记录, trackingNumber={}, orderNos={}",
 							trackingNumber, orderNos);
@@ -678,6 +719,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			if (shop != null) {
 				vo.setShopName(shop.getShopName());
 			}
+			
+			// 设置发货操作人ID
+			vo.setShippedOperatorId(latestShipping.getShippedOperatorId());
 			
 			// 按订单号分组处理订单
 			Map<String, List<TemuOrderShippingInfoDO>> orderNoGroup = groupedShippings.stream()
