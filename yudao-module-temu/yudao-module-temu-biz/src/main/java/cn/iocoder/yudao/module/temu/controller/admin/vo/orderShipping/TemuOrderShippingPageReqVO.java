@@ -36,8 +36,8 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	@Schema(description = "定制SKU")
 	private String customSku;
 
-	@Schema(description = "定制SKU列表")
-	private List<String> customSkuList;
+//	@Schema(description = "定制SKU列表")
+//	private List<String> customSkuList;
 
 	@Schema(description = "类目ID列表")
 	private List<String> categoryIds;

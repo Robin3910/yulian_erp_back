@@ -99,7 +99,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// ==================== 步骤1：查询匹配订单 ====================
 		long step1StartTime = System.currentTimeMillis();
 		List<TemuOrderDO> matchedOrders = getMatchedOrders(pageVO.getOrderStatus(), pageVO.getOrderNo(), pageVO.getCustomSku(),
-				    pageVO.getCustomSkuList(),pageVO.getCategoryIds());
+				    pageVO.getCategoryIds());
 		log.info("[getOrderShippingPage] [步骤1] 查询匹配订单: 耗时={}ms, 匹配订单数={}",
 				System.currentTimeMillis() - step1StartTime,
 				matchedOrders == null ? 0 : matchedOrders.size());
@@ -495,9 +495,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	 * @param orderNo     订单号
 	 * @return 匹配的订单列表
 	 */
-	private List<TemuOrderDO> getMatchedOrders(Integer orderStatus, String orderNo, String customSku,List<String> customSkuList,List<String> categoryIds) {
+	private List<TemuOrderDO> getMatchedOrders(Integer orderStatus, String orderNo, String customSku,List<String> categoryIds) {
 		if (orderStatus == null && !StringUtils.hasText(orderNo)&& !StringUtils.hasText(customSku)
-				&& CollectionUtils.isEmpty(categoryIds)&& (customSkuList == null || customSkuList.isEmpty())) {
+				&& CollectionUtils.isEmpty(categoryIds)) {
 			return null;
 		}
 		LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
@@ -515,14 +515,14 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		if (StringUtils.hasText(orderNo)) {
 			orderWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
 		}
-		// if (StringUtils.hasText(customSku)) {
-		// 	orderWrapper.like(TemuOrderDO::getCustomSku, customSku);
-		// }
-		if (customSkuList != null && !customSkuList.isEmpty()) {
-        	orderWrapper.in(TemuOrderDO::getCustomSku, customSkuList);
-		} else if (StringUtils.hasText(customSku)) {
-			orderWrapper.like(TemuOrderDO::getCustomSku, customSku);
-		}
+		 if (StringUtils.hasText(customSku)) {
+		 	orderWrapper.like(TemuOrderDO::getCustomSku, customSku);
+		 }
+//		if (customSkuList != null && !customSkuList.isEmpty()) {
+//        	orderWrapper.in(TemuOrderDO::getCustomSku, customSkuList);
+//		} else if (StringUtils.hasText(customSku)) {
+//			orderWrapper.like(TemuOrderDO::getCustomSku, customSku);
+//		}
 		if (!CollectionUtils.isEmpty(categoryIds)) {
 			orderWrapper.in(TemuOrderDO::getCategoryId, categoryIds);
 		}
