@@ -37,4 +37,7 @@ public interface ErrorCodeConstants {
 	// ========== 图像搜索相关 ==========
 	ErrorCode TEMU_IMAGE_SIZE_EXCEEDS_LIMIT = new ErrorCode(1008001000, "图片大小超过限制");
 	ErrorCode TEMU_IMAGE_TYPE_NOT_SUPPORTED = new ErrorCode(1008001001, "不支持的图片格式");
+
+	// ========== 告警规则相关错误码 ==========
+	ErrorCode ALERT_RULE_NOT_EXISTS = new ErrorCode(1005000000, "告警规则不存在");
 }
