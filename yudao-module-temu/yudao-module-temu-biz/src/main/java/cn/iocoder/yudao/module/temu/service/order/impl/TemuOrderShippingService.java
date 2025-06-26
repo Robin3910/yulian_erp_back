@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
@@ -36,6 +37,9 @@ import java.util.Objects;
 
 import javax.annotation.Resource;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuWorkerTaskDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
+
 /**
  * Temu订单物流 Service 实现类
  */
@@ -58,6 +62,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
 	@Resource
 	private AdminUserMapper adminUserMapper;
+	
+	@Resource
+	private TemuWorkerTaskMapper temuWorkerTaskMapper;
 	
 	// 分页查询用户店铺待发货列表
 	@Override
@@ -444,7 +451,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				// 获取当前操作人ID
 				Long operatorId = null;
 				try {
-					operatorId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+					operatorId = SecurityFrameworkUtils.getLoginUserId();
 					log.info("[batchUpdateOrderStatus] 获取到操作人ID: {}", operatorId);
 				} catch (Exception e) {
 					log.warn("[batchUpdateOrderStatus] 获取操作人ID失败: {}", e.getMessage());
@@ -478,6 +485,36 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					
 					log.info("[batchUpdateOrderStatus] 物流订单状态更新完成, 更新数量: {}, 操作人ID: {}", 
 							shippingUpdateCount, operatorId);
+					
+					// 新增：插入工作人员任务记录（发货）
+					for (TemuOrderDO order : orders) {
+						TemuWorkerTaskDO workerTask = new TemuWorkerTaskDO();
+						workerTask.setWorkerId(operatorId);
+						// 查询操作人昵称
+						String workerName = null;
+						if (operatorId != null) {
+							AdminUserDO user = adminUserMapper.selectById(operatorId);
+							if (user != null) {
+								workerName = user.getNickname();
+							}
+						}
+						workerTask.setWorkerName(workerName);
+						workerTask.setTaskType((byte)3); // 3:发货
+						workerTask.setTaskStatus((byte)1); // 1:已完成
+						workerTask.setOrderId(order.getId());
+						workerTask.setOrderNo(order.getOrderNo());
+						workerTask.setCustomSku(order.getCustomSku());
+						// 统计当前用户已处理过的不同 custom_sku 数量
+						int skuQuantity = temuWorkerTaskMapper.selectDistinctCustomSkuCountByWorkerId(operatorId);
+						boolean alreadyProcessed = temuWorkerTaskMapper.existsByWorkerIdAndCustomSku(operatorId, order.getCustomSku());
+						if (!alreadyProcessed) {
+							skuQuantity += 1;
+						}
+						workerTask.setSkuQuantity(skuQuantity);
+						workerTask.setTaskCompleteTime(LocalDateTime.now());
+						workerTask.setShopId(order.getShopId());
+						temuWorkerTaskMapper.insert(workerTask);
+					}
 				} else {
 					log.warn("[batchUpdateOrderStatus] 未找到匹配的物流记录, trackingNumber={}, orderNos={}",
 							trackingNumber, orderNos);

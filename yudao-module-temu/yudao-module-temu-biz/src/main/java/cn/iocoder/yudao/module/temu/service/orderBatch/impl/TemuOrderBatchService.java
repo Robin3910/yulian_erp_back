@@ -18,6 +18,8 @@ import cn.iocoder.yudao.module.temu.enums.TemuOrderBatchStatusEnum;
 import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchService;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuWorkerTaskDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
 
 import javax.annotation.Resource;
 
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +57,8 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 	private OrderBatchTaskMapper orderBatchTaskMapper;
 	@Resource
 	private WeiXinProducer weiXinProducer;
+	@Resource
+	private TemuWorkerTaskMapper temuWorkerTaskMapper;
 	
 	/*
 	 * 创建批次订单
@@ -594,6 +599,18 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (orderBatchTaskDO.getStatus() != TASK_STATUS_WAIT) {
 			throw exception(ErrorCodeConstants.ORDER_BATCH_TASK_STATUS_ERROR);
 		}
+		
+		// 获取当前操作人信息
+		Long operatorId = SecurityFrameworkUtils.getLoginUserId();
+		AdminUserDO operator = adminUserMapper.selectById(operatorId);
+		String operatorName = operator != null ? operator.getNickname() : null;
+		
+		// 获取订单信息
+		TemuOrderDO order = temuOrderMapper.selectById(requestVO.getOrderId());
+		if (order == null) {
+			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+		}
+		
 		//批次根据批次类型设置订单的状态
 		TemuOrderDO temuOrderDO = new TemuOrderDO();
 		temuOrderDO.setId(requestVO.getOrderId());
@@ -611,6 +628,28 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				break;
 		}
 		temuOrderMapper.updateById(temuOrderDO);
+		
+		// 插入工作人员任务记录
+		TemuWorkerTaskDO workerTask = new TemuWorkerTaskDO();
+		workerTask.setWorkerId(operatorId);
+		workerTask.setWorkerName(operatorName);
+		workerTask.setTaskType(orderBatchTaskDO.getType() == TASK_TYPE_ART ? (byte)1 : (byte)2); // 1:作图 2:生产
+		workerTask.setTaskStatus((byte)1); // 1:已完成
+		workerTask.setOrderId(order.getId());
+		workerTask.setOrderNo(order.getOrderNo());
+		workerTask.setCustomSku(order.getCustomSku());
+		workerTask.setBatchOrderId(orderBatchTaskDO.getBatchOrderId());
+		// 统计当前用户已处理过的不同 custom_sku 数量
+		int skuQuantity = temuWorkerTaskMapper.selectDistinctCustomSkuCountByWorkerId(operatorId);
+		boolean alreadyProcessed = temuWorkerTaskMapper.existsByWorkerIdAndCustomSku(operatorId, order.getCustomSku());
+		if (!alreadyProcessed) {
+			skuQuantity += 1;
+		}
+		workerTask.setSkuQuantity(skuQuantity);
+		workerTask.setTaskCompleteTime(LocalDateTime.now());
+		workerTask.setShopId(order.getShopId());
+		temuWorkerTaskMapper.insert(workerTask);
+		
 		//检查当前任务关联的订单是否完成当前类型的所有任务  如果已经完成 修改当前批次任务的
 		MPJLambdaWrapperX<TemuOrderBatchRelationDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
 		objectMPJLambdaWrapperX
@@ -662,6 +701,12 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.IN_PRODUCTION) {
 			throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
 		}
+		
+		// 获取当前操作人信息
+		Long operatorId = SecurityFrameworkUtils.getLoginUserId();
+		AdminUserDO operator = adminUserMapper.selectById(operatorId);
+		String operatorName = operator != null ? operator.getNickname() : null;
+		
 		switch (requestVO.getTaskType()) {
 			case TASK_TYPE_ART:
 				temuOrderDO.setIsCompleteDrawTask(ORDER_TASK_STATUS_COMPLETE);
@@ -679,6 +724,28 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		}
 		//更新订单状态
 		temuOrderMapper.updateById(temuOrderDO);
+		
+		// 插入工作人员任务记录
+		TemuWorkerTaskDO workerTask = new TemuWorkerTaskDO();
+		workerTask.setWorkerId(operatorId);
+		workerTask.setWorkerName(operatorName);
+		workerTask.setTaskType(requestVO.getTaskType() == TASK_TYPE_ART ? (byte)1 : (byte)2); // 1:作图 2:生产
+		workerTask.setTaskStatus((byte)1); // 1:已完成
+		workerTask.setOrderId(temuOrderDO.getId());
+		workerTask.setOrderNo(temuOrderDO.getOrderNo());
+		workerTask.setCustomSku(temuOrderDO.getCustomSku());
+		workerTask.setBatchOrderId(requestVO.getId());
+		// 统计当前用户已处理过的不同 custom_sku 数量
+		int skuQuantity = temuWorkerTaskMapper.selectDistinctCustomSkuCountByWorkerId(operatorId);
+		boolean alreadyProcessed = temuWorkerTaskMapper.existsByWorkerIdAndCustomSku(operatorId, temuOrderDO.getCustomSku());
+		if (!alreadyProcessed) {
+			skuQuantity += 1;
+		}
+		workerTask.setSkuQuantity(skuQuantity);
+		workerTask.setTaskCompleteTime(LocalDateTime.now());
+		workerTask.setShopId(temuOrderDO.getShopId());
+		temuWorkerTaskMapper.insert(workerTask);
+		
 		//如果是生产类型完成任务 检查 当前批次所有的订单是否已经完成
 		if (requestVO.getTaskType() == TASK_TYPE_PRODUCTION) {
 			MPJLambdaWrapperX<TemuOrderBatchRelationDO> objectMPJLambdaWrapperX = new MPJLambdaWrapperX<>();
