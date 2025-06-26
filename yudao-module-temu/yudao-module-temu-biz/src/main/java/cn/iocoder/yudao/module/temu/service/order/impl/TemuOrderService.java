@@ -164,6 +164,16 @@ public class TemuOrderService implements ITemuOrderService {
 			success = "id：{{#user.id}} 更新了{{#orderSize}}条数据,提交的数据是{{#orderString}}",
 			type = "TEMU订单操作", bizNo = "{{#user.id}}")
 	public Boolean beatchUpdateStatus(List<TemuOrderDO> requestVO) {
+		// 必须在方法开始时设置LogRecord上下文变量，以便SpEL表达式能够正确解析
+		LogRecordContext.putVariable("user", getLoginUser());
+		LogRecordContext.putVariable("orderSize", requestVO.size());
+		HashMap<String, String> stringStringHashMap = new HashMap<>();
+		requestVO.iterator().forEachRemaining(temuOrderDO -> {
+			stringStringHashMap.put("id", String.valueOf(temuOrderDO.getId()));
+			stringStringHashMap.put("orderStatus", String.valueOf(temuOrderDO.getOrderStatus()));
+		});
+		LogRecordContext.putVariable("orderString", JsonUtils.toJsonString(stringStringHashMap));
+		
 		for (TemuOrderDO temuOrderDO : requestVO) {
 			// 先查询原始订单数据
 			TemuOrderDO originalOrder = temuOrderMapper.selectById(temuOrderDO.getId());
@@ -195,14 +205,6 @@ public class TemuOrderService implements ITemuOrderService {
 			}
 		}
 
-		LogRecordContext.putVariable("user", getLoginUser());
-		LogRecordContext.putVariable("orderSize", requestVO.size());
-		HashMap<String, String> stringStringHashMap = new HashMap<>();
-		requestVO.iterator().forEachRemaining(temuOrderDO -> {
-			stringStringHashMap.put("id", String.valueOf(temuOrderDO.getId()));
-			stringStringHashMap.put("orderStatus", String.valueOf(temuOrderDO.getOrderStatus()));
-		});
-		LogRecordContext.putVariable("orderString", JsonUtils.toJsonString(stringStringHashMap));
 		return result;
 	}
 	
@@ -641,22 +643,29 @@ public class TemuOrderService implements ITemuOrderService {
 			if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.UNDELIVERED) {
 				throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
 			}
-			//根据分类规则加载不同的对象
-			BigDecimal unitPrice;
-			IPriceRule rule;
-			//根据规则类型加载不同的对象
-			rule = PriceRuleFactory.createPriceRule(temuProductCategoryDO.getRuleType(), temuProductCategoryDO.getUnitPrice());
-			unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
+			
 			//更新数量
 			temuOrderDO.setQuantity(temuOrderBatchOrderReqVO.getQuantity());
-			//更新单价
-			temuOrderDO.setUnitPrice(unitPrice);
-			//更新总价
-			temuOrderDO.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity())));
+			
+			// 判断是否为返单，返单直接设置价格为0，不进行价格计算
+			if (temuOrderDO.getIsReturnOrder() != null && temuOrderDO.getIsReturnOrder() == 1) {
+				// 返单订单：单价和总价都设为0
+				temuOrderDO.setUnitPrice(BigDecimal.ZERO);
+				temuOrderDO.setTotalPrice(BigDecimal.ZERO);
+				log.info("返单订单 {} 价格设置为0，不进行扣费", temuOrderDO.getOrderNo());
+			} else {
+				// 非返单订单：正常计算价格
+				BigDecimal unitPrice;
+				IPriceRule rule;
+				//根据规则类型加载不同的对象
+				rule = PriceRuleFactory.createPriceRule(temuProductCategoryDO.getRuleType(), temuProductCategoryDO.getUnitPrice());
+				unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
+				temuOrderDO.setUnitPrice(unitPrice);
+				temuOrderDO.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity())));
+			}
+			
 			//修改订单状态
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
-			////更新订单信息
-			//temuOrderMapper.updateById(temuOrderDO);
 			temuOrderDOList.add(temuOrderDO);
 			processCount++;
 		}
@@ -683,8 +692,36 @@ public class TemuOrderService implements ITemuOrderService {
 		DictTypeDO dictTypeDO = dictTypeMapper.selectByType("temu_order_batch_pay_order_status");
 		//如果状态开启那么开始处理支付
 		if (dictTypeDO.getStatus() == 0) {
-			//统计订单总金额
-			BigDecimal totalPrice = temuOrderDOList.stream().map(TemuOrderDO::getTotalPrice).reduce(BigDecimal::add).orElse(BigDecimal.ZERO);
+			// 分离返单和非返单订单
+			List<TemuOrderDO> returnOrders = temuOrderDOList.stream()
+					.filter(order -> order.getIsReturnOrder() != null && order.getIsReturnOrder() == 1)
+					.collect(Collectors.toList());
+			
+			List<TemuOrderDO> normalOrders = temuOrderDOList.stream()
+					.filter(order -> order.getIsReturnOrder() == null || order.getIsReturnOrder() != 1)
+					.collect(Collectors.toList());
+			
+			// 记录返单信息
+			if (!returnOrders.isEmpty()) {
+				log.info("发现 {} 个返单订单，跳过扣费：{}", 
+					returnOrders.size(), 
+					returnOrders.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.joining(", ")));
+			}
+			
+			// 如果没有正常订单需要扣费，直接返回
+			if (normalOrders.isEmpty()) {
+				log.info("所有订单都是返单，无需扣费");
+				return;
+			}
+			
+			//统计正常订单总金额（排除返单订单）
+			BigDecimal totalPrice = normalOrders.stream()
+					.map(TemuOrderDO::getTotalPrice)
+					.reduce(BigDecimal::add)
+					.orElse(BigDecimal.ZERO);
+			
+			log.info("需要扣费的订单数量：{}，总金额：{}", normalOrders.size(), totalPrice);
+			
 			//检查当前用户是否存在余额
 			LoginUser loginUser = getLoginUser();
 			if (loginUser == null) {
@@ -699,11 +736,13 @@ public class TemuOrderService implements ITemuOrderService {
 			if (new BigDecimal(wallet.getBalance() / 100).compareTo(totalPrice) < 0) {
 				throw exception(ErrorCodeConstants.WALLET_NOT_ENOUGH);
 			}
-			temuOrderDOList.forEach(temuOrderDO -> {
+			
+			// 只对非返单订单进行扣费
+			normalOrders.forEach(temuOrderDO -> {
+				log.info("扣费订单：{}，金额：{}", temuOrderDO.getOrderNo(), temuOrderDO.getTotalPrice());
 				payWalletService.reduceWalletBalance(wallet.getId(), temuOrderDO.getId(), PayWalletBizTypeEnum.PAYMENT_TEMU_ORDER, temuOrderDO.getTotalPrice().multiply(new BigDecimal(100)).intValue());
 			});
 		}
-		
 	}
 	
 	@Override
