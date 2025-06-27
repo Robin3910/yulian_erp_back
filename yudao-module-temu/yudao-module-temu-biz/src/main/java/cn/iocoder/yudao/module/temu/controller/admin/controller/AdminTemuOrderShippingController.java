@@ -7,6 +7,8 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -77,6 +79,13 @@ public class AdminTemuOrderShippingController {
             @Valid @RequestBody TemuOrderShippingPageReqVO.BatchUpdateStatusReqVO reqVO) {
         return success(shippingService.batchUpdateOrderStatus(reqVO.getOrderIds(), reqVO.getOrderStatus(),
                 reqVO.getTrackingNumber()));
+    }
+
+    @GetMapping("/count")
+    @Operation(summary = "查询加急未发货订单总数")
+    public CommonResult<TemuOrderShippingCountRespVO> getUrgentOrderCount(
+            @Valid TemuOrderShippingCountReqVO reqVO) {
+        return success(shippingService.getUrgentOrderCount(reqVO));
     }
 
 }

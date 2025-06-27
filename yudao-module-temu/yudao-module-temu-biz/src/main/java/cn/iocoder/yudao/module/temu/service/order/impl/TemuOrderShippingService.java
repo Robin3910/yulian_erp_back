@@ -10,6 +10,8 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderS
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderListRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
@@ -1021,6 +1023,42 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		}
 
 		return trackingNumberToSequence;
+	}
+	
+	@Override
+	public TemuOrderShippingCountRespVO getUrgentOrderCount(TemuOrderShippingCountReqVO reqVO) {
+		log.info("[getUrgentOrderCount] 开始查询加急未发货订单总数, 参数: {}", reqVO);
+		
+		// 构建查询条件：加急 + 未发货 + 时间范围
+		LambdaQueryWrapperX<TemuOrderShippingInfoDO> queryWrapper = new LambdaQueryWrapperX<>();
+		queryWrapper.eq(TemuOrderShippingInfoDO::getIsUrgent, true)  // 加急
+				.eq(TemuOrderShippingInfoDO::getShippingStatus, 0);   // 未发货
+		
+		// 处理时间范围条件
+		if (reqVO.getCreateTimeStart() != null && reqVO.getCreateTimeEnd() != null) {
+			// 如果前端传了时间参数，使用前端的时间范围
+			LocalDateTime startTime = reqVO.getCreateTimeStart().atStartOfDay();
+			LocalDateTime endTime = reqVO.getCreateTimeEnd().atTime(23, 59, 59);
+			queryWrapper.ge(TemuOrderShippingInfoDO::getCreateTime, startTime)
+					.le(TemuOrderShippingInfoDO::getCreateTime, endTime);
+			log.info("[getUrgentOrderCount] 使用前端指定的时间范围: {} 到 {}", startTime, endTime);
+		} else {
+			// 如果前端没有传时间参数，默认查询当天
+			LocalDate today = LocalDate.now();
+			LocalDateTime startTime = today.atStartOfDay();
+			LocalDateTime endTime = today.atTime(23, 59, 59);
+			queryWrapper.ge(TemuOrderShippingInfoDO::getCreateTime, startTime)
+					.le(TemuOrderShippingInfoDO::getCreateTime, endTime);
+			log.info("[getUrgentOrderCount] 使用默认当天时间范围: {} 到 {}", startTime, endTime);
+		}
+		
+		// 查询总数
+		Long total = shippingInfoMapper.selectCount(queryWrapper);
+		log.info("[getUrgentOrderCount] 查询完成, 总数: {}", total);
+		
+		TemuOrderShippingCountRespVO respVO = new TemuOrderShippingCountRespVO();
+		respVO.setTotal(total);
+		return respVO;
 	}
 	
 }
