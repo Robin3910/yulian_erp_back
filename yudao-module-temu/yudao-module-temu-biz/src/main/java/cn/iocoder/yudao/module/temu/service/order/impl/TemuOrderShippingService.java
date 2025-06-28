@@ -156,7 +156,17 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// 5.2 查询这些物流单号关联的所有记录
 		long step5_2StartTime = System.currentTimeMillis();
 		List<TemuOrderShippingInfoDO> allRelatedShippings;
-		if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
+
+		// 优化：当使用orderStatus JOIN查询时，需要查询所有相关的物流记录
+		if (pageVO.getOrderStatus() != null && !StringUtils.hasText(pageVO.getOrderNo()) &&
+				!StringUtils.hasText(pageVO.getCustomSku()) && CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
+			// 使用JOIN查询获取所有相关的物流记录
+			allRelatedShippings = shippingInfoMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers)
+							.inSql(TemuOrderShippingInfoDO::getOrderNo,
+									"SELECT order_no FROM temu_order WHERE order_status = " + pageVO.getOrderStatus()));
+		} else if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
 			allRelatedShippings = list;
 		} else if (matchedOrders == null && !CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
 			allRelatedShippings = shippingInfoMapper.selectList(
@@ -553,6 +563,13 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		if (!hasOtherConditions && !hasCategoryCondition) {
 			return null;
 		}
+
+		// 优化：当有orderStatus条件时，只查询订单号，避免查询大量订单数据
+		if (orderStatus != null && !StringUtils.hasText(orderNo) && !StringUtils.hasText(customSku) && CollectionUtils.isEmpty(categoryIds)) {
+			log.info("[getMatchedOrders] 只有orderStatus条件，使用优化查询策略");
+			return getMatchedOrdersByStatusOnly(orderStatus);
+		}
+
 		LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
 		orderWrapper.select(TemuOrderDO::getId, TemuOrderDO::getOrderNo, TemuOrderDO::getProductTitle,
 				TemuOrderDO::getOrderStatus, TemuOrderDO::getSku, TemuOrderDO::getSkc,
@@ -582,7 +599,26 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		
 		return orderMapper.selectList(orderWrapper);
 	}
-	
+
+	/**
+	 * 优化方法：当只有orderStatus条件时，只查询订单号，避免查询大量订单数据
+	 */
+	private List<TemuOrderDO> getMatchedOrdersByStatusOnly(Integer orderStatus) {
+		// 只查询订单号，不查询其他字段
+		LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
+		orderWrapper.select(TemuOrderDO::getOrderNo)  // 只查询订单号
+				.eq(TemuOrderDO::getOrderStatus, orderStatus);
+
+		List<TemuOrderDO> orders = orderMapper.selectList(orderWrapper);
+
+		// 创建完整的订单对象，但只设置订单号
+		return orders.stream().map(order -> {
+			TemuOrderDO fullOrder = new TemuOrderDO();
+			fullOrder.setOrderNo(order.getOrderNo());
+			return fullOrder;
+		}).collect(Collectors.toList());
+	}
+
 	/**
 	 * 构建物流信息查询条件
 	 */
@@ -594,7 +630,17 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		
 		// 打印完整的请求参数
 		log.info("[buildShippingQueryWrapper] 开始处理查询, 请求参数: pageVO={}", pageVO);
-		
+
+		// 优化：当有orderStatus条件且没有其他复杂条件时，使用JOIN查询
+		if (pageVO.getOrderStatus() != null && !StringUtils.hasText(pageVO.getOrderNo()) &&
+				!StringUtils.hasText(pageVO.getCustomSku()) && CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
+			log.info("[buildShippingQueryWrapper] 使用orderStatus JOIN查询优化");
+			String joinQuery = buildOrderStatusJoinQuery(pageVO, limitShopIds);
+			queryWrapper.inSql(TemuOrderShippingInfoDO::getId, joinQuery);
+			queryWrapper.orderByDesc(TemuOrderShippingInfoDO::getCreateTime);
+			return queryWrapper;
+		}
+
 		// 构建基础查询条件
 		StringBuilder subQuery = new StringBuilder("SELECT MAX(id) as id FROM temu_order_shipping_info WHERE 1=1");
 		
@@ -699,6 +745,60 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		log.info("[buildShippingQueryWrapper] 最终生成的SQL: {}", finalSql);
 		
 		return queryWrapper;
+	}
+
+	/**
+	 * 构建orderStatus JOIN查询
+	 * 直接在物流表中关联订单表进行状态查询，避免先查询大量订单
+	 */
+	private String buildOrderStatusJoinQuery(TemuOrderShippingPageReqVO pageVO, Set<Long> limitShopIds) {
+		StringBuilder joinQuery = new StringBuilder();
+		joinQuery.append("SELECT MAX(s.id) as id FROM temu_order_shipping_info s ");
+		joinQuery.append("INNER JOIN temu_order o ON s.order_no = o.order_no ");
+		joinQuery.append("WHERE 1=1");
+
+		// 处理店铺ID条件
+		if (pageVO.getShopId() != null) {
+			joinQuery.append(" AND s.shop_id = ").append(pageVO.getShopId());
+		} else if (limitShopIds != null && !limitShopIds.isEmpty()) {
+			joinQuery.append(" AND s.shop_id IN (")
+					.append(String.join(",", limitShopIds.stream().map(String::valueOf).collect(Collectors.toList())))
+					.append(")");
+		}
+
+		// 处理物流单号
+		if (StringUtils.hasText(pageVO.getTrackingNumber())) {
+			joinQuery.append(" AND s.tracking_number LIKE '%").append(pageVO.getTrackingNumber()).append("%'");
+		}
+
+		// 处理是否加急条件
+		if (pageVO.getIsUrgent() != null) {
+			joinQuery.append(" AND s.is_urgent = ").append(pageVO.getIsUrgent() ? "1" : "0");
+		}
+
+		// 处理物流单序号条件
+		if (pageVO.getDailySequence() != null) {
+			joinQuery.append(" AND s.daily_sequence = ").append(pageVO.getDailySequence());
+		}
+
+		// 处理创建时间条件
+		if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
+			String startTimeStr = pageVO.getCreateTime()[0].toString() + " 00:00:00";
+			String endTimeStr = pageVO.getCreateTime()[1].toString() + " 23:59:59";
+			joinQuery.append(" AND s.create_time >= '").append(startTimeStr).append("'")
+					.append(" AND s.create_time <= '").append(endTimeStr).append("'");
+		}
+
+		// 处理订单状态条件
+		if (pageVO.getOrderStatus() != null) {
+			joinQuery.append(" AND o.order_status = ").append(pageVO.getOrderStatus());
+		}
+
+		// 按物流单号分组
+		joinQuery.append(" GROUP BY s.tracking_number");
+
+		log.info("[buildOrderStatusJoinQuery] 生成的JOIN查询SQL: {}", joinQuery.toString());
+		return joinQuery.toString();
 	}
 
 	/**
