@@ -603,6 +603,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			subQuery.append(" AND is_urgent = ").append(pageVO.getIsUrgent() ? "1" : "0");
 		}
 		
+		// 处理物流单序号条件
+		if (pageVO.getDailySequence() != null) {
+			subQuery.append(" AND daily_sequence = ").append(pageVO.getDailySequence());
+		}
+		
 		// 处理创建时间条件
 		LocalDateTime beginTime = null;
 		LocalDateTime endTime = null;

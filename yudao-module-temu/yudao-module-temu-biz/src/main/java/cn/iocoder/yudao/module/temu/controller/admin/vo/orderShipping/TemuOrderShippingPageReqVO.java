@@ -48,6 +48,10 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	@DateTimeFormat(pattern = "yyyy-MM-dd")
 	@Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
 	private LocalDate[] createTime;
+
+	@Schema(description = "物流单序号")
+	private Integer dailySequence;
+
 	
 	@Data
 	@Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")
