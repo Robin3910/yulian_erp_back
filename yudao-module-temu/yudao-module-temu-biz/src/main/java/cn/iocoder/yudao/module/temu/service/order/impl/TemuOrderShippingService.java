@@ -158,6 +158,10 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		List<TemuOrderShippingInfoDO> allRelatedShippings;
 		if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
 			allRelatedShippings = list;
+		} else if (matchedOrders == null && !CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
+			allRelatedShippings = shippingInfoMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers));
 		} else {
 			allRelatedShippings = shippingInfoMapper.selectList(
 					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
@@ -535,8 +539,18 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	 * @return 匹配的订单列表
 	 */
 	private List<TemuOrderDO> getMatchedOrders(Integer orderStatus, String orderNo, String customSku,List<String> categoryIds) {
-		if (orderStatus == null && !StringUtils.hasText(orderNo)&& !StringUtils.hasText(customSku)
-				&& CollectionUtils.isEmpty(categoryIds)) {
+		// 优化：当有类目ID条件时，不在这里查询，而是在物流表中直接JOIN查询
+		boolean hasOtherConditions = orderStatus != null || StringUtils.hasText(orderNo) || StringUtils.hasText(customSku);
+		boolean hasCategoryCondition = !CollectionUtils.isEmpty(categoryIds);
+
+		// 如果只有类目条件，返回null，避免查询大量订单数据
+		if (!hasOtherConditions && hasCategoryCondition) {
+			log.info("[getMatchedOrders] 只有类目条件，跳过订单查询，将在物流表中直接JOIN查询");
+			return null;
+		}
+
+		// 如果没有任何条件，返回null
+		if (!hasOtherConditions && !hasCategoryCondition) {
 			return null;
 		}
 		LambdaQueryWrapperX<TemuOrderDO> orderWrapper = new LambdaQueryWrapperX<>();
@@ -657,7 +671,17 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					.append(String.join("','", orderNos))
 					.append("')");
 		}
-		
+
+		// 优化：处理类目条件 - 当只有类目条件时，使用JOIN查询
+		if (matchedOrders == null && !CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
+			log.info("[buildShippingQueryWrapper] 使用类目JOIN查询优化");
+			// 构建JOIN查询，直接在物流表中关联订单表查询类目
+			String joinQuery = buildCategoryJoinQuery(pageVO, limitShopIds);
+			queryWrapper.inSql(TemuOrderShippingInfoDO::getId, joinQuery);
+			queryWrapper.orderByDesc(TemuOrderShippingInfoDO::getCreateTime);
+			return queryWrapper;
+		}
+
 		// 按物流单号分组，如果指定了订单号或订单状态，则同时按订单号分组
 		if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
 			subQuery.append(" GROUP BY tracking_number, order_no");
@@ -676,7 +700,63 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		
 		return queryWrapper;
 	}
-	
+
+	/**
+	 * 构建类目JOIN查询
+	 * 直接在物流表中关联订单表进行类目查询，避免先查询大量订单
+	 */
+	private String buildCategoryJoinQuery(TemuOrderShippingPageReqVO pageVO, Set<Long> limitShopIds) {
+		StringBuilder joinQuery = new StringBuilder();
+		joinQuery.append("SELECT MAX(s.id) as id FROM temu_order_shipping_info s ");
+		joinQuery.append("INNER JOIN temu_order o ON s.order_no = o.order_no ");
+		joinQuery.append("WHERE 1=1");
+
+		// 处理店铺ID条件
+		if (pageVO.getShopId() != null) {
+			joinQuery.append(" AND s.shop_id = ").append(pageVO.getShopId());
+		} else if (limitShopIds != null && !limitShopIds.isEmpty()) {
+			joinQuery.append(" AND s.shop_id IN (")
+					.append(String.join(",", limitShopIds.stream().map(String::valueOf).collect(Collectors.toList())))
+					.append(")");
+		}
+
+		// 处理物流单号
+		if (StringUtils.hasText(pageVO.getTrackingNumber())) {
+			joinQuery.append(" AND s.tracking_number LIKE '%").append(pageVO.getTrackingNumber()).append("%'");
+		}
+
+		// 处理是否加急条件
+		if (pageVO.getIsUrgent() != null) {
+			joinQuery.append(" AND s.is_urgent = ").append(pageVO.getIsUrgent() ? "1" : "0");
+		}
+
+		// 处理物流单序号条件
+		if (pageVO.getDailySequence() != null) {
+			joinQuery.append(" AND s.daily_sequence = ").append(pageVO.getDailySequence());
+		}
+
+		// 处理创建时间条件
+		if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
+			String startTimeStr = pageVO.getCreateTime()[0].toString() + " 00:00:00";
+			String endTimeStr = pageVO.getCreateTime()[1].toString() + " 23:59:59";
+			joinQuery.append(" AND s.create_time >= '").append(startTimeStr).append("'")
+					.append(" AND s.create_time <= '").append(endTimeStr).append("'");
+		}
+
+		// 处理类目条件
+		if (!CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
+			joinQuery.append(" AND o.category_id IN ('")
+					.append(String.join("','", pageVO.getCategoryIds()))
+					.append("')");
+		}
+
+		// 按物流单号分组
+		joinQuery.append(" GROUP BY s.tracking_number");
+
+		log.info("[buildCategoryJoinQuery] 生成的JOIN查询SQL: {}", joinQuery.toString());
+		return joinQuery.toString();
+	}
+
 	/**
 	 * 批量查询分类信息
 	 */
