@@ -199,8 +199,22 @@ public class TemuOrderService implements ITemuOrderService {
 					temuOrderDO.setQuantity(originalOrder.getOriginalQuantity());
 				}
 			}
-		}
 
+			// 订单取消时退回金额
+			if (temuOrderDO.getOrderStatus() == TemuOrderStatusEnum.UNDELIVERED) {
+				// 只对未退过款的订单进行退款（可加退款标记字段，当前简单实现）
+				if (originalOrder != null && originalOrder.getTotalPrice() != null && originalOrder.getTotalPrice().compareTo(BigDecimal.ZERO) > 0) {
+					LoginUser loginUser = getLoginUser();
+					if (loginUser != null) {
+						PayWalletDO wallet = payWalletService.getOrCreateWallet(loginUser.getId(), ADMIN.getValue());
+						if (wallet != null) {
+							payWalletService.addWalletBalance(wallet.getId(), String.valueOf(temuOrderDO.getId()), PayWalletBizTypeEnum.PAYMENT_REFUND, originalOrder.getTotalPrice().multiply(new BigDecimal(100)).intValue());
+							log.info("订单{}已取消，退回金额{}到用户{}的钱包", temuOrderDO.getOrderNo(), originalOrder.getTotalPrice(), loginUser.getId());
+						}
+					}
+				}
+			}
+		}
 
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
 
