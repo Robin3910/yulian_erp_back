@@ -413,13 +413,14 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderBatchDO == null) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
 		}
-		if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
-			throw exception(ORDER_BATCH_STATUS_ERROR);
-		}
-		List<TemuOrderBatchRelationDO> temuOrderBatchRelationDOList = temuOrderBatchRelationMapper.selectByMap(MapUtil.<String, Object>builder()
-				.put("batch_id", temuOrderBatchUpdateStatusVO.getId())
-				.build()
-		);
+		// 允许处理任何状态的批次
+		// if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+		// throw exception(ORDER_BATCH_STATUS_ERROR);
+		// }
+		List<TemuOrderBatchRelationDO> temuOrderBatchRelationDOList = temuOrderBatchRelationMapper
+				.selectByMap(MapUtil.<String, Object>builder()
+						.put("batch_id", temuOrderBatchUpdateStatusVO.getId())
+						.build());
 		if (temuOrderBatchRelationDOList == null || temuOrderBatchRelationDOList.isEmpty()) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
 		}
@@ -465,13 +466,14 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderBatchDO == null) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
 		}
-		if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
-			throw exception(ORDER_BATCH_STATUS_ERROR);
-		}
-		List<TemuOrderBatchRelationDO> temuOrderBatchRelationDOList = temuOrderBatchRelationMapper.selectByMap(MapUtil.<String, Object>builder()
-				.put("batch_id", temuOrderBatchUpdateStatusVO.getId())
-				.build()
-		);
+		// 允许处理任何状态的批次
+		// if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+		// throw exception(ORDER_BATCH_STATUS_ERROR);
+		// }
+		List<TemuOrderBatchRelationDO> temuOrderBatchRelationDOList = temuOrderBatchRelationMapper
+				.selectByMap(MapUtil.<String, Object>builder()
+						.put("batch_id", temuOrderBatchUpdateStatusVO.getId())
+						.build());
 		if (temuOrderBatchRelationDOList == null || temuOrderBatchRelationDOList.isEmpty()) {
 			throw exception(ORDER_BATCH_NOT_EXISTS);
 		}
@@ -497,7 +499,22 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		temuOrderMapper.updateBatch(temuOrderDOList);
 		//设置批次订单状态 生产任务完成 则整个任务就完成了
 		if (temuOrderBatchTaskDO.getType() == TASK_TYPE_PRODUCTION) {
-			temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
+			// 检查该批次下是否还有未完成的订单
+			MPJLambdaWrapperX<TemuOrderBatchRelationDO> checkWrapper = new MPJLambdaWrapperX<>();
+			checkWrapper.selectAll(TemuOrderBatchRelationDO.class)
+					.leftJoin(TemuOrderDO.class, TemuOrderDO::getId, TemuOrderBatchRelationDO::getOrderId)
+					.eq(TemuOrderBatchRelationDO::getBatchId, temuOrderBatchUpdateStatusVO.getId())
+					.eq(TemuOrderDO::getIsCompleteProducerTask, ORDER_TASK_STATUS_NOT_COMPLETE);
+
+			List<TemuOrderBatchRelationDO> uncompletedOrders = temuOrderBatchRelationMapper
+					.selectJoinList(TemuOrderBatchRelationDO.class, checkWrapper);
+
+			// 只有当所有订单都完成时，才将批次状态设为完成
+			if (uncompletedOrders == null || uncompletedOrders.isEmpty()) {
+				temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE);
+			} else {
+				temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.IN_PRODUCTION);
+			}
 			temuOrderBatchMapper.updateById(temuOrderBatchDO);
 		}
 		
@@ -689,11 +706,11 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 		if (temuOrderBatchDO == null) {
 			throw exception(ErrorCodeConstants.ORDER_BATCH_NOT_EXISTS);
 		}
-		//检查批次状态 已生产的批次订单不允许操作
-		if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
-			throw exception(ErrorCodeConstants.ORDER_BATCH_STATUS_ERROR);
-		}
-		//检查订单状态
+		// 检查批次状态 - 取消检查批次状态，允许处理任何状态下的批次中的订单
+		// if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.IN_PRODUCTION) {
+		// throw exception(ErrorCodeConstants.ORDER_BATCH_STATUS_ERROR);
+		// }
+		// 检查订单状态
 		TemuOrderDO temuOrderDO = temuOrderMapper.selectById(requestVO.getOrderId());
 		if (temuOrderDO == null) {
 			throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
@@ -756,7 +773,14 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 			List<TemuOrderBatchRelationDO> temuOrderBatchRelationList = temuOrderBatchRelationMapper.selectJoinList(TemuOrderBatchRelationDO.class, objectMPJLambdaWrapperX);
 			//当所有任务已经完成的时候
 			if (temuOrderBatchRelationList == null || temuOrderBatchRelationList.isEmpty()) {
-				updateStatus(new TemuOrderBatchUpdateStatusVO().setId(requestVO.getId()));
+				// 如果当前批次状态不是已完成，才更新状态
+				if (temuOrderBatchDO.getStatus() != TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE) {
+					updateStatus(new TemuOrderBatchUpdateStatusVO().setId(requestVO.getId()));
+				}
+			} else if (temuOrderBatchDO.getStatus() == TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE) {
+				// 如果当前批次状态是已完成，但还有未完成的订单，将批次状态重新设置为生产中
+				temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.IN_PRODUCTION);
+				temuOrderBatchMapper.updateById(temuOrderBatchDO);
 			}
 		}
 		return 1;
@@ -967,6 +991,19 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 						.status(TASK_STATUS_WAIT)
 						.type(TASK_TYPE_PRODUCTION)
 						.build());
+			}
+
+			// 当新订单被添加到批次时，确保其任务状态为待完成
+			TemuOrderDO orderUpdate = new TemuOrderDO();
+			orderUpdate.setId(orderId);
+			orderUpdate.setIsCompleteDrawTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+			orderUpdate.setIsCompleteProducerTask(TemuOrderStatusEnum.TASK_STATUS_WAIT);
+			temuOrderMapper.updateById(orderUpdate);
+
+			// 如果批次状态已经是完成状态，重新设置为生产中
+			if (temuOrderBatchDO.getStatus() == TemuOrderBatchStatusEnum.PRODUCTION_COMPLETE) {
+				temuOrderBatchDO.setStatus(TemuOrderBatchStatusEnum.IN_PRODUCTION);
+				temuOrderBatchMapper.updateById(temuOrderBatchDO);
 			}
 		}
 		// 批量更新订单批次表数据

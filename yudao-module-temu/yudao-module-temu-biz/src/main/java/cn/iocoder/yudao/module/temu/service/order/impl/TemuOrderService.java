@@ -72,6 +72,9 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.net.URL;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderPlacementRecordDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderPlacementRecordMapper;
+
 @Service
 @Slf4j
 public class TemuOrderService implements ITemuOrderService {
@@ -109,6 +112,9 @@ public class TemuOrderService implements ITemuOrderService {
 
 	@Resource
 	private TemuOrderBatchCategoryService temuOrderBatchCategoryService;
+	
+	@Resource
+	private TemuOrderPlacementRecordMapper temuOrderPlacementRecordMapper;
 	
 	
 	@Override
@@ -193,8 +199,22 @@ public class TemuOrderService implements ITemuOrderService {
 					temuOrderDO.setQuantity(originalOrder.getOriginalQuantity());
 				}
 			}
-		}
 
+			// 订单取消时退回金额
+			if (temuOrderDO.getOrderStatus() == TemuOrderStatusEnum.UNDELIVERED) {
+				// 只对未退过款的订单进行退款（可加退款标记字段，当前简单实现）
+				if (originalOrder != null && originalOrder.getTotalPrice() != null && originalOrder.getTotalPrice().compareTo(BigDecimal.ZERO) > 0) {
+					LoginUser loginUser = getLoginUser();
+					if (loginUser != null) {
+						PayWalletDO wallet = payWalletService.getOrCreateWallet(loginUser.getId(), ADMIN.getValue());
+						if (wallet != null) {
+							payWalletService.addWalletBalance(wallet.getId(), String.valueOf(temuOrderDO.getId()), PayWalletBizTypeEnum.PAYMENT_REFUND, originalOrder.getTotalPrice().multiply(new BigDecimal(100)).intValue());
+							log.info("订单{}已取消，退回金额{}到用户{}的钱包", temuOrderDO.getOrderNo(), originalOrder.getTotalPrice(), loginUser.getId());
+						}
+					}
+				}
+			}
+		}
 
 		Boolean result = temuOrderMapper.updateBatch(requestVO);
 
@@ -412,20 +432,25 @@ public class TemuOrderService implements ITemuOrderService {
 				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				// 返单的订单，备货单ID会不一样
 				TemuOrderDO existingOrder = null;
+				// 新增：先查当前订单号的isReturnOrder
+				TemuOrderDO currentOrderInDb = temuOrderMapper.selectByOrderNo(order.getOrderNo());
+				boolean alreadyReturn = currentOrderInDb != null && currentOrderInDb.getIsReturnOrder() != null && currentOrderInDb.getIsReturnOrder() == 1;
 				if (CollUtil.isNotEmpty(existingOrders)) {
 					for (TemuOrderDO tempOrder : existingOrders) {
 						if (!tempOrder.getOrderNo().equals(order.getOrderNo())) {
-							// 发送企业微信告警，提醒返单
-							String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
-								order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
-								tempOrder.getBookingTime(), order.getBookingTime(), shopName);
-							TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
 							// bookingTime更晚的订单，为返单
 							if (order.getBookingTime() != null && order.getBookingTime().isAfter(tempOrder.getBookingTime())) {
-								order.setIsReturnOrder(1);
-							}
-							if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
-								weiXinProducer.sendMessage(shop.getWebhook(), message);
+								if (!alreadyReturn) {
+									// 发送企业微信告警，提醒返单
+									String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
+										order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
+										tempOrder.getBookingTime(), order.getBookingTime(), shopName);
+									TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+									order.setIsReturnOrder(1);
+									if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
+										weiXinProducer.sendMessage(shop.getWebhook(), message);
+									}
+								}
 							}
 						} else {
 							existingOrder = tempOrder;
@@ -628,6 +653,10 @@ public class TemuOrderService implements ITemuOrderService {
 
 		ArrayList<TemuOrderDO> temuOrderDOList = new ArrayList<>();
 		int processCount = 0;
+		LoginUser loginUser = getLoginUser();
+		String operator = SecurityFrameworkUtils.getLoginUserNickname();
+		Long operatorId = loginUser != null ? loginUser.getId() : null;
+		LocalDateTime now = LocalDateTime.now();
 		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
 			//检查订单是否存在
 			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchOrderReqVO.getId());
@@ -668,6 +697,33 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
 			temuOrderDOList.add(temuOrderDO);
 			processCount++;
+
+			//插入下单记录表
+			TemuOrderPlacementRecordDO record = new TemuOrderPlacementRecordDO();
+			record.setOrderNo(temuOrderDO.getOrderNo());
+			record.setShopId(temuOrderDO.getShopId());
+			TemuShopDO shop = temuShopMapper.selectByShopId(temuOrderDO.getShopId());
+			record.setShopName(shop != null ? shop.getShopName() : null);
+			record.setProductTitle(temuOrderDO.getProductTitle());
+			record.setProductProperties(temuOrderDO.getProductProperties());
+			if (temuOrderDO.getCategoryId() != null) {
+				try {
+					record.setCategoryId(Long.valueOf(temuOrderDO.getCategoryId()));
+				} catch (Exception ignore) {}
+			}
+			record.setCategoryName(temuOrderDO.getCategoryName());
+			record.setOriginalQuantity(temuOrderDO.getOriginalQuantity());
+			record.setQuantity(temuOrderDO.getQuantity());
+			record.setUnitPrice(temuOrderDO.getUnitPrice());
+			record.setTotalPrice(temuOrderDO.getTotalPrice());
+			record.setSku(temuOrderDO.getSku());
+			record.setSkc(temuOrderDO.getSkc());
+			record.setCustomSku(temuOrderDO.getCustomSku());
+			record.setOperationTime(now);
+			record.setIsReturnOrder(temuOrderDO.getIsReturnOrder() != null && temuOrderDO.getIsReturnOrder() == 1);
+			record.setOperatorId(operatorId);
+			record.setOperator(operator);
+			temuOrderPlacementRecordMapper.insert(record);
 		}
 		//批量更新订单
 		temuOrderMapper.updateBatch(temuOrderDOList);

@@ -193,4 +193,16 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	 */
 	@Update("UPDATE temu_order SET goods_sn_no = #{goodsSnNo} WHERE custom_sku = #{customSku}")
 	int updateGoodsSnNoByCustomSku(@Param("customSku") String customSku, @Param("goodsSnNo") String goodsSnNo);
+
+	/**
+	 * 根据订单号查询订单
+	 *
+	 * @param orderNo 订单号
+	 * @return 订单信息
+	 */
+	default TemuOrderDO selectByOrderNo(String orderNo) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+		queryWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
+		return selectOne(queryWrapper);
+	}
 }

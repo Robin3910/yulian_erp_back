@@ -3,6 +3,11 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.TemuOperationLogPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.TemuOperationLogRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.TemuOperationLogSaveReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.UserRechargeRecordPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.UserRechargeRecordRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementRecordPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementRecordRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementAmountStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOperationLogDO;
 import cn.iocoder.yudao.module.temu.service.operationlog.TemuOperationLogService;
 import org.springframework.web.bind.annotation.*;
@@ -81,6 +86,26 @@ public class TemuOperationLogController {
         return success(BeanUtils.toBean(pageResult, TemuOperationLogRespVO.class));
     }
 
+    @GetMapping("/bill/user-recharge")
+    @Operation(summary = "获得用户充值记录分页")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:query')")
+    public CommonResult<PageResult<UserRechargeRecordRespVO>> getUserRechargeRecordPage(@Valid UserRechargeRecordPageReqVO pageReqVO) {
+        PageResult<UserRechargeRecordRespVO> pageResult = operationLogService.getUserRechargeRecordPage(pageReqVO);
+        return success(pageResult);
+    }
+
+    @GetMapping("/bill/user-recharge/export-excel")
+    @Operation(summary = "导出用户充值记录 Excel")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportUserRechargeRecordExcel(@Valid UserRechargeRecordPageReqVO pageReqVO,
+              HttpServletResponse response) throws IOException {
+        pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<UserRechargeRecordRespVO> list = operationLogService.getUserRechargeRecordList(pageReqVO);
+        // 导出 Excel
+        ExcelUtils.write(response, "用户充值记录.xls", "数据", UserRechargeRecordRespVO.class, list);
+    }
+
     @GetMapping("/export-excel")
     @Operation(summary = "导出操作日志 Excel")
     @PreAuthorize("@ss.hasPermission('temu:operation-log:export')")
@@ -92,6 +117,34 @@ public class TemuOperationLogController {
         // 导出 Excel
         ExcelUtils.write(response, "操作日志.xls", "数据", TemuOperationLogRespVO.class,
                         BeanUtils.toBean(list, TemuOperationLogRespVO.class));
+    }
+
+    @GetMapping("/bill/order-placement")
+    @Operation(summary = "获得批量下单记录分页")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:query')")
+    public CommonResult<PageResult<OrderPlacementRecordRespVO>> getOrderPlacementRecordPage(@Valid OrderPlacementRecordPageReqVO pageReqVO) {
+        PageResult<OrderPlacementRecordRespVO> pageResult = operationLogService.getOrderPlacementRecordPage(pageReqVO);
+        return success(pageResult);
+    }
+
+    @GetMapping("/bill/order-placement/amount-statistics")
+    @Operation(summary = "获得批量下单记录总金额统计")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:query')")
+    public CommonResult<OrderPlacementAmountStatisticsRespVO> getOrderPlacementAmountStatistics(@Valid OrderPlacementRecordPageReqVO pageReqVO) {
+        OrderPlacementAmountStatisticsRespVO statistics = operationLogService.getOrderPlacementAmountStatistics(pageReqVO);
+        return success(statistics);
+    }
+
+    @GetMapping("/bill/order-placement/export-excel")
+    @Operation(summary = "导出批量下单记录 Excel")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportOrderPlacementRecordExcel(@Valid OrderPlacementRecordPageReqVO pageReqVO,
+              HttpServletResponse response) throws IOException {
+        pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<OrderPlacementRecordRespVO> list = operationLogService.getOrderPlacementRecordList(pageReqVO);
+        // 导出 Excel
+        ExcelUtils.write(response, "批量下单记录.xls", "数据", OrderPlacementRecordRespVO.class, list);
     }
 
 }
