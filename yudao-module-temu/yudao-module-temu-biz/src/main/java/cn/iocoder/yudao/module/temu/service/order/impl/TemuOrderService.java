@@ -432,20 +432,25 @@ public class TemuOrderService implements ITemuOrderService {
 				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				// 返单的订单，备货单ID会不一样
 				TemuOrderDO existingOrder = null;
+				// 新增：先查当前订单号的isReturnOrder
+				TemuOrderDO currentOrderInDb = temuOrderMapper.selectByOrderNo(order.getOrderNo());
+				boolean alreadyReturn = currentOrderInDb != null && currentOrderInDb.getIsReturnOrder() != null && currentOrderInDb.getIsReturnOrder() == 1;
 				if (CollUtil.isNotEmpty(existingOrders)) {
 					for (TemuOrderDO tempOrder : existingOrders) {
 						if (!tempOrder.getOrderNo().equals(order.getOrderNo())) {
-							// 发送企业微信告警，提醒返单
-							String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
-								order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
-								tempOrder.getBookingTime(), order.getBookingTime(), shopName);
-							TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
 							// bookingTime更晚的订单，为返单
 							if (order.getBookingTime() != null && order.getBookingTime().isAfter(tempOrder.getBookingTime())) {
-								order.setIsReturnOrder(1);
-							}
-							if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
-								weiXinProducer.sendMessage(shop.getWebhook(), message);
+								if (!alreadyReturn) {
+									// 发送企业微信告警，提醒返单
+									String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
+										order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
+										tempOrder.getBookingTime(), order.getBookingTime(), shopName);
+									TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+									order.setIsReturnOrder(1);
+									if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
+										weiXinProducer.sendMessage(shop.getWebhook(), message);
+									}
+								}
 							}
 						} else {
 							existingOrder = tempOrder;
