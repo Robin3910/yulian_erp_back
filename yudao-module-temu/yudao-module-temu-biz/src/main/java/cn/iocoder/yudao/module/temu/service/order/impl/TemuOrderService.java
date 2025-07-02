@@ -72,6 +72,9 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.net.URL;
 
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderPlacementRecordDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderPlacementRecordMapper;
+
 @Service
 @Slf4j
 public class TemuOrderService implements ITemuOrderService {
@@ -109,6 +112,9 @@ public class TemuOrderService implements ITemuOrderService {
 
 	@Resource
 	private TemuOrderBatchCategoryService temuOrderBatchCategoryService;
+	
+	@Resource
+	private TemuOrderPlacementRecordMapper temuOrderPlacementRecordMapper;
 	
 	
 	@Override
@@ -628,6 +634,10 @@ public class TemuOrderService implements ITemuOrderService {
 
 		ArrayList<TemuOrderDO> temuOrderDOList = new ArrayList<>();
 		int processCount = 0;
+		LoginUser loginUser = getLoginUser();
+		String operator = SecurityFrameworkUtils.getLoginUserNickname();
+		Long operatorId = loginUser != null ? loginUser.getId() : null;
+		LocalDateTime now = LocalDateTime.now();
 		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
 			//检查订单是否存在
 			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchOrderReqVO.getId());
@@ -668,6 +678,33 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
 			temuOrderDOList.add(temuOrderDO);
 			processCount++;
+
+			//插入下单记录表
+			TemuOrderPlacementRecordDO record = new TemuOrderPlacementRecordDO();
+			record.setOrderNo(temuOrderDO.getOrderNo());
+			record.setShopId(temuOrderDO.getShopId());
+			TemuShopDO shop = temuShopMapper.selectByShopId(temuOrderDO.getShopId());
+			record.setShopName(shop != null ? shop.getShopName() : null);
+			record.setProductTitle(temuOrderDO.getProductTitle());
+			record.setProductProperties(temuOrderDO.getProductProperties());
+			if (temuOrderDO.getCategoryId() != null) {
+				try {
+					record.setCategoryId(Long.valueOf(temuOrderDO.getCategoryId()));
+				} catch (Exception ignore) {}
+			}
+			record.setCategoryName(temuOrderDO.getCategoryName());
+			record.setOriginalQuantity(temuOrderDO.getOriginalQuantity());
+			record.setQuantity(temuOrderDO.getQuantity());
+			record.setUnitPrice(temuOrderDO.getUnitPrice());
+			record.setTotalPrice(temuOrderDO.getTotalPrice());
+			record.setSku(temuOrderDO.getSku());
+			record.setSkc(temuOrderDO.getSkc());
+			record.setCustomSku(temuOrderDO.getCustomSku());
+			record.setOperationTime(now);
+			record.setIsReturnOrder(temuOrderDO.getIsReturnOrder() != null && temuOrderDO.getIsReturnOrder() == 1);
+			record.setOperatorId(operatorId);
+			record.setOperator(operator);
+			temuOrderPlacementRecordMapper.insert(record);
 		}
 		//批量更新订单
 		temuOrderMapper.updateBatch(temuOrderDOList);

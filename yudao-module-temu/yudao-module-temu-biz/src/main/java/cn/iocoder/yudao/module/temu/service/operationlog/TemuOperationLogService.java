@@ -4,7 +4,14 @@ import javax.validation.*;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.TemuOperationLogPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.TemuOperationLogSaveReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.UserRechargeRecordPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.UserRechargeRecordRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementRecordPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementRecordRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementAmountStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOperationLogDO;
+
+import java.util.List;
 
 /**
  * 操作日志 Service 接口
@@ -52,6 +59,22 @@ public interface TemuOperationLogService {
     PageResult<TemuOperationLogDO> getOperationLogPage(TemuOperationLogPageReqVO pageReqVO);
 
     /**
+     * 获得用户充值记录分页
+     *
+     * @param pageReqVO 分页查询
+     * @return 用户充值记录分页
+     */
+    PageResult<UserRechargeRecordRespVO> getUserRechargeRecordPage(UserRechargeRecordPageReqVO pageReqVO);
+
+    /**
+     * 获得用户充值记录列表（用于导出）
+     *
+     * @param pageReqVO 查询条件
+     * @return 用户充值记录列表
+     */
+    List<UserRechargeRecordRespVO> getUserRechargeRecordList(UserRechargeRecordPageReqVO pageReqVO);
+
+    /**
      * 异步创建操作日志（供切面调用）
      *
      * @param module 操作模块
@@ -67,4 +90,28 @@ public interface TemuOperationLogService {
     void createOperationLogAsync(String module, String operationType, String requestParams, 
                                 String responseResult, String className, String methodName,
                                 String userId, String userName, String ipAddress);
+
+    /**
+     * 获得批量下单记录分页
+     *
+     * @param pageReqVO 分页查询
+     * @return 批量下单记录分页
+     */
+    PageResult<OrderPlacementRecordRespVO> getOrderPlacementRecordPage(OrderPlacementRecordPageReqVO pageReqVO);
+
+    /**
+     * 获得批量下单记录列表，用于导出
+     *
+     * @param pageReqVO 查询条件
+     * @return 批量下单记录列表
+     */
+    List<OrderPlacementRecordRespVO> getOrderPlacementRecordList(OrderPlacementRecordPageReqVO pageReqVO);
+
+    /**
+     * 获得批量下单记录总金额统计
+     *
+     * @param pageReqVO 查询条件
+     * @return 批量下单记录总金额统计
+     */
+    OrderPlacementAmountStatisticsRespVO getOrderPlacementAmountStatistics(OrderPlacementRecordPageReqVO pageReqVO);
 }
