@@ -432,8 +432,8 @@ public class TemuOrderService implements ITemuOrderService {
 				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				// 返单的订单，备货单ID会不一样
 				TemuOrderDO existingOrder = null;
-				// 新增：先查当前订单号的isReturnOrder
-				TemuOrderDO currentOrderInDb = temuOrderMapper.selectByOrderNo(order.getOrderNo());
+				// 用定制sku和订单号一起查询当前订单的isReturnOrder
+				TemuOrderDO currentOrderInDb = temuOrderMapper.selectByCustomSkuAndOrderNo(order.getCustomSku(), order.getOrderNo());
 				boolean alreadyReturn = currentOrderInDb != null && currentOrderInDb.getIsReturnOrder() != null && currentOrderInDb.getIsReturnOrder() == 1;
 				if (CollUtil.isNotEmpty(existingOrders)) {
 					for (TemuOrderDO tempOrder : existingOrders) {
