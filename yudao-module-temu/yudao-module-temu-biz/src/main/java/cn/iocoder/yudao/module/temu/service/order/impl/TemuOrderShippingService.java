@@ -668,6 +668,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			subQuery.append(" AND daily_sequence = ").append(pageVO.getDailySequence());
 		}
 		
+		// 新增：处理发货状态条件
+		if (pageVO.getShippingStatus() != null) {
+			subQuery.append(" AND shipping_status = ").append(pageVO.getShippingStatus());
+		}
+		
 		// 处理创建时间条件
 		LocalDateTime beginTime = null;
 		LocalDateTime endTime = null;
@@ -781,6 +786,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			joinQuery.append(" AND s.daily_sequence = ").append(pageVO.getDailySequence());
 		}
 
+		// 新增：处理发货状态条件
+		if (pageVO.getShippingStatus() != null) {
+			joinQuery.append(" AND s.shipping_status = ").append(pageVO.getShippingStatus());
+		}
+
 		// 处理创建时间条件
 		if (pageVO.getCreateTime() != null && pageVO.getCreateTime().length == 2) {
 			String startTimeStr = pageVO.getCreateTime()[0].toString() + " 00:00:00";
@@ -833,6 +843,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// 处理物流单序号条件
 		if (pageVO.getDailySequence() != null) {
 			joinQuery.append(" AND s.daily_sequence = ").append(pageVO.getDailySequence());
+		}
+
+		// 新增：处理发货状态条件
+		if (pageVO.getShippingStatus() != null) {
+			joinQuery.append(" AND s.shipping_status = ").append(pageVO.getShippingStatus());
 		}
 
 		// 处理创建时间条件

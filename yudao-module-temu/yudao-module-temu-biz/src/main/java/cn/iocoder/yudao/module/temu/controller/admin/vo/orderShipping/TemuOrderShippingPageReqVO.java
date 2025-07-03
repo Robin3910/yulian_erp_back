@@ -52,6 +52,9 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	@Schema(description = "物流单序号")
 	private Integer dailySequence;
 
+	@Schema(description = "发货状态（0：未发货；1：已发货）")
+	private Integer shippingStatus;
+
 	
 	@Data
 	@Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")
