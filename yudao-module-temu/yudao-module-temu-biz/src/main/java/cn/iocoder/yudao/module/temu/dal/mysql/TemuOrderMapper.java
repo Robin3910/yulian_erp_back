@@ -205,4 +205,19 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		queryWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
 		return selectOne(queryWrapper);
 	}
+
+	/**
+	 * 根据商品编号查询所有订单
+	 *
+	 * @param goodsSnNos 商品编号列表
+	 * @return 订单信息列表
+	 */
+	default List<TemuOrderDO> selectListBygoodsSnNo(List<String> goodsSnNos) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapperX = new LambdaQueryWrapperX<>();
+		if (goodsSnNos == null || goodsSnNos.isEmpty()) {
+			return new ArrayList<>();
+		}
+		queryWrapperX.in(TemuOrderDO::getGoodsSnNo, goodsSnNos);
+		return selectList(queryWrapperX);
+	}
 }

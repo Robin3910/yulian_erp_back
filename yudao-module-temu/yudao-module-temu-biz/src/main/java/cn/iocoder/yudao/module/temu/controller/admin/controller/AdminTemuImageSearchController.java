@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageAddReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchOrderRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchBySnReqVO;
 import cn.iocoder.yudao.module.temu.service.imageSearch.TemuImageSearchService;
 import cn.iocoder.yudao.module.temu.utils.imagesearch.ImageValidateUtils;
 import com.aliyun.imagesearch20201214.models.AddImageResponse;
@@ -55,4 +56,18 @@ public class AdminTemuImageSearchController {
         List<TemuImageSearchOrderRespVO> result = imageSearchService.searchImageByPicWithHighestScore(reqVO);
         return success(result);
     }
+
+    @PostMapping("/search-barcode")
+    @Operation(summary = "根据条码编号或定制SKU查询订单")
+    public CommonResult<List<TemuImageSearchOrderRespVO>> searchOrderBySnOrSku(@Validated @RequestBody TemuImageSearchBySnReqVO reqVO) {
+        // 参数校验
+        if (!reqVO.isValid()) {
+            return CommonResult.error(400, "goodsSnNo和customSku至少需要提供一个");
+        }
+        // 调用服务根据 条码编号 或 定制SKU 查询订单
+        List<TemuImageSearchOrderRespVO> result = imageSearchService.searchOrderBySnOrSku(reqVO);
+        return success(result);
+    }
+
+    
 }

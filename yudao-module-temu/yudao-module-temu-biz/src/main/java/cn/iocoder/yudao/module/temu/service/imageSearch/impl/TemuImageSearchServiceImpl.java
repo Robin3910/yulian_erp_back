@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageAddReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchOrderRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchBySnReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -255,6 +257,106 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
             log.error("[searchImageByPic][类目({}) 搜索失败]",
                     reqVO.getCategoryId(), e);
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 根据条码编号或定制SKU查询订单
+     * @param reqVO 搜索请求（包含goodsSnNo或customSku）
+     * @return 订单详情列表
+     */
+    @Override
+    public List<TemuImageSearchOrderRespVO> searchOrderBySnOrSku(TemuImageSearchBySnReqVO reqVO) {
+        log.info("[searchOrderBySnOrSku] 开始根据条码编号或定制SKU查询订单, 参数: {}", reqVO);
+        
+        // 参数校验
+        if (!reqVO.isValid()) {
+            log.warn("[searchOrderBySnOrSku] 参数无效，goodsSnNo和customSku至少需要提供一个");
+            return new ArrayList<>();
+        }
+        
+        try {
+            List<TemuOrderDO> orderList;
+            
+            if (StrUtil.isNotEmpty(reqVO.getGoodsSnNo())) {
+                // 如果提供了商品编号，优先使用商品编号查询
+                log.info("[searchOrderBySnOrSku] 使用条码编号查询: {}", reqVO.getGoodsSnNo());
+                orderList = temuOrderMapper.selectListBygoodsSnNo(Arrays.asList(reqVO.getGoodsSnNo()));
+            } else {
+                // 如果提供了自定义SKU，使用定制SKU查询
+                log.info("[searchOrderBySnOrSku] 使用定制SKU查询: {}", reqVO.getCustomSku());
+                orderList = temuOrderMapper.selectListByCustomSku(Arrays.asList(reqVO.getCustomSku()));
+            }
+            
+            log.info("[searchOrderBySnOrSku] 查询到订单数量: {}", orderList.size());
+            
+            if (orderList.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // 预先查询所有店铺信息
+            List<Long> shopIds = orderList.stream()
+                    .map(TemuOrderDO::getShopId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            Map<Long, TemuShopDO> shopMap = temuShopMapper.selectByShopIds(shopIds).stream()
+                    .collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop));
+            
+            // 预先查询所有物流信息
+            List<String> orderNos = orderList.stream()
+                    .map(TemuOrderDO::getOrderNo)
+                    .collect(Collectors.toList());
+            Map<String, TemuOrderShippingInfoDO> shippingMap = temuOrderShippingMapper.selectListByOrderNos(orderNos).stream()
+                    .collect(Collectors.toMap(TemuOrderShippingInfoDO::getOrderNo, shipping -> shipping));
+            
+            // 创建返回结果列表
+            List<TemuImageSearchOrderRespVO> resultList = new ArrayList<>();
+            
+            // 遍历订单列表，构建返回结果
+            for (TemuOrderDO order : orderList) {
+                TemuImageSearchOrderRespVO respVO = new TemuImageSearchOrderRespVO();
+                // 复制订单信息
+                BeanUtils.copyProperties(order, respVO);
+                
+//                // 设置productId（使用查询条件中的值）
+//                if (StrUtil.isNotEmpty(reqVO.getGoodsSnNo())) {
+//                    respVO.setProductId(reqVO.getGoodsSnNo());
+//                } else {
+//                    respVO.setProductId(reqVO.getCustomSku());
+//                }
+//
+//                // 设置相似度得分（因为是直接查询，所以设为1.0表示完全匹配）
+//                respVO.setScore(1.0f);
+                
+                // 设置店铺相关字段
+                TemuShopDO shop = shopMap.get(order.getShopId());
+                if (shop != null) {
+                    respVO.setShopName(shop.getShopName());
+                    respVO.setAliasName(shop.getAliasName());
+                }
+                
+                // 设置物流相关字段
+                TemuOrderShippingInfoDO shipping = shippingMap.get(order.getOrderNo());
+                if (shipping != null) {
+                    respVO.setTrackingNumber(shipping.getTrackingNumber());
+                    respVO.setExpressImageUrl(shipping.getExpressImageUrl());
+                    respVO.setExpressOutsideImageUrl(shipping.getExpressOutsideImageUrl());
+                    respVO.setExpressSkuImageUrl(shipping.getExpressSkuImageUrl());
+                    respVO.setDailySequence(shipping.getDailySequence());
+                    respVO.setShippingTime(shipping.getCreateTime());
+                }
+                
+                resultList.add(respVO);
+                log.info("[searchOrderBySnOrSku][查询结果：订单号={}, 商品条码={}, 定制SKU={}]",
+                        order.getOrderNo(), order.getSku(), order.getCustomSku());
+            }
+            
+            log.info("[searchOrderBySnOrSku] 查询完成，返回结果数量: {}", resultList.size());
+            return resultList;
+            
+        } catch (Exception e) {
+            log.error("[searchOrderBySnOrSku] 查询失败", e);
+            throw new RuntimeException("根据条码编号或定制SKU查询订单失败", e);
         }
     }
 

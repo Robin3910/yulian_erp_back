@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.service.imageSearch;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageAddReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchOrderRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.imagesearch.TemuImageSearchBySnReqVO;
 import com.aliyun.imagesearch20201214.models.AddImageResponse;
 import com.aliyun.imagesearch20201214.models.SearchImageByPicResponse;
 import java.util.List;
@@ -35,4 +36,12 @@ public interface TemuImageSearchService {
      * @return 订单详情列表（包含所有最高分结果对应的订单信息）
      */
     List<TemuImageSearchOrderRespVO> searchImageByPicWithHighestScore(TemuImageSearchReqVO reqVO);
+
+    /**
+     * 根据商品编号或自定义SKU查询订单
+     * 
+     * @param reqVO 搜索请求（包含goodsSnNo或customSku）
+     * @return 订单详情列表
+     */
+    List<TemuImageSearchOrderRespVO> searchOrderBySnOrSku(TemuImageSearchBySnReqVO reqVO);
 }
