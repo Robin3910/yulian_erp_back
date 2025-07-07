@@ -384,7 +384,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		
 		// 5. 如果还有需要保存的记录
 		if (!saveRequestVOs.isEmpty()) {
-			// 转换所有请求为 DO
+			// 转换VO为DO对象
 			LocalDateTime now = LocalDateTime.now();
 			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
 					.map(vo -> {
@@ -1158,7 +1158,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// ================== 4. 准备新数据 ==================
 		// 检查是否还有需要保存的记录
 		if (!saveRequestVOs.isEmpty()) {
-			// 转换VO为DO对象
+			// 转换VO为DO对象，sorting_sequence 先设为0
 			LocalDateTime now = LocalDateTime.now();
 			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
 					.map(vo -> {
@@ -1188,9 +1188,12 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						// 从映射中获取该物流单号对应的日期序号表
 						Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence.get(vo.getTrackingNumber());
 						if (dateSequenceMap != null) {
-							// 设置当前物流单号的序号	key=日期，value=序号
+							// 设置当前物流单号的序号\tkey=日期，value=序号
 							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
 						}
+
+						// 设置分拣序号
+						info.setSortingSequence(0);
 
 						return info;
 					})
@@ -1200,6 +1203,24 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			try {
 				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
 				log.info("批量保存成功，数量：{}", affectedRows);
+
+				// ========== 批量分配分拣序号 sorting_sequence ==========
+				Set<String> trackingNumbers = toSaveList.stream()
+					.map(TemuOrderShippingInfoDO::getTrackingNumber)
+					.collect(Collectors.toSet());
+				for (String trackingNumber : trackingNumbers) {
+					// 查询该物流单号下所有订单，按创建时间和ID排序
+					List<TemuOrderShippingInfoDO> orders = shippingInfoMapper.selectList(
+						new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
+							.orderByAsc(TemuOrderShippingInfoDO::getCreateTime, TemuOrderShippingInfoDO::getId)
+					);
+					int seq = 1;
+					for (TemuOrderShippingInfoDO order : orders) {
+						order.setSortingSequence(seq++);
+						shippingInfoMapper.updateById(order);
+					}
+				}
 				return affectedRows;
 			} catch (Exception e) {
 				log.error("批量保存失败", e);

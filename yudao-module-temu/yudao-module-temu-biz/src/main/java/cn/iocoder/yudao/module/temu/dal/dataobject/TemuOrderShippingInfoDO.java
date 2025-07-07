@@ -81,4 +81,9 @@ public class TemuOrderShippingInfoDO extends BaseDO {
      */
     @TableField("shipped_operator_id")
     private Long shippedOperatorId;
+    /**
+     * 分拣序号，用于标识订单分拣的顺序
+     */
+    @TableField("sorting_sequence")
+    private Integer sortingSequence;
 }
