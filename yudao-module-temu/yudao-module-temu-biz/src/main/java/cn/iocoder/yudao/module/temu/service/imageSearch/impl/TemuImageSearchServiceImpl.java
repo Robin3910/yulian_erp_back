@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -318,16 +319,6 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                 // 复制订单信息
                 BeanUtils.copyProperties(order, respVO);
                 
-//                // 设置productId（使用查询条件中的值）
-//                if (StrUtil.isNotEmpty(reqVO.getGoodsSnNo())) {
-//                    respVO.setProductId(reqVO.getGoodsSnNo());
-//                } else {
-//                    respVO.setProductId(reqVO.getCustomSku());
-//                }
-//
-//                // 设置相似度得分（因为是直接查询，所以设为1.0表示完全匹配）
-//                respVO.setScore(1.0f);
-                
                 // 设置店铺相关字段
                 TemuShopDO shop = shopMap.get(order.getShopId());
                 if (shop != null) {
@@ -349,6 +340,18 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                 resultList.add(respVO);
                 log.info("[searchOrderBySnOrSku][查询结果：订单号={}, 商品条码={}, 定制SKU={}]",
                         order.getOrderNo(), order.getSku(), order.getCustomSku());
+            }
+            
+            // 批量更新 isCompleteProducerTask 字段为 1
+            if (orderList != null && !orderList.isEmpty()) {
+                List<Long> orderIds = orderList.stream()
+                    .map(TemuOrderDO::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+                if (!orderIds.isEmpty()) {
+                    temuOrderMapper.updateIsCompleteProducerTaskBatch(orderIds);
+                    log.info("已更新生产状态,orderIds为{}",orderIds);
+                }
             }
             
             log.info("[searchOrderBySnOrSku] 查询完成，返回结果数量: {}", resultList.size());

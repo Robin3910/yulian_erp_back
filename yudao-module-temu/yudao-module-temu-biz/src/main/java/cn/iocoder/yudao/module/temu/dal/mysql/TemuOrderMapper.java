@@ -20,7 +20,6 @@ import org.apache.ibatis.annotations.Update;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 @Mapper
 public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	/**
@@ -220,4 +219,20 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		queryWrapperX.in(TemuOrderDO::getGoodsSnNo, goodsSnNos);
 		return selectList(queryWrapperX);
 	}
+	
+	/**
+	 * 批量将订单的 isCompleteProducerTask 字段更新为 1
+	 * @param ids 订单ID列表
+	 * @return 更新条数
+	 */
+	@Update({
+	    "<script>",
+	    "UPDATE temu_order SET is_complete_producer_task = 1 WHERE id IN",
+	    "<foreach collection='ids' item='id' open='(' separator=',' close=')'>",
+	    "#{id}",
+	    "</foreach>",
+	    "</script>"
+	})
+	int updateIsCompleteProducerTaskBatch(@Param("ids") List<Long> ids);
+	
 }
