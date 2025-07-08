@@ -235,4 +235,14 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	})
 	int updateIsCompleteProducerTaskBatch(@Param("ids") List<Long> ids);
 	
+	/**
+	 * 根据订单编号查询所有订单
+	 * @param orderNo 订单编号
+	 * @return 订单列表
+	 */
+	default List<TemuOrderDO> selectListByOrderNo(String orderNo) {
+		LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+		queryWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
+		return selectList(queryWrapper);
+	}
 }

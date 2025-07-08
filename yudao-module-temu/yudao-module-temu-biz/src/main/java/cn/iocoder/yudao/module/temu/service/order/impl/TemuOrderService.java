@@ -574,6 +574,25 @@ public class TemuOrderService implements ITemuOrderService {
 					temuOrderMapper.insert(order);
 				}
 				count++;
+
+				// 插入后再补充sorting_sequence
+				List<TemuOrderDO> sameOrderNoOrders = temuOrderMapper.selectListByOrderNo(order.getOrderNo());
+				Integer sortingSequence = null;
+				Optional<TemuOrderDO> sameSkuOrder = sameOrderNoOrders.stream()
+					.filter(o -> order.getSku() != null && order.getSku().equals(o.getSku()) && !order.getId().equals(o.getId()))
+					.findFirst();
+				if (sameSkuOrder.isPresent()) {
+					sortingSequence = sameSkuOrder.get().getSortingSequence();
+				} else {
+					int maxSeq = sameOrderNoOrders.stream()
+						.map(TemuOrderDO::getSortingSequence)
+						.filter(Objects::nonNull)
+						.max(Integer::compareTo)
+						.orElse(0);
+					sortingSequence = maxSeq + 1;
+				}
+				order.setSortingSequence(sortingSequence);
+				temuOrderMapper.updateById(order);
 				
 			} catch (Exception e) {
 				log.error("保存订单失败: {}", e.getMessage(), e);
