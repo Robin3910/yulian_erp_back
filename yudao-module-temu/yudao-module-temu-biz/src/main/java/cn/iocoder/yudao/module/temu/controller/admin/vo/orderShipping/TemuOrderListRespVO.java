@@ -59,4 +59,7 @@ public class TemuOrderListRespVO {
     @Schema(description = "是否完成生产任务")
     private Integer isCompleteProducerTask;
 
+    @Schema(description = "分拣序号，用于标识订单分拣的顺序")
+    private Integer sortingSequence;
+
 }

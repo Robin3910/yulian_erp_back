@@ -24,6 +24,6 @@ public class TemuOrderNoListRespVO {
     @Schema(description = "快递商品图片")
     private String expressSkuImageUrl;
 
-    @Schema(description = "分拣序号，用于标识订单分拣的顺序")
-    private Integer sortingSequence;
+//    @Schema(description = "分拣序号，用于标识订单分拣的顺序")
+//    private Integer sortingSequence;
 }

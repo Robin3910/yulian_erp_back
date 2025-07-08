@@ -44,5 +44,8 @@ public class TemuImageSearchOrderRespVO extends TemuOrderDO {
     //物流单发货时间
     private LocalDateTime shippingTime;
 
+    //分拣中包序号
+    private Integer sortingSequence;
+
 
 }
