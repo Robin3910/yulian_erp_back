@@ -12,4 +12,14 @@ public class TemuOrderDetailDO extends TemuOrderDO {
 	private Integer categoryRuleType;
 	private String  productCategoryName;
 	private BigDecimal defaultPrice;
+
+	// 新增：每日序号
+	private Integer dailySequence;
+
+	public Integer getDailySequence() {
+		return dailySequence;
+	}
+	public void setDailySequence(Integer dailySequence) {
+		this.dailySequence = dailySequence;
+	}
 }
