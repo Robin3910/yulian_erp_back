@@ -48,9 +48,6 @@ public class TemuOrderShippingRespVO {
     @Schema(description = "发货操作人昵称")
     private String shippedOperatorNickname;
 
-    @Schema(description = "分拣序号，用于标识订单分拣的顺序")
-    private Integer sortingSequence;
-
     @Schema(description = "Temu管理 - 待发货列表保存请求 VO")
     @Data
     public static class TemuOrderShippingSaveRequestVO {

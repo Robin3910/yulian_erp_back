@@ -991,6 +991,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				orderNoVO.setExpressImageUrl(latestOrderShipping.getExpressImageUrl());
 				orderNoVO.setExpressOutsideImageUrl(latestOrderShipping.getExpressOutsideImageUrl());
 				orderNoVO.setExpressSkuImageUrl(latestOrderShipping.getExpressSkuImageUrl());
+				// 新增：赋值分拣序号
+				orderNoVO.setSortingSequence(latestOrderShipping.getSortingSequence());
 				
 				// 设置该订单号下的所有订单
 				List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
