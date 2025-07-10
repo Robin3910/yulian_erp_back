@@ -74,6 +74,7 @@ import java.net.URL;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderPlacementRecordDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderPlacementRecordMapper;
+import java.time.LocalDate;
 
 @Service
 @Slf4j
@@ -575,24 +576,39 @@ public class TemuOrderService implements ITemuOrderService {
 				}
 				count++;
 
-				// 插入后再补充sorting_sequence
-				List<TemuOrderDO> sameOrderNoOrders = temuOrderMapper.selectListByOrderNo(order.getOrderNo());
-				Integer sortingSequence = null;
-				Optional<TemuOrderDO> sameSkuOrder = sameOrderNoOrders.stream()
-					.filter(o -> order.getSku() != null && order.getSku().equals(o.getSku()) && !order.getId().equals(o.getId()))
-					.findFirst();
-				if (sameSkuOrder.isPresent()) {
-					sortingSequence = sameSkuOrder.get().getSortingSequence();
-				} else {
-					int maxSeq = sameOrderNoOrders.stream()
-						.map(TemuOrderDO::getSortingSequence)
-						.filter(Objects::nonNull)
-						.max(Integer::compareTo)
-						.orElse(0);
-					sortingSequence = maxSeq + 1;
+				// ========== sorting_sequence 赋值逻辑 ===========
+				// 1. 查询当天所有订单（以bookingTime为准）
+				LocalDate bookingDate = order.getBookingTime() != null ? order.getBookingTime().toLocalDate() : LocalDate.now();
+				List<TemuOrderDO> sameDayOrders = temuOrderMapper.selectListByBookingDate(bookingDate);
+				// 2. 全局递增序号
+				int globalSeq = 1;
+				// 3. 订单编号+SKU组合 -> sorting_sequence
+				Map<String, Integer> orderSkuSeqMap = new LinkedHashMap<>();
+				
+				// 4. 按订单编号和SKU排序，为每个不同的组合分配序号
+				List<String> orderSkuCombinations = sameDayOrders.stream()
+						.map(o -> o.getOrderNo() + "_" + (o.getSku() != null ? o.getSku() : ""))
+						.distinct()
+						.sorted()
+						.collect(Collectors.toList());
+				
+				// 5. 为每个订单编号+SKU组合分配序号
+				for (String combination : orderSkuCombinations) {
+					orderSkuSeqMap.put(combination, globalSeq++);
 				}
-				order.setSortingSequence(sortingSequence);
-				temuOrderMapper.updateById(order);
+				
+				// 6. 为每个订单设置sorting_sequence
+				for (TemuOrderDO o : sameDayOrders) {
+					String orderNo = o.getOrderNo();
+					String orderSku = o.getSku() != null ? o.getSku() : "";
+					String combination = orderNo + "_" + orderSku;
+					Integer seq = orderSkuSeqMap.get(combination);
+					if (seq != null) {
+						o.setSortingSequence(seq);
+						temuOrderMapper.updateById(o);
+					}
+				}
+
 				
 			} catch (Exception e) {
 				log.error("保存订单失败: {}", e.getMessage(), e);

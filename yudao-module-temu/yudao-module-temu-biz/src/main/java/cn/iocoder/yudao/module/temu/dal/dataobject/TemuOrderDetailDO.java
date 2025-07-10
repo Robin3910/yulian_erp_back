@@ -15,11 +15,4 @@ public class TemuOrderDetailDO extends TemuOrderDO {
 
 	// 新增：每日序号
 	private Integer dailySequence;
-
-	public Integer getDailySequence() {
-		return dailySequence;
-	}
-	public void setDailySequence(Integer dailySequence) {
-		this.dailySequence = dailySequence;
-	}
 }

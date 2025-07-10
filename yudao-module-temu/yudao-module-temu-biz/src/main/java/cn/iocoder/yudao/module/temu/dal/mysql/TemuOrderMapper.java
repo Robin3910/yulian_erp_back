@@ -17,6 +17,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -248,4 +250,21 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 		queryWrapper.eq(TemuOrderDO::getOrderNo, orderNo);
 		return selectList(queryWrapper);
 	}
+
+    /**
+     * 查询某天所有订单（bookingTime在当天）
+     * @param bookingDate 日期（LocalDate）
+     * @return 订单列表
+     */
+    default List<TemuOrderDO> selectListByBookingDate(LocalDate bookingDate) {
+        if (bookingDate == null) {
+            return new ArrayList<>();
+        }
+        LocalDateTime start = bookingDate.atStartOfDay();
+        LocalDateTime end = bookingDate.atTime(23, 59, 59);
+        LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+        queryWrapper.ge(TemuOrderDO::getBookingTime, start)
+                    .le(TemuOrderDO::getBookingTime, end);
+        return selectList(queryWrapper);
+    }
 }
