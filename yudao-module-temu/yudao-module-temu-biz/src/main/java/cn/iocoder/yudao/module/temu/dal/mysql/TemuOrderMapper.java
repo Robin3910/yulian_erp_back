@@ -110,9 +110,9 @@ public interface TemuOrderMapper extends BaseMapperX<TemuOrderDO> {
 	default PageResult<TemuOrderDetailDO> selectPage(TemuOrderRequestVO temuOrderRequestVO) {
 		MPJLambdaWrapper<TemuOrderDO> wrapper = builderOrderWrapper(temuOrderRequestVO);
 		wrapper.selectAll(TemuOrderDO.class);
-		// 联表temu_order_shipping_info，查daily_sequence
-		wrapper.leftJoin("temu_order_shipping_info shipping ON shipping.order_no = t.order_no");
-		wrapper.select("shipping.daily_sequence as dailySequence");
+//		// 联表temu_order_shipping_info，查daily_sequence
+//		wrapper.leftJoin("temu_order_shipping_info shipping ON shipping.order_no = t.order_no");
+//		wrapper.select("shipping.daily_sequence as dailySequence");
 		return selectJoinPage(temuOrderRequestVO, TemuOrderDetailDO.class, wrapper);
 	}
 	
