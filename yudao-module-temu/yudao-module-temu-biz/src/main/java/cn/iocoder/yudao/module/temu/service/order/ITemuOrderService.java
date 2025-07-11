@@ -82,4 +82,6 @@ public interface ITemuOrderService {
 	 * @return 更新是否成功
 	 */
 	Boolean updateOrderStatus(List<TemuOrderDO> reqVOList);
+
+    OrderSkuPageRespVO orderSkuPage(TemuOrderRequestVO req, Integer pageNo, Integer pageSize);
 }

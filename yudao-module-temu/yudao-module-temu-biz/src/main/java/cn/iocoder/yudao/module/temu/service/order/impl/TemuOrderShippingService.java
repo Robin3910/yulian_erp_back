@@ -209,7 +209,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 								TemuOrderDO::getEffectiveImgUrl, TemuOrderDO::getComplianceUrl,
 								TemuOrderDO::getOriginalQuantity,
 								TemuOrderDO::getComplianceImageUrl, TemuOrderDO::getComplianceGoodsMergedUrl,
-								TemuOrderDO::getIsCompleteProducerTask,TemuOrderDO::getSortingSequence)
+								TemuOrderDO::getIsCompleteProducerTask,TemuOrderDO::getSortingSequence,
+								// 新增：查bookingTime
+								TemuOrderDO::getBookingTime)
 						.in(TemuOrderDO::getOrderNo, allOrderNos));
 		Map<String, List<TemuOrderDO>> orderMap = orders.stream()
 				.collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
@@ -858,6 +860,10 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						}
 					}
 					orderVO.setComplianceUrl(order.getComplianceUrl());
+					// 新增：赋值bookingTime
+					if (order.getBookingTime() != null) {
+						orderVO.setBookingTime(order.getBookingTime());
+					}
 					orderListVOs.add(orderVO);
 				}
 				orderNoVO.setOrderList(orderListVOs);

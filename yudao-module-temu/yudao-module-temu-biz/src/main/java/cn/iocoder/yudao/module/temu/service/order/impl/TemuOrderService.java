@@ -7,6 +7,7 @@ import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ServerException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
@@ -75,6 +76,10 @@ import java.net.URL;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderPlacementRecordDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderPlacementRecordMapper;
 import java.time.LocalDate;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderSkuPageRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderGroupBySortingSequenceVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderSkuPageItemVO;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 @Service
 @Slf4j
@@ -915,6 +920,253 @@ public class TemuOrderService implements ITemuOrderService {
 
 		return temuOrderMapper.updateBatch(updateOrders);
 	}
+
+    @Override
+    public OrderSkuPageRespVO orderSkuPage(TemuOrderRequestVO req, Integer pageNo, Integer pageSize) {
+        // 1. 查询分组信息
+        List<Map<String, Object>> groupResults = queryOrderGroups(req);
+        
+        // 2. 计算总数（分组数量）
+        long total = groupResults.size();
+        
+        // 3. 分页处理分组
+        int startIndex = (pageNo - 1) * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, groupResults.size());
+        
+        if (startIndex >= groupResults.size()) {
+            return buildEmptyPageResult(pageNo, pageSize);
+        }
+        
+        List<Map<String, Object>> pagedGroups = groupResults.subList(startIndex, endIndex);
+        
+        // 4. 根据分页后的分组查询对应的订单项
+        List<OrderGroupBySortingSequenceVO> groupedList = pagedGroups.stream()
+                .map(group -> buildGroupVO(group, req))
+                .collect(Collectors.toList());
+        
+        // 5. 构建返回结果
+        return buildPageResult(groupedList, total, pageNo, pageSize);
+    }
+    
+    /**
+     * 查询订单分组信息
+     */
+    private List<Map<String, Object>> queryOrderGroups(TemuOrderRequestVO req) {
+        // 执行查询 - 使用QueryWrapper
+        QueryWrapper<TemuOrderDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("DISTINCT sorting_sequence, order_no, sku, UNIX_TIMESTAMP(booking_time) * 1000 as booking_time");
+        
+        // 添加查询条件
+        addQueryConditionsToWrapper(queryWrapper, req);
+        
+        // 按照booking_time降序排列，最新的数据在前面
+        queryWrapper.orderByDesc("booking_time");
+        
+        // 执行查询
+        return temuOrderMapper.selectMaps(queryWrapper);
+    }
+    
+    /**
+     * 根据分组信息查询对应的订单项
+     */
+    private OrderGroupBySortingSequenceVO buildGroupVO(Map<String, Object> group, TemuOrderRequestVO req) {
+        OrderGroupBySortingSequenceVO groupVO = new OrderGroupBySortingSequenceVO();
+        
+        // 设置分组级别信息
+        groupVO.setSortingSequence((Integer) group.get("sorting_sequence"));
+        groupVO.setOrderNo((String) group.get("order_no"));
+        groupVO.setSku((String) group.get("sku"));
+        groupVO.setBookingTime((Long) group.get("booking_time"));
+        
+        // 根据分组条件查询对应的订单项
+        List<OrderSkuPageItemVO> orderItems = queryOrderItemsByGroup(group, req);
+        groupVO.setOrders(orderItems);
+        
+        return groupVO;
+    }
+    
+    /**
+     * 根据分组条件查询订单项
+     */
+    private List<OrderSkuPageItemVO> queryOrderItemsByGroup(Map<String, Object> group, TemuOrderRequestVO req) {
+        String orderNo = (String) group.get("order_no");
+        String sku = (String) group.get("sku");
+        Long bookingTime = (Long) group.get("booking_time");
+        
+        // 构建查询条件
+        LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+        
+        // 精确匹配分组条件
+        queryWrapper.eq(TemuOrderDO::getOrderNo, orderNo)
+                   .eq(TemuOrderDO::getSku, sku);
+        
+        // 时间匹配
+        if (bookingTime != null) {
+            LocalDateTime bookingDateTime = LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(bookingTime), 
+                java.time.ZoneId.systemDefault()
+            );
+            queryWrapper.eq(TemuOrderDO::getBookingTime, bookingDateTime);
+        }
+        
+        // 应用其他查询条件
+        applyQueryConditions(queryWrapper, req);
+        
+        // 只查询订单项需要的字段
+        queryWrapper.select(
+            TemuOrderDO::getCustomSku,
+            TemuOrderDO::getQuantity,
+            TemuOrderDO::getOriginalQuantity,
+            TemuOrderDO::getCategoryId,
+            TemuOrderDO::getCategoryName,
+            TemuOrderDO::getEffectiveImgUrl
+        );
+        
+        // 查询并转换为VO
+        return temuOrderMapper.selectList(queryWrapper).stream()
+                .map(this::convertToOrderItemVO)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 添加查询条件到QueryWrapper
+     */
+    private void addQueryConditionsToWrapper(QueryWrapper<TemuOrderDO> queryWrapper, TemuOrderRequestVO req) {
+        if (req.getOrderStatus() != null && !req.getOrderStatus().isEmpty()) {
+            try {
+                Integer orderStatus = Integer.valueOf(req.getOrderStatus());
+                queryWrapper.eq("order_status", orderStatus);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid orderStatus: {}", req.getOrderStatus());
+            }
+        }
+        
+        if (req.getSku() != null && !req.getSku().isEmpty()) {
+            queryWrapper.like("sku", req.getSku());
+        }
+        
+        if (req.getSkc() != null && !req.getSkc().isEmpty()) {
+            queryWrapper.like("skc", req.getSkc());
+        }
+        
+        if (req.getCustomSku() != null && !req.getCustomSku().isEmpty()) {
+            queryWrapper.like("custom_sku", req.getCustomSku());
+        }
+        
+        if (req.getOrderNo() != null && !req.getOrderNo().isEmpty()) {
+            queryWrapper.like("order_no", req.getOrderNo());
+        }
+        
+        if (req.getCustomSkuList() != null && !req.getCustomSkuList().isEmpty()) {
+            queryWrapper.in("custom_sku", req.getCustomSkuList());
+        }
+        
+        if (req.getShopId() != null && req.getShopId().length > 0) {
+            queryWrapper.in("shop_id", Arrays.asList(req.getShopId()));
+        }
+        
+        if (req.getBookingTime() != null && req.getBookingTime().length == 2) {
+            queryWrapper.between("booking_time", req.getBookingTime()[0], req.getBookingTime()[1]);
+        }
+        
+        if (req.getCategoryId() != null && req.getCategoryId().length > 0) {
+            queryWrapper.in("category_id", Arrays.asList(req.getCategoryId()));
+        }
+        
+        if (req.getHasCategory() != null) {
+            if (req.getHasCategory() == 0) {
+                queryWrapper.isNull("category_id");
+            } else if (req.getHasCategory() == 1) {
+                queryWrapper.isNotNull("category_id");
+            }
+        }
+        
+        if (req.getIsReturnOrder() != null) {
+            queryWrapper.eq("is_return_order", req.getIsReturnOrder());
+        }
+    }
+    
+    /**
+     * 应用查询条件到LambdaQueryWrapper
+     */
+    private void applyQueryConditions(LambdaQueryWrapperX<TemuOrderDO> queryWrapper, TemuOrderRequestVO req) {
+        if (req.getOrderStatus() != null && !req.getOrderStatus().isEmpty()) {
+            try {
+                Integer orderStatus = Integer.valueOf(req.getOrderStatus());
+                queryWrapper.eq(TemuOrderDO::getOrderStatus, orderStatus);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid orderStatus: {}", req.getOrderStatus());
+            }
+        }
+        
+        queryWrapper.likeIfPresent(TemuOrderDO::getSkc, req.getSkc())
+                   .likeIfPresent(TemuOrderDO::getCustomSku, req.getCustomSku());
+        
+        if (req.getCustomSkuList() != null && !req.getCustomSkuList().isEmpty()) {
+            queryWrapper.in(TemuOrderDO::getCustomSku, req.getCustomSkuList());
+        }
+        
+        if (req.getShopId() != null && req.getShopId().length > 0) {
+            queryWrapper.in(TemuOrderDO::getShopId, Arrays.asList(req.getShopId()));
+        }
+        
+        if (req.getCategoryId() != null && req.getCategoryId().length > 0) {
+            queryWrapper.in(TemuOrderDO::getCategoryId, Arrays.asList(req.getCategoryId()));
+        }
+        
+        if (req.getHasCategory() != null) {
+            switch (req.getHasCategory()) {
+                case 0:
+                    queryWrapper.isNull(TemuOrderDO::getCategoryId);
+                    break;
+                case 1:
+                    queryWrapper.isNotNull(TemuOrderDO::getCategoryId);
+                    break;
+            }
+        }
+        
+        if (req.getIsReturnOrder() != null) {
+            queryWrapper.eq(TemuOrderDO::getIsReturnOrder, req.getIsReturnOrder());
+        }
+    }
+    
+    /**
+     * 构建分页结果
+     */
+    private OrderSkuPageRespVO buildPageResult(List<OrderGroupBySortingSequenceVO> list, long total, int pageNo, int pageSize) {
+        OrderSkuPageRespVO result = new OrderSkuPageRespVO();
+        result.setList(list);
+        result.setTotal(total);
+        result.setPageNo(pageNo);
+        result.setPageSize(pageSize);
+        return result;
+    }
+    
+    /**
+     * 构建空的分页结果
+     */
+    private OrderSkuPageRespVO buildEmptyPageResult(int pageNo, int pageSize) {
+        OrderSkuPageRespVO result = new OrderSkuPageRespVO();
+        result.setList(new ArrayList<>());
+        result.setTotal(0);
+        result.setPageNo(pageNo);
+        result.setPageSize(pageSize);
+        return result;
+    }
+    
+    /**
+     * 转换为订单项VO
+     */
+    private OrderSkuPageItemVO convertToOrderItemVO(TemuOrderDO order) {
+        OrderSkuPageItemVO itemVO = new OrderSkuPageItemVO();
+        itemVO.setCustomSku(order.getCustomSku());
+        itemVO.setQuantity(order.getQuantity());
+        itemVO.setOriginalQuantity(order.getOriginalQuantity());
+        itemVO.setCategoryId(order.getCategoryId());
+        itemVO.setCategoryName(order.getCategoryName());
+        itemVO.setEffectiveImgUrl(order.getEffectiveImgUrl());
+        return itemVO;
+    }
 
 	private String convertToString(Object obj) {
 		return obj == null ? "" : obj.toString();

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Schema(description = "temu管理 - 订单集合 Response VO")
 @Data
@@ -61,5 +62,8 @@ public class TemuOrderListRespVO {
 
     @Schema(description = "分拣序号，用于标识订单分拣的顺序")
     private Integer sortingSequence;
+
+    @Schema(description = "平台订单时间")
+    private LocalDateTime bookingTime;
 
 }

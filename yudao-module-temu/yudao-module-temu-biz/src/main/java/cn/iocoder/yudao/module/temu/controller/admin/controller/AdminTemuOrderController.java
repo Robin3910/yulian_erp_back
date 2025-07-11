@@ -132,4 +132,13 @@ public class AdminTemuOrderController {
 	public CommonResult<Boolean> updateOrderStatus(@Valid @RequestBody List<TemuOrderDO> reqVOList) {
 		return success(temuOrderService.updateOrderStatus(reqVOList));
 	}
+
+    @GetMapping("/order-sku-page")
+    @Operation(summary = "分页查询唯一(orderNo, sku)组合的订单")
+    public CommonResult<OrderSkuPageRespVO> orderSkuPage(
+            TemuOrderRequestVO temuOrderRequestVO,
+            @RequestParam(defaultValue = "1") Integer pageNo,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
+        return success(temuOrderService.orderSkuPage(temuOrderRequestVO, pageNo, pageSize));
+    }
 }
