@@ -1275,7 +1275,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			if (oldList != null && !oldList.isEmpty()) {
 				for (TemuOrderShippingInfoDO old : oldList) {
 					if (old.getShippingStatus() != null && old.getShippingStatus() == 1) {
-						String key = old.getOrderNo() + "_" + old.getShopId();
+						String key = old.getOrderNo() + "_" + old.getShopId() + "_" + old.getTrackingNumber();;
 						shippedOperatorMap.put(key, old.getShippedOperatorId());
 					}
 				}
@@ -1307,7 +1307,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
 
 						// 判断是否需要设置为已发货
-						String key = vo.getOrderNo() + "_" + vo.getShopId();
+						String key = vo.getOrderNo() + "_" + vo.getShopId() + "_" + vo.getTrackingNumber();;
 						if (shippedOperatorMap.containsKey(key)) {
 							info.setShippingStatus(1); // 已发货
 							info.setShippedOperatorId(shippedOperatorMap.get(key));
