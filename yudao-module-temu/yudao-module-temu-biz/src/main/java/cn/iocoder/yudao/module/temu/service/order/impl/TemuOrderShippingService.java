@@ -904,21 +904,32 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
 			// 检查是否为加急订单，如果是则发送企业微信通知
 			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
-				// 获取shopId为88888888的店铺webhook地址
-				TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
-				if (shop != null && shop.getWebhook() != null) {
-					String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
-							temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
+				// 查询数据库中该物流单号的is_urgent状态
+				Long urgentCount = shippingInfoMapper.selectCount(
+						new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+								.eq(TemuOrderShippingInfoDO::getTrackingNumber, saveRequestVO.getTrackingNumber())
+								.eq(TemuOrderShippingInfoDO::getIsUrgent, 1)
+				);
+				// 如果数据库中已经有加急记录，则不再发送告警
+				if (urgentCount == 0) {
+					// 获取shopId为88888888的店铺webhook地址
+					TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+					if (shop != null && shop.getWebhook() != null) {
+						String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
+								temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
 
-					String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！",
-							saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
+						String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！",
+								saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
 
-					try {
-						weiXinProducer.sendMessage(shop.getWebhook(), message);
-						log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
-					} catch (Exception e) {
-						log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
+						try {
+							weiXinProducer.sendMessage(shop.getWebhook(), message);
+							log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
+						} catch (Exception e) {
+							log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
+						}
 					}
+				} else {
+					log.info("[batchSaveOrderShipping][该物流单号已存在加急记录，不再发送加急告警，trackingNumber={}]", saveRequestVO.getTrackingNumber());
 				}
 			}
 		}
