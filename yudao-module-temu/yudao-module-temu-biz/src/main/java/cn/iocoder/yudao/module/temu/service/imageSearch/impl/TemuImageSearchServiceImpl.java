@@ -191,7 +191,6 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                     respVO.setExpressSkuImageUrl(shipping.getExpressSkuImageUrl());
                     respVO.setDailySequence(shipping.getDailySequence());
                     respVO.setShippingTime(shipping.getCreateTime());
-                    respVO.setSortingSequence(shipping.getSortingSequence());
                 }
 
                 resultList.add(respVO);
@@ -336,7 +335,6 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                     respVO.setExpressSkuImageUrl(shipping.getExpressSkuImageUrl());
                     respVO.setDailySequence(shipping.getDailySequence());
                     respVO.setShippingTime(shipping.getCreateTime());
-                    respVO.setSortingSequence(shipping.getSortingSequence());
                 }
                 
                 resultList.add(respVO);

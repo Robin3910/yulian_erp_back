@@ -842,8 +842,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				orderNoVO.setExpressImageUrl(latestOrderShipping.getExpressImageUrl());
 				orderNoVO.setExpressOutsideImageUrl(latestOrderShipping.getExpressOutsideImageUrl());
 				orderNoVO.setExpressSkuImageUrl(latestOrderShipping.getExpressSkuImageUrl());
-				// 新增：赋值分拣序号
-//				orderNoVO.setSortingSequence(latestOrderShipping.getSortingSequence());
 				
 				// 设置该订单号下的所有订单
 				List<TemuOrderListRespVO> orderListVOs = new ArrayList<>();
@@ -1044,9 +1042,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
 						}
 
-						// 设置分拣序号
-						info.setSortingSequence(0);
-
 						return info;
 					})
 					.collect(Collectors.toList());
@@ -1055,24 +1050,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			try {
 				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
 				log.info("批量保存成功，数量：{}", affectedRows);
-
-				// ========== 批量分配分拣序号 sorting_sequence ==========
-				Set<String> trackingNumbers = toSaveList.stream()
-					.map(TemuOrderShippingInfoDO::getTrackingNumber)
-					.collect(Collectors.toSet());
-				for (String trackingNumber : trackingNumbers) {
-					// 查询该物流单号下所有订单，按创建时间和ID排序
-					List<TemuOrderShippingInfoDO> orders = shippingInfoMapper.selectList(
-						new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-							.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
-							.orderByAsc(TemuOrderShippingInfoDO::getCreateTime, TemuOrderShippingInfoDO::getId)
-					);
-					int seq = 1;
-					for (TemuOrderShippingInfoDO order : orders) {
-						order.setSortingSequence(seq++);
-						shippingInfoMapper.updateById(order);
-					}
-				}
 				return affectedRows;
 			} catch (Exception e) {
 				log.error("批量保存失败", e);
@@ -1333,9 +1310,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
 						}
 
-						// 设置分拣序号
-						info.setSortingSequence(0);
-
 						return info;
 					})
 					.collect(Collectors.toList());
@@ -1344,24 +1318,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			try {
 				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
 				log.info("批量保存成功，数量：{}", affectedRows);
-
-				// ========== 批量分配分拣序号 sorting_sequence ==========
-				Set<String> trackingNumbers = toSaveList.stream()
-						.map(TemuOrderShippingInfoDO::getTrackingNumber)
-						.collect(Collectors.toSet());
-				for (String trackingNumber : trackingNumbers) {
-					// 查询该物流单号下所有订单，按创建时间和ID排序
-					List<TemuOrderShippingInfoDO> orders = shippingInfoMapper.selectList(
-							new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-									.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
-									.orderByAsc(TemuOrderShippingInfoDO::getCreateTime, TemuOrderShippingInfoDO::getId)
-					);
-					int seq = 1;
-					for (TemuOrderShippingInfoDO order : orders) {
-						order.setSortingSequence(seq++);
-						shippingInfoMapper.updateById(order);
-					}
-				}
 				return affectedRows;
 			} catch (Exception e) {
 				log.error("批量保存失败", e);
