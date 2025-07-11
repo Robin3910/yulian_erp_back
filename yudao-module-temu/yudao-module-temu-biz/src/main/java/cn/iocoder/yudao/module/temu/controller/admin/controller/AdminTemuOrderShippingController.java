@@ -50,13 +50,13 @@ public class AdminTemuOrderShippingController {
         }
         // 从配置中获取是否开启序号保存
         String isDailySequence = configApi.getConfigValueByKey("temu.is_daily_sequence");
-        log.info("批量保存待发货订单是否开启编号的配置值: {}", isDailySequence);
+        log.info("批量保存待发货订单是否使用测试方法的配置值: {}", isDailySequence);
         boolean flag = false; // 默认值
         if (StrUtil.isNotEmpty(isDailySequence)) {
             try {
                 flag = Boolean.parseBoolean(isDailySequence);
             } catch (Exception e) {
-                log.warn("批量保存待发货订单是否开启编号的配置格式错误，使用默认值");
+                log.warn("批量保存待发货订单是否使用测试方法的配置格式错误，使用默认值");
             }
         }
         if(flag){

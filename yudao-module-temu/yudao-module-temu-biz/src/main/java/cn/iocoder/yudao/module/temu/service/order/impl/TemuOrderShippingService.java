@@ -272,155 +272,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	}
 	
 	/**
-	 * 物流单号可以重复
-	 * 已发货状态的记录都会被保留
-	 * 只有当物流单号、shopId和orderNo都匹配时，才会从 saveRequestVOs 中移除对应记录（避免重复保存）
-	 * 未发货状态的记录会被删除并重新保存
-	 * 新保存的记录默认为未发货状态
-	 *
-	 * @param saveRequestVOs
-	 * @return
-	 */
-	@Override
-	@Transactional(rollbackFor = Exception.class)
-	public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
-		if (CollectionUtils.isEmpty(saveRequestVOs)) {
-			return 0;
-		}
-		// 1. 参数校验（强制要求 trackingNumber 非空）
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			if (saveRequestVO == null) {
-				throw new IllegalArgumentException("待发货订单信息不能为空");
-			}
-			if (saveRequestVO.getOrderNo() == null) {
-				throw new IllegalArgumentException("订单编号不能为空");
-			}
-			if (saveRequestVO.getShopId() == null) {
-				throw new IllegalArgumentException("店铺ID不能为空");
-			}
-			if (saveRequestVO.getTrackingNumber() == null) {
-				throw new IllegalArgumentException("物流单号不能为空");
-			}
-			
-			// 检查是否为加急订单，如果是则发送企业微信通知
-			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
-				// 获取shopId为88888888的店铺webhook地址
-				TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
-				if (shop != null && shop.getWebhook() != null) {
-					String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ? 
-						temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
-					
-					String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！", 
-						saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
-					
-					try {
-						weiXinProducer.sendMessage(shop.getWebhook(), message);
-						log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
-					} catch (Exception e) {
-						log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
-					}
-				}
-			}
-		}
-
-		// 特殊情况： 平台物流取消重新预约 再次同步物流记录的 店铺，订单编号一样，但是物流单号会改变，之前的物流记录作废，保证同步上来的是最新的
-		// 删除这些订单对应的未发货记录（按orderNo和shopId匹配），即使 shippingStatus是 已发货状态 也删除
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			shippingInfoMapper.delete(
-					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
-							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
-							//.eq(TemuOrderShippingInfoDO::getShippingStatus, 0) // 只删除未发货的记录
-			);
-		}
-
-		// 2. 提取所有 trackingNumber
-		Set<String> trackingNumbers = saveRequestVOs.stream()
-				.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
-				.collect(Collectors.toSet());
-		
-		// 3. 查询已存在的记录
-		List<TemuOrderShippingInfoDO> existingShippings = shippingInfoMapper.selectList(
-				new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-						.in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers));
-		
-		// 4. 处理已存在的记录
-		if (!existingShippings.isEmpty()) {
-			// 收集需要删除的记录ID
-			List<Long> toDeleteIds = new ArrayList<>();
-			// 创建一个Set来存储已发货且匹配的记录的唯一标识（物流单号+shopId+orderNo）
-			Set<String> matchedShippedRecords = new HashSet<>();
-			
-			for (TemuOrderShippingInfoDO existing : existingShippings) {
-				if (existing.getShippingStatus() != null && existing.getShippingStatus() == 1) {
-					// 已发货状态的记录都保留（不删除）
-					// 检查是否有完全匹配的新记录
-					for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO newRecord : saveRequestVOs) {
-						if (existing.getTrackingNumber().equals(newRecord.getTrackingNumber())
-								&& existing.getShopId().equals(newRecord.getShopId())
-								&& existing.getOrderNo().equals(newRecord.getOrderNo())) {
-							// 如果找到完全匹配的记录，将其标记为已匹配
-							matchedShippedRecords.add(generateMatchKey(newRecord));
-						}
-					}
-				} else {
-					// 未发货状态的记录需要删除
-					toDeleteIds.add(existing.getId());
-				}
-			}
-			
-			// 删除未发货状态的记录
-			if (!toDeleteIds.isEmpty()) {
-				shippingInfoMapper.deleteBatchIds(toDeleteIds);
-			}
-			
-			// 过滤掉已发货且完全匹配的记录
-			if (!matchedShippedRecords.isEmpty()) {
-				saveRequestVOs = saveRequestVOs.stream()
-						.filter(vo -> !matchedShippedRecords.contains(generateMatchKey(vo)))
-						.collect(Collectors.toList());
-			}
-		}
-		
-		// 5. 如果还有需要保存的记录
-		if (!saveRequestVOs.isEmpty()) {
-			// 转换VO为DO对象
-			LocalDateTime now = LocalDateTime.now();
-			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
-					.map(vo -> {
-						TemuOrderShippingInfoDO info = new TemuOrderShippingInfoDO();
-						info.setOrderNo(vo.getOrderNo());
-						info.setTrackingNumber(vo.getTrackingNumber());
-						info.setExpressImageUrl(vo.getExpressImageUrl());
-						info.setExpressOutsideImageUrl(vo.getExpressOutsideImageUrl());
-						info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
-						info.setShopId(vo.getShopId());
-						info.setShippingStatus(0); // 新保存的记录默认为未发货状态
-						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
-						if (vo.getShippingTime() != null) {
-							info.setCreateTime(LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-						} else {
-							info.setCreateTime(now);
-						}
-						info.setUpdateTime(now);
-						return info;
-					})
-					.collect(Collectors.toList());
-			
-			// 6. 批量保存
-			try {
-				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
-				log.info("批量保存成功，数量：{}", affectedRows);
-				return affectedRows;
-			} catch (Exception e) {
-				log.error("批量保存失败", e);
-				throw new ServiceException("批量保存失败：" + e.getMessage());
-			}
-		}
-		return 0;
-	}
-	
-	/**
 	 * 生成记录的唯一匹配键（物流单号+shopId+orderNo）
 	 */
 	private String generateMatchKey(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo) {
@@ -1029,13 +880,12 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	}
 
 	/**
-	 * 测试方法：
-	 * 批量保存物流单号新增序号
+	 * 批量保存物流面单信息
 	 * @param saveRequestVOs
 	 * @return
 	 */
 	@Transactional(rollbackFor = Exception.class)
-	public int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+	public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
 		if (CollectionUtils.isEmpty(saveRequestVOs)) {
 			return 0;
 		}
@@ -1352,6 +1202,173 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		TemuOrderShippingCountRespVO respVO = new TemuOrderShippingCountRespVO();
 		respVO.setTotal(total);
 		return respVO;
+	}
+
+	/**
+	 * 测试方法
+	 * 批量保存物流面单信息
+	 * @param saveRequestVOs
+	 * @return
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+		if (CollectionUtils.isEmpty(saveRequestVOs)) {
+			return 0;
+		}
+		// 1. 参数校验（强制要求 trackingNumber 非空）
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			if (saveRequestVO == null) {
+				throw new IllegalArgumentException("待发货订单信息不能为空");
+			}
+			if (saveRequestVO.getOrderNo() == null) {
+				throw new IllegalArgumentException("订单编号不能为空");
+			}
+			if (saveRequestVO.getShopId() == null) {
+				throw new IllegalArgumentException("店铺ID不能为空");
+			}
+			if (saveRequestVO.getTrackingNumber() == null) {
+				throw new IllegalArgumentException("物流单号不能为空");
+			}
+
+			// 检查是否为加急订单，如果是则发送企业微信通知
+			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
+				// 获取shopId为88888888的店铺webhook地址
+				TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+				if (shop != null && shop.getWebhook() != null) {
+					String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
+							temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
+
+					String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！",
+							saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
+
+					try {
+						weiXinProducer.sendMessage(shop.getWebhook(), message);
+						log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
+					} catch (Exception e) {
+						log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
+					}
+				}
+			}
+		}
+
+		// ================== 2. 生成物流序号映射 ==================
+		// Map<物流单号, Map<日期, 当天的序号>>
+		// 用于给相同物流单号在同一天创建的记录生成自增序号
+		Map<String, Map<LocalDate, Integer>> trackingNumberToSequence = getTrackingNumberSequences(saveRequestVOs);
+
+		// 优化：在删除前提取已发货记录的shippedOperatorId，后续新数据设置
+		Map<String, Long> shippedOperatorMap = new HashMap<>(); // key: orderNo + "_" + shopId, value: shippedOperatorId
+
+		// ================== 3. 清理历史记录 ==================
+		// 先查询所有匹配的历史记录，提取已发货的shippedOperatorId
+		// （1） 首先查询出表中(orderNo+shopId)匹配的所有记录
+		// （2） 提前保存 shippingStatus = 1 的记录的 shippedOperatorId	（已发货，发货人）
+		//  (3) 最后删除所有匹配的历史记录（包括已发货状态）
+		// （4） 在第4步，准备新数据，通过(orderNo+shopId)判断是否需要设置（已发货，发货人）
+		//  以上步骤为确保每次同步物流面单的信息都是最新，也处理了已发货的物流（又修改了物流单号）的特殊情况
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			List<TemuOrderShippingInfoDO> oldList = shippingInfoMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
+							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
+			);
+			if (oldList != null && !oldList.isEmpty()) {
+				for (TemuOrderShippingInfoDO old : oldList) {
+					if (old.getShippingStatus() != null && old.getShippingStatus() == 1) {
+						String key = old.getOrderNo() + "_" + old.getShopId();
+						shippedOperatorMap.put(key, old.getShippedOperatorId());
+					}
+				}
+			}
+			// 删除所有匹配的历史记录（包括已发货状态）
+			shippingInfoMapper.delete(
+					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
+							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
+			);
+		}
+
+		// ================== 4. 准备新数据 ==================
+		// 检查是否还有需要保存的记录
+		if (!saveRequestVOs.isEmpty()) {
+			// 转换VO为DO对象，sorting_sequence 先设为0
+			LocalDateTime now = LocalDateTime.now();
+			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
+					.map(vo -> {
+						// 创建实体对象
+						TemuOrderShippingInfoDO info = new TemuOrderShippingInfoDO();
+						// 设置基础字段
+						info.setOrderNo(vo.getOrderNo());
+						info.setTrackingNumber(vo.getTrackingNumber());
+						info.setExpressImageUrl(vo.getExpressImageUrl());
+						info.setExpressOutsideImageUrl(vo.getExpressOutsideImageUrl());
+						info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
+						info.setShopId(vo.getShopId());
+						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
+
+						// 判断是否需要设置为已发货
+						String key = vo.getOrderNo() + "_" + vo.getShopId();
+						if (shippedOperatorMap.containsKey(key)) {
+							info.setShippingStatus(1); // 已发货
+							info.setShippedOperatorId(shippedOperatorMap.get(key));
+						} else {
+							info.setShippingStatus(0); // 新保存的记录默认为未发货状态
+						}
+
+						// 确定物流信息的创建时间： 优先使用VO中的发货时间 / 无发货时间则使用当前系统时间
+						LocalDateTime createTime;
+						if (vo.getShippingTime() != null) {
+							createTime = LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+						} else {
+							createTime = now;
+						}
+						info.setCreateTime(createTime);
+						info.setUpdateTime(now);
+
+						// ===== 设置物流单号的每日序号 =====
+						// 从映射中获取该物流单号对应的日期序号表
+						Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence.get(vo.getTrackingNumber());
+						if (dateSequenceMap != null) {
+							// 设置当前物流单号的序号\tkey=日期，value=序号
+							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
+						}
+
+						// 设置分拣序号
+						info.setSortingSequence(0);
+
+						return info;
+					})
+					.collect(Collectors.toList());
+
+			// ================== 5. 批量保存 ==================
+			try {
+				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
+				log.info("批量保存成功，数量：{}", affectedRows);
+
+				// ========== 批量分配分拣序号 sorting_sequence ==========
+				Set<String> trackingNumbers = toSaveList.stream()
+						.map(TemuOrderShippingInfoDO::getTrackingNumber)
+						.collect(Collectors.toSet());
+				for (String trackingNumber : trackingNumbers) {
+					// 查询该物流单号下所有订单，按创建时间和ID排序
+					List<TemuOrderShippingInfoDO> orders = shippingInfoMapper.selectList(
+							new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+									.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
+									.orderByAsc(TemuOrderShippingInfoDO::getCreateTime, TemuOrderShippingInfoDO::getId)
+					);
+					int seq = 1;
+					for (TemuOrderShippingInfoDO order : orders) {
+						order.setSortingSequence(seq++);
+						shippingInfoMapper.updateById(order);
+					}
+				}
+				return affectedRows;
+			} catch (Exception e) {
+				log.error("批量保存失败", e);
+				throw new ServiceException("批量保存失败：" + e.getMessage());
+			}
+		}
+		return 0;
 	}
 	
 }
