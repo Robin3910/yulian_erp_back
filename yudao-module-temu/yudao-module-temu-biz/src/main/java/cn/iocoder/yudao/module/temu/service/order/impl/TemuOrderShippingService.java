@@ -989,7 +989,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						// 从映射中获取该物流单号对应的日期序号表
 						Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence.get(vo.getTrackingNumber());
 						if (dateSequenceMap != null) {
-							// 设置当前物流单号的序号\tkey=日期，value=序号
+							// 设置当前物流单号的序号 key=日期，value=序号
 							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
 						}
 
@@ -1246,7 +1246,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
 
 						// 判断是否需要设置为已发货
-						String key = vo.getOrderNo() + "_" + vo.getShopId() + "_" + vo.getTrackingNumber();;
+						String key = vo.getOrderNo() + "_" + vo.getShopId() + "_" + vo.getTrackingNumber();
 						if (shippedOperatorMap.containsKey(key)) {
 							info.setShippingStatus(1); // 已发货
 							info.setShippedOperatorId(shippedOperatorMap.get(key));
