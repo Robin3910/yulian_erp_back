@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Objects;
+import java.util.Set;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
 @Slf4j
 @Service
@@ -269,63 +271,89 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
     @Override
     public List<TemuImageSearchOrderRespVO> searchOrderBySnOrSku(TemuImageSearchBySnReqVO reqVO) {
         log.info("[searchOrderBySnOrSku] 开始根据条码编号或定制SKU查询订单, 参数: {}", reqVO);
-        
         // 参数校验
         if (!reqVO.isValid()) {
             log.warn("[searchOrderBySnOrSku] 参数无效，goodsSnNo和customSku至少需要提供一个");
             return new ArrayList<>();
         }
-        
         try {
-            List<TemuOrderDO> orderList;
-            
+            List<TemuOrderDO> firstQueryOrderList;
             if (StrUtil.isNotEmpty(reqVO.getGoodsSnNo())) {
                 // 如果提供了商品编号，优先使用商品编号查询
                 log.info("[searchOrderBySnOrSku] 使用条码编号查询: {}", reqVO.getGoodsSnNo());
-                orderList = temuOrderMapper.selectListBygoodsSnNo(Arrays.asList(reqVO.getGoodsSnNo()));
+                firstQueryOrderList = temuOrderMapper.selectListBygoodsSnNo(Arrays.asList(reqVO.getGoodsSnNo()));
             } else {
-                // 如果提供了自定义SKU，使用定制SKU查询
+                // 如果提供了定制SKU，使用定制SKU查询
                 log.info("[searchOrderBySnOrSku] 使用定制SKU查询: {}", reqVO.getCustomSku());
-                orderList = temuOrderMapper.selectListByCustomSku(Arrays.asList(reqVO.getCustomSku()));
+                firstQueryOrderList = temuOrderMapper.selectListByCustomSku(Arrays.asList(reqVO.getCustomSku()));
             }
-            
-            log.info("[searchOrderBySnOrSku] 查询到订单数量: {}", orderList.size());
-            
-            if (orderList.isEmpty()) {
+            log.info("[searchOrderBySnOrSku] 第一次查询到订单数量: {}", firstQueryOrderList.size());
+            if (firstQueryOrderList.isEmpty()) {
                 return new ArrayList<>();
             }
-            
+            // 用第一次查到的订单的orderNo和sku字段，再次去temu_order表查询
+            Set<String> orderNos = firstQueryOrderList.stream()
+                    .map(TemuOrderDO::getOrderNo)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Set<String> skus = firstQueryOrderList.stream()
+                    .map(TemuOrderDO::getSku)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            List<TemuOrderDO> finalOrderList = new ArrayList<>();
+            if (!orderNos.isEmpty() && !skus.isEmpty()) {
+                // orderNo和sku都不为空时，联合查询
+                LambdaQueryWrapperX<TemuOrderDO> queryWrapper = new LambdaQueryWrapperX<>();
+                queryWrapper.in(TemuOrderDO::getOrderNo, orderNos)
+                        .in(TemuOrderDO::getSku, skus);
+                finalOrderList = temuOrderMapper.selectList(queryWrapper);
+            }
+            log.info("[searchOrderBySnOrSku] 二次查询到订单数量: {}", finalOrderList.size());
+            if (finalOrderList.isEmpty()) {
+                return new ArrayList<>();
+            }
+            // 批量更新 isCompleteProducerTask 字段为 1
+            if (!firstQueryOrderList.isEmpty()) {
+                List<Long> orderIds = firstQueryOrderList.stream()
+                        .map(TemuOrderDO::getId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                if (!orderIds.isEmpty()) {
+                    temuOrderMapper.updateIsCompleteProducerTaskBatch(orderIds);
+                    log.info("已更新生产状态,orderIds为{}", orderIds);
+                }
+            }
+            // 再用 orderNo+sku 查询最新的订单数据
+            List<TemuOrderDO> updatedOrders = temuOrderMapper.selectList(
+                    new LambdaQueryWrapperX<TemuOrderDO>()
+                            .in(TemuOrderDO::getOrderNo, orderNos)
+                            .in(TemuOrderDO::getSku, skus)
+            );
             // 预先查询所有店铺信息
-            List<Long> shopIds = orderList.stream()
+            List<Long> shopIds = updatedOrders.stream()
                     .map(TemuOrderDO::getShopId)
                     .distinct()
                     .collect(Collectors.toList());
             Map<Long, TemuShopDO> shopMap = temuShopMapper.selectByShopIds(shopIds).stream()
                     .collect(Collectors.toMap(TemuShopDO::getShopId, shop -> shop));
-            
             // 预先查询所有物流信息
-            List<String> orderNos = orderList.stream()
+            List<String> finalOrderNos = updatedOrders.stream()
                     .map(TemuOrderDO::getOrderNo)
                     .collect(Collectors.toList());
-            Map<String, TemuOrderShippingInfoDO> shippingMap = temuOrderShippingMapper.selectListByOrderNos(orderNos).stream()
+            Map<String, TemuOrderShippingInfoDO> shippingMap = temuOrderShippingMapper.selectListByOrderNos(finalOrderNos).stream()
                     .collect(Collectors.toMap(TemuOrderShippingInfoDO::getOrderNo, shipping -> shipping));
-            
             // 创建返回结果列表
             List<TemuImageSearchOrderRespVO> resultList = new ArrayList<>();
-            
-            // 遍历订单列表，构建返回结果
-            for (TemuOrderDO order : orderList) {
+
+            for (TemuOrderDO order : updatedOrders) {
                 TemuImageSearchOrderRespVO respVO = new TemuImageSearchOrderRespVO();
-                // 复制订单信息
                 BeanUtils.copyProperties(order, respVO);
-                
                 // 设置店铺相关字段
                 TemuShopDO shop = shopMap.get(order.getShopId());
                 if (shop != null) {
                     respVO.setShopName(shop.getShopName());
                     respVO.setAliasName(shop.getAliasName());
                 }
-                
                 // 设置物流相关字段
                 TemuOrderShippingInfoDO shipping = shippingMap.get(order.getOrderNo());
                 if (shipping != null) {
@@ -336,27 +364,11 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                     respVO.setDailySequence(shipping.getDailySequence());
                     respVO.setShippingTime(shipping.getCreateTime());
                 }
-                
                 resultList.add(respVO);
-                log.info("[searchOrderBySnOrSku][查询结果：订单号={}, 商品条码={}, 定制SKU={}]",
-                        order.getOrderNo(), order.getSku(), order.getCustomSku());
+                log.info("[searchOrderBySnOrSku][查询结果：订单号={}, 商品条码={}, 定制SKU={}]", order.getOrderNo(), order.getSku(), order.getCustomSku());
             }
-            
-            // 批量更新 isCompleteProducerTask 字段为 1
-            if (orderList != null && !orderList.isEmpty()) {
-                List<Long> orderIds = orderList.stream()
-                    .map(TemuOrderDO::getId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-                if (!orderIds.isEmpty()) {
-                    temuOrderMapper.updateIsCompleteProducerTaskBatch(orderIds);
-                    log.info("已更新生产状态,orderIds为{}",orderIds);
-                }
-            }
-            
             log.info("[searchOrderBySnOrSku] 查询完成，返回结果数量: {}", resultList.size());
             return resultList;
-            
         } catch (Exception e) {
             log.error("[searchOrderBySnOrSku] 查询失败", e);
             throw new RuntimeException("根据条码编号或定制SKU查询订单失败", e);
