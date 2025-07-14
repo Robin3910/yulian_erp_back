@@ -287,6 +287,9 @@ public class TemuOrderService implements ITemuOrderService {
 		// 3. 批量生成sorting_sequence（基于ordersList数据，不查询数据库）
 		generateSortingSequenceBatch(ordersList);
 		
+		// 4. 验证生成的序号一致性
+		validateSortingSequenceConsistency(ordersList);
+		
 		for (Map<String, Object> orderMap : ordersList) {
 			try {
 				TemuOrderDO order = new TemuOrderDO();
@@ -437,6 +440,9 @@ public class TemuOrderService implements ITemuOrderService {
 				// 保存原始信息
 				order.setOriginalInfo(JSONUtil.toJsonStr(orderMap));
 				
+				// 设置sorting_sequence
+				order.setSortingSequence(convertToString(orderMap.get("sorting_sequence")));
+				
 				// 检查订单是否已存在
 				List<TemuOrderDO> existingOrders = temuOrderMapper.selectByCustomSku(order.getCustomSku());
 				// 返单的订单，备货单ID会不一样
@@ -576,6 +582,20 @@ public class TemuOrderService implements ITemuOrderService {
 					if (order.getIsCompleteDrawTask() == null) order.setIsCompleteDrawTask(existingOrder.getIsCompleteDrawTask());
 					if (order.getIsCompleteProducerTask() == null) order.setIsCompleteProducerTask(existingOrder.getIsCompleteProducerTask());
 					if (order.getIsReturnOrder() == null) order.setIsReturnOrder(existingOrder.getIsReturnOrder());
+					
+					// 序号处理：优先保留原有序号，确保SKU-序号对应关系稳定
+					if (StringUtils.hasText(existingOrder.getSortingSequence())) {
+						// 保留原有序号，避免重新排序导致的分拣混乱
+						order.setSortingSequence(existingOrder.getSortingSequence());
+						log.debug("保留原有序号: orderNo={}, sku={}, existingSortingSequence={}", 
+							order.getOrderNo(), order.getSku(), existingOrder.getSortingSequence());
+					} else if (!StringUtils.hasText(order.getSortingSequence())) {
+						// 如果原有序号为空且新序号也为空，则使用新生成的序号
+						String newSortingSequence = convertToString(orderMap.get("sorting_sequence"));
+						order.setSortingSequence(newSortingSequence);
+						log.debug("使用新生成序号: orderNo={}, sku={}, newSortingSequence={}", 
+							order.getOrderNo(), order.getSku(), newSortingSequence);
+					}
 
 					temuOrderMapper.updateById(order);
 				} else {
@@ -1203,6 +1223,54 @@ public class TemuOrderService implements ITemuOrderService {
 
 	
 	/**
+	 * 验证生成的序号一致性
+	 */
+	private void validateSortingSequenceConsistency(List<Map<String, Object>> ordersList) {
+		if (CollUtil.isEmpty(ordersList)) {
+			return;
+		}
+		
+		// 按订单编号分组检查序号一致性
+		Map<String, List<Map<String, Object>>> orderNoGroupMap = ordersList.stream()
+				.collect(Collectors.groupingBy(orderMap -> 
+					convertToString(orderMap.get("orderId"))));
+		
+		for (Map.Entry<String, List<Map<String, Object>>> entry : orderNoGroupMap.entrySet()) {
+			String orderNo = entry.getKey();
+			List<Map<String, Object>> sameOrderNoList = entry.getValue();
+			
+			// 检查同一订单号下的SKU-序号映射
+			Map<String, String> skuToSequenceMap = new HashMap<>();
+			boolean hasInconsistency = false;
+			
+			for (Map<String, Object> orderMap : sameOrderNoList) {
+				String sku = "";
+				Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
+				if (skusMap != null) {
+					sku = convertToString(skusMap.get("skuId"));
+				}
+				
+				String sortingSequence = convertToString(orderMap.get("sorting_sequence"));
+				
+				if (StrUtil.isNotBlank(sku) && StrUtil.isNotBlank(sortingSequence)) {
+					String existingSequence = skuToSequenceMap.get(sku);
+					if (existingSequence != null && !existingSequence.equals(sortingSequence)) {
+						log.warn("SKU {} 在同一订单 {} 中存在不同的序号: {} vs {}", 
+							sku, orderNo, existingSequence, sortingSequence);
+						hasInconsistency = true;
+					} else {
+						skuToSequenceMap.put(sku, sortingSequence);
+					}
+				}
+			}
+			
+			if (hasInconsistency) {
+				log.warn("订单 {} 的SKU-序号映射存在不一致: {}", orderNo, skuToSequenceMap);
+			}
+		}
+	}
+	
+	/**
 	 * 批量生成sorting_sequence（基于传入的ordersList数据，不查询数据库）
 	 * 1. 使用订单编号后6位作为基础编号
 	 * 2. 按订单编号+SKU组合进行分组
@@ -1248,9 +1316,20 @@ public class TemuOrderService implements ITemuOrderService {
 							return "";
 						}));
 
-				// 5. 为每个SKU组分配sorting_sequence
+				// 5. 为每个SKU组分配sorting_sequence（使用稳定的SKU-序号映射）
 				List<String> allSkus = new ArrayList<>(skuGroupMap.keySet());
-				allSkus.sort(String::compareTo); // 按SKU排序，确保结果一致
+				
+				// 使用SKU的哈希值来确定序号顺序，确保同一SKU总是获得相同的序号
+				// 这样即使SKU列表顺序变化，每个SKU的序号也会保持一致
+				allSkus.sort((sku1, sku2) -> {
+					int hash1 = Math.abs(sku1.hashCode());
+					int hash2 = Math.abs(sku2.hashCode());
+					if (hash1 != hash2) {
+						return Integer.compare(hash1, hash2);
+					}
+					// 如果哈希值相同，按SKU字符串排序
+					return sku1.compareTo(sku2);
+				});
 
 				for (int i = 0; i < allSkus.size(); i++) {
 					String sku = allSkus.get(i);
