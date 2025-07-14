@@ -1032,6 +1032,9 @@ public class TemuOrderService implements ITemuOrderService {
         if (req.getCustomSkuList() != null && !req.getCustomSkuList().isEmpty()) {
             queryWrapper.in("custom_sku", req.getCustomSkuList());
         }
+		if (req.getSkuList() != null && !req.getSkuList().isEmpty()) {
+			queryWrapper.in("sku", req.getSkuList());
+		}
         
         if (req.getShopId() != null && req.getShopId().length > 0) {
             queryWrapper.in("shop_id", Arrays.asList(req.getShopId()));
@@ -1077,6 +1080,9 @@ public class TemuOrderService implements ITemuOrderService {
         if (req.getCustomSkuList() != null && !req.getCustomSkuList().isEmpty()) {
             queryWrapper.in(TemuOrderDO::getCustomSku, req.getCustomSkuList());
         }
+		if (req.getSkuList() != null && !req.getSkuList().isEmpty()) {
+			queryWrapper.in(TemuOrderDO::getSku, req.getSkuList());
+		}
         
         if (req.getShopId() != null && req.getShopId().length > 0) {
             queryWrapper.in(TemuOrderDO::getShopId, Arrays.asList(req.getShopId()));

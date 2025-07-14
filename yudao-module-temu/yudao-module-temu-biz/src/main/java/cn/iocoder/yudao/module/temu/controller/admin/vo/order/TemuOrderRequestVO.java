@@ -6,7 +6,6 @@ import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import javax.validation.constraints.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -20,6 +19,8 @@ public class TemuOrderRequestVO extends PageParam {
 	// 店铺id
 	private Long[] shopId;
 	private String sku;
+	@Schema(description = "SKU编号列表")
+	private List<String> skuList;
 	private String skc;
 	private String customSku;
 	private String orderStatus;
