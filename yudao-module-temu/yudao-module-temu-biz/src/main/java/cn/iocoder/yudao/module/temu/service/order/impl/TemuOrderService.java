@@ -284,6 +284,9 @@ public class TemuOrderService implements ITemuOrderService {
 					.collect(Collectors.toMap(TemuShopOldTypeSkcDO::getSkc, oldType -> oldType));
 		}
 		
+		// 3. 批量生成sorting_sequence（基于ordersList数据，不查询数据库）
+		generateSortingSequenceBatch(ordersList);
+		
 		for (Map<String, Object> orderMap : ordersList) {
 			try {
 				TemuOrderDO order = new TemuOrderDO();
@@ -582,39 +585,8 @@ public class TemuOrderService implements ITemuOrderService {
 				count++;
 
 				// ========== sorting_sequence 赋值逻辑 ===========
-				// 1. 查询当天所有订单（以bookingTime为准）
-				LocalDate bookingDate = order.getBookingTime() != null ? order.getBookingTime().toLocalDate() : LocalDate.now();
-				List<TemuOrderDO> sameDayOrders = temuOrderMapper.selectListByBookingDate(bookingDate);
-				// 2. 全局递增序号
-				int globalSeq = 1;
-				// 3. 订单编号+SKU组合 -> sorting_sequence
-				Map<String, Integer> orderSkuSeqMap = new LinkedHashMap<>();
-				
-				// 4. 按订单编号和SKU排序，为每个不同的组合分配序号
-				List<String> orderSkuCombinations = sameDayOrders.stream()
-						.map(o -> o.getOrderNo() + "_" + (o.getSku() != null ? o.getSku() : ""))
-						.distinct()
-						.sorted()
-						.collect(Collectors.toList());
-				
-				// 5. 为每个订单编号+SKU组合分配序号
-				for (String combination : orderSkuCombinations) {
-					orderSkuSeqMap.put(combination, globalSeq++);
-				}
-				
-				// 6. 为每个订单设置sorting_sequence
-				for (TemuOrderDO o : sameDayOrders) {
-					String orderNo = o.getOrderNo();
-					String orderSku = o.getSku() != null ? o.getSku() : "";
-					String combination = orderNo + "_" + orderSku;
-					Integer seq = orderSkuSeqMap.get(combination);
-					if (seq != null) {
-						o.setSortingSequence(seq);
-						temuOrderMapper.updateById(o);
-					}
-				}
-
-				
+				// 新的方案：使用订单编号后6位 + 后缀的方式
+				// generateSortingSequence(order);
 			} catch (Exception e) {
 				log.error("保存订单失败: {}", e.getMessage(), e);
 				// 继续处理下一个订单
@@ -973,7 +945,7 @@ public class TemuOrderService implements ITemuOrderService {
         OrderGroupBySortingSequenceVO groupVO = new OrderGroupBySortingSequenceVO();
         
         // 设置分组级别信息
-        groupVO.setSortingSequence((Integer) group.get("sorting_sequence"));
+        groupVO.setSortingSequence((String) group.get("sorting_sequence"));
         groupVO.setOrderNo((String) group.get("order_no"));
         groupVO.setSku((String) group.get("sku"));
         groupVO.setBookingTime((Long) group.get("booking_time"));
@@ -1219,6 +1191,84 @@ public class TemuOrderService implements ITemuOrderService {
 		if (order != null) {
 			order.setGoodsSn(url);
 			temuOrderMapper.updateById(order);
+		}
+	}
+
+
+	
+	/**
+	 * 批量生成sorting_sequence（基于传入的ordersList数据，不查询数据库）
+	 * 1. 使用订单编号后6位作为基础编号
+	 * 2. 按订单编号+SKU组合进行分组
+	 * 3. 相同SKU使用相同的sorting_sequence
+	 * 4. 不同SKU使用不同的后缀
+	 */
+	private void generateSortingSequenceBatch(List<Map<String, Object>> ordersList) {
+		if (CollUtil.isEmpty(ordersList)) {
+			return;
+		}
+
+		// 1. 按订单编号分组
+		Map<String, List<Map<String, Object>>> orderNoGroupMap = ordersList.stream()
+				.collect(Collectors.groupingBy(orderMap -> 
+					convertToString(orderMap.get("orderId"))));
+
+		// 2. 为每个订单编号组生成sorting_sequence
+		for (Map.Entry<String, List<Map<String, Object>>> entry : orderNoGroupMap.entrySet()) {
+			String orderNo = entry.getKey();
+			List<Map<String, Object>> sameOrderNoList = entry.getValue();
+
+			if (StrUtil.isBlank(orderNo)) {
+				continue;
+			}
+
+			try {
+				// 3. 获取订单编号后6位作为基础编号
+				String baseSequence;
+				if (orderNo.length() >= 6) {
+					baseSequence = orderNo.substring(orderNo.length() - 6);
+				} else {
+					// 如果订单编号不足6位，前面补0
+					baseSequence = String.format("%06d", Integer.parseInt(orderNo));
+				}
+
+				// 4. 按SKU分组，相同SKU使用相同的sorting_sequence
+				Map<String, List<Map<String, Object>>> skuGroupMap = sameOrderNoList.stream()
+						.collect(Collectors.groupingBy(orderMap -> {
+							Map<String, Object> skusMap = (Map<String, Object>) orderMap.get("skus");
+							if (skusMap != null) {
+								return convertToString(skusMap.get("skuId"));
+							}
+							return "";
+						}));
+
+				// 5. 为每个SKU组分配sorting_sequence
+				List<String> allSkus = new ArrayList<>(skuGroupMap.keySet());
+				allSkus.sort(String::compareTo); // 按SKU排序，确保结果一致
+
+				for (int i = 0; i < allSkus.size(); i++) {
+					String sku = allSkus.get(i);
+					List<Map<String, Object>> sameSkuList = skuGroupMap.get(sku);
+					
+					// 生成sorting_sequence
+					String sortingSequence;
+					if (i == 0) {
+						// 第一个SKU，直接使用基础编号（保持前导零）
+						sortingSequence = baseSequence;
+					} else {
+						// 其他SKU，添加后缀
+						sortingSequence = baseSequence + "_" + String.format("%02d", i + 1);
+					}
+
+					// 为所有相同SKU的订单设置相同的sorting_sequence
+					sameSkuList.forEach(orderMap -> orderMap.put("sorting_sequence", sortingSequence));
+				}
+
+			} catch (NumberFormatException e) {
+				log.warn("订单编号格式错误，无法生成sorting_sequence: orderNo={}", orderNo);
+			} catch (Exception e) {
+				log.error("生成sorting_sequence时发生异常: orderNo={}", orderNo, e);
+			}
 		}
 	}
 	

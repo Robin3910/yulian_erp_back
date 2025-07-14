@@ -5,7 +5,7 @@ import java.util.List;
 
 @Data
 public class OrderGroupBySortingSequenceVO {
-    private Integer sortingSequence;
+    private String sortingSequence;  // 分拣序号，支持下划线格式
     private String orderNo;        // 订单编号
     private String sku;            // SKU
     private Long bookingTime;      // 平台订单创建时间
