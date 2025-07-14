@@ -121,7 +121,9 @@ public class TemuOrderService implements ITemuOrderService {
 	
 	@Resource
 	private TemuOrderPlacementRecordMapper temuOrderPlacementRecordMapper;
-	
+
+	@Resource
+	private ConfigApi configApi;
 	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
@@ -286,9 +288,22 @@ public class TemuOrderService implements ITemuOrderService {
 		
 		// 3. 批量生成sorting_sequence（基于ordersList数据，不查询数据库）
 		generateSortingSequenceBatch(ordersList);
-		
-		// 4. 验证生成的序号一致性
-		validateSortingSequenceConsistency(ordersList);
+
+		// 从配置中获取是否开启可动态配置批次生成时间段
+		String isSortingSequence = configApi.getConfigValueByKey("temu_is_sortingSequence");
+		log.info("中包序号功能是否开启: {}", isSortingSequence);
+		boolean flag = false; // 默认值
+		if (StrUtil.isNotEmpty(isSortingSequence)) {
+			try {
+				flag = Boolean.parseBoolean(isSortingSequence);
+			} catch (Exception e) {
+				log.warn("中包序号功能是否开启，使用默认值");
+			}
+		}
+		if(flag){
+			// 4. 验证生成的序号一致性
+			validateSortingSequenceConsistency(ordersList);
+		}
 		
 		for (Map<String, Object> orderMap : ordersList) {
 			try {
@@ -582,19 +597,21 @@ public class TemuOrderService implements ITemuOrderService {
 					if (order.getIsCompleteDrawTask() == null) order.setIsCompleteDrawTask(existingOrder.getIsCompleteDrawTask());
 					if (order.getIsCompleteProducerTask() == null) order.setIsCompleteProducerTask(existingOrder.getIsCompleteProducerTask());
 					if (order.getIsReturnOrder() == null) order.setIsReturnOrder(existingOrder.getIsReturnOrder());
-					
-					// 序号处理：优先保留原有序号，确保SKU-序号对应关系稳定
-					if (StringUtils.hasText(existingOrder.getSortingSequence())) {
-						// 保留原有序号，避免重新排序导致的分拣混乱
-						order.setSortingSequence(existingOrder.getSortingSequence());
-						log.debug("保留原有序号: orderNo={}, sku={}, existingSortingSequence={}", 
-							order.getOrderNo(), order.getSku(), existingOrder.getSortingSequence());
-					} else if (!StringUtils.hasText(order.getSortingSequence())) {
-						// 如果原有序号为空且新序号也为空，则使用新生成的序号
-						String newSortingSequence = convertToString(orderMap.get("sorting_sequence"));
-						order.setSortingSequence(newSortingSequence);
-						log.debug("使用新生成序号: orderNo={}, sku={}, newSortingSequence={}", 
-							order.getOrderNo(), order.getSku(), newSortingSequence);
+
+					if(flag){
+						// 序号处理：优先保留原有序号，确保SKU-序号对应关系稳定
+						if (StringUtils.hasText(existingOrder.getSortingSequence())) {
+							// 保留原有序号，避免重新排序导致的分拣混乱
+							order.setSortingSequence(existingOrder.getSortingSequence());
+							log.debug("保留原有序号: orderNo={}, sku={}, existingSortingSequence={}",
+									order.getOrderNo(), order.getSku(), existingOrder.getSortingSequence());
+						} else if (!StringUtils.hasText(order.getSortingSequence())) {
+							// 如果原有序号为空且新序号也为空，则使用新生成的序号
+							String newSortingSequence = convertToString(orderMap.get("sorting_sequence"));
+							order.setSortingSequence(newSortingSequence);
+							log.debug("使用新生成序号: orderNo={}, sku={}, newSortingSequence={}",
+									order.getOrderNo(), order.getSku(), newSortingSequence);
+						}
 					}
 
 					temuOrderMapper.updateById(order);
