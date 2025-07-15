@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.temu.service.order.impl;
 
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
@@ -9,6 +10,8 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.temu.api.openapi.dto.OrderInfoDTO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shop.TemuOpenapiShopPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.shop.TemuOpenapiShopPageRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.user.UserSimpleRespVo;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
@@ -37,6 +40,9 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOpenapiShopMapper;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOpenapiShopDO;
+
 @Slf4j
 @Service
 public class CommonService implements ICommonService {
@@ -55,6 +61,9 @@ public class CommonService implements ICommonService {
 	
 	@Resource
 	private AdminUserMapper adminUserMapper;
+	
+	@Resource
+	private TemuOpenapiShopMapper temuOpenapiShopMapper;
 	
 	@Override
 	public PageResult<TemuProductCategoryDO> list() {
@@ -210,5 +219,78 @@ public class CommonService implements ICommonService {
 			}
 		}
 	}
-	
+
+	@Override
+	public void saveTemuOpenapiShop(TemuOpenapiShopDO shopDO) {
+		if (shopDO.getTenantId() == null) {
+			shopDO.setTenantId(1L);
+		}
+		if (shopDO.getUpdateTime() == null) {
+			shopDO.setUpdateTime(new java.util.Date());
+		}
+		boolean canInsert = false;
+		try {
+			// 直接new TemuOpenApiUtil并set参数
+			TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
+			openApiUtil.setAppKey(shopDO.getAppKey());
+			openApiUtil.setAppSecret(shopDO.getAppSecret());
+			openApiUtil.setAccessToken(shopDO.getToken());
+			openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
+
+			// 请求bg.open.accesstoken.info.get
+			TreeMap<String, Object> params = new TreeMap<>();
+			params.put("type", "bg.open.accesstoken.info.get");
+			String apiResult = openApiUtil.request(params);
+			JSONObject json = JSONUtil.parseObj(apiResult);
+			boolean success = json.getBool("success", false);
+			if (success) {
+				JSONObject result = json.getJSONObject("result");
+				if (result != null) {
+					String mallId = result.getStr("mallId");
+					Long expiredTime = result.getLong("expiredTime", null);
+					if (mallId != null && mallId.equals(shopDO.getShopId()) && expiredTime != null) {
+						// expiredTime是秒，转为Date，赋值给到期时间
+						shopDO.setAuthExpireTime(new Date(expiredTime * 1000));
+						// 授权时间为当前时间
+						shopDO.setAuthTime(new Date());
+
+						// 请求bg.mall.info.get
+						params.put("type", "bg.mall.info.get");
+						String mallInfoResult = openApiUtil.request(params);
+						JSONObject mallInfoJson = JSONUtil.parseObj(mallInfoResult);
+						boolean mallInfoSuccess = mallInfoJson.getBool("success", false);
+						if (mallInfoSuccess) {
+							JSONObject mallInfo = mallInfoJson.getJSONObject("result");
+							if (mallInfo != null) {
+								Boolean semiManagedMall = mallInfo.getBool("semiManagedMall", null);
+								Boolean isThriftStore = mallInfo.getBool("isThriftStore", null);
+								shopDO.setSemiManagedMall(semiManagedMall);
+								shopDO.setIsThriftStore(isThriftStore);
+							}
+						}
+						canInsert = true;
+					}
+				}
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("解析apiResult失败", e);
+		}
+
+		// 最后插入数据库前，先查重
+		if (canInsert) {
+			TemuOpenapiShopDO exist = temuOpenapiShopMapper.selectByShopId(shopDO.getShopId());
+			if (exist == null) {
+				temuOpenapiShopMapper.insert(shopDO);
+			} else {
+				throw new RuntimeException("[saveTemuOpenapiShop] 店铺已存在，shopId=" + shopDO.getShopId());
+			}
+		} else {
+			throw new RuntimeException("API校验未通过，未保存数据");
+		}
+	}
+
+	@Override
+	public PageResult<TemuOpenapiShopPageRespVO> getTemuOpenapiShopPage(TemuOpenapiShopPageReqVO reqVO) {
+		return temuOpenapiShopMapper.selectPage(reqVO);
+	}
 }
