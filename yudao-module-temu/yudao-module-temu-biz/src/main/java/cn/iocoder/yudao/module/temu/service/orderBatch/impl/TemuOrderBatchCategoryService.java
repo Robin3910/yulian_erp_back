@@ -211,6 +211,7 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
                 String batchNo = String.format("%s%s%02d", dateStr, periodStr, batchCount);
                 newBatch.setBatchNo(batchNo);
                 newBatch.setStatus(0);
+                System.out.println(batchNo);
                 temuOrderBatchMapper.insert(newBatch);
                 batchId = newBatch.getId();
 
