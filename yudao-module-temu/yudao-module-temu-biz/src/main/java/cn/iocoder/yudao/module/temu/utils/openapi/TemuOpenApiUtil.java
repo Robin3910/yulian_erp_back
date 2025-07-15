@@ -141,4 +141,26 @@ public class TemuOpenApiUtil {
 		
 		return subOrderForSupplierList;
 	}
+	
+	/**
+	 * 获取发货订单列表
+	 *
+	 * @param params 请求参数
+	 * @return 发货订单列表
+	 */
+	public String getShipOrderList(TreeMap<String, Object> params) {
+		params.put("type", "bg.shiporderv2.get");
+		Integer pageSize = 10;
+		Integer pageNo = 1;
+		params.put("pageSize", pageSize);
+		params.put("pageNo", pageNo);
+
+		// 创建快递单号列表
+		List<String> expressDeliverySnList = new ArrayList<>();
+		expressDeliverySnList.add("SF3190241519922");
+		params.put("expressDeliverySnList", expressDeliverySnList);
+
+		// 发送请求并返回结果
+		return request(params);
+	}
 }
