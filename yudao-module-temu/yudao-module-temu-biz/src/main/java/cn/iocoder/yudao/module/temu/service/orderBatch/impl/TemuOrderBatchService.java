@@ -263,7 +263,14 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 							return orderDetail;
 						})
 						.collect(Collectors.toList());
-				detail.setOrderList(orders);
+				// 按sku分组排序
+				List<TemuOrderDetailDO> sortedOrders = orders.stream()
+						.collect(Collectors.groupingBy(TemuOrderDetailDO::getSku))
+						.entrySet().stream()
+						.sorted(Map.Entry.comparingByKey())
+						.flatMap(entry -> entry.getValue().stream())
+						.collect(Collectors.toList());
+				detail.setOrderList(sortedOrders);
 			} else {
 				detail.setOrderList(new ArrayList<>());
 			}
@@ -884,7 +891,14 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 							return orderDetail;
 						})
 						.collect(Collectors.toList());
-				batch.setOrderList(orders);
+				// 按sku分组排序
+				List<TemuOrderDetailDO> sortedOrders = orders.stream()
+						.collect(Collectors.groupingBy(TemuOrderDetailDO::getSku))
+						.entrySet().stream()
+						.sorted(Map.Entry.comparingByKey())
+						.flatMap(entry -> entry.getValue().stream())
+						.collect(Collectors.toList());
+				batch.setOrderList(sortedOrders);
 			} else {
 				batch.setOrderList(new ArrayList<>());
 			}
