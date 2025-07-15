@@ -16,4 +16,11 @@
         LIMIT 1
     </select>
 
+    <select id="selectByCreateTimeRange" resultType="cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderBatchDO">
+        SELECT
+        <include refid="selectFields"/>
+        FROM temu_order_batch
+        WHERE create_time BETWEEN #{start} AND #{end}
+    </select>
+
 </mapper>

@@ -17,7 +17,9 @@ import cn.iocoder.yudao.module.temu.service.orderBatch.ITemuOrderBatchCategorySe
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.apache.ibatis.annotations.Param;
+import java.time.LocalDateTime;
+import java.util.List;
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,6 +29,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.temu.enums.ErrorCodeConstants.ORDER_BATCH_EXISTS;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @Slf4j
@@ -148,17 +151,20 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
 
         // 获取当前时间
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime periodStart;
-        LocalDateTime periodEnd;
+        LocalDate today = now.toLocalDate();
+        LocalDateTime periodStart, periodEnd;
+        String periodStr;
 
         if (now.getHour() < 12) {
             // 上午时段 (0:00 - 12:00)
-            periodStart = now.with(LocalTime.MIN); // 当天 0:00
-            periodEnd = now.with(LocalTime.NOON); // 当天 12:00
+            periodStart = today.atStartOfDay();
+            periodEnd = today.atTime(12, 0, 0);
+            periodStr = "上午";
         } else {
             // 下午时段 (12:00 - 24:00)
-            periodStart = now.with(LocalTime.NOON); // 当天 12:00
-            periodEnd = now.with(LocalTime.MAX); // 当天 23:59:59
+            periodStart = today.atTime(12, 0, 0);
+            periodEnd = today.atTime(23, 59, 59);
+            periodStr = "下午";
         }
 
         // 遍历每个batchCategoryId
@@ -172,15 +178,42 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
                 // 如果存在批次，使用现有的batchId
                 batchId = latestBatch.getId();
             } else {
-                // 如果不存在批次，创建新的批次
+                // 查询当前时段已有批次数量
+                List<TemuOrderBatchDO> periodBatchList = temuOrderBatchMapper.selectByCreateTimeRange(periodStart, periodEnd);
+                
+                // 将批次列表按上午下午分组统计
+                int morningCount = 0;
+                int afternoonCount = 0;
+                
+                for (TemuOrderBatchDO batch : periodBatchList) {
+                    LocalTime batchTime = batch.getCreateTime().toLocalTime();
+                    if (batchTime.isBefore(LocalTime.of(12, 0))) {
+                        morningCount++;
+                    } else {
+                        afternoonCount++;
+                    }
+                }
+                
+                // 根据当前时段确定批次数量
+                int batchCount;
+                if (now.getHour() < 12) {
+                    // 上午时段
+                    batchCount = morningCount + 1;
+                } else {
+                    // 下午时段
+                    batchCount = afternoonCount + 1;
+                }
+
+                // 创建新批次
                 TemuOrderBatchDO newBatch = new TemuOrderBatchDO();
                 newBatch.setBatchCategoryId(batchCategoryId);
-                // 设置批次号（年月日时分秒+4位随机数）
-                newBatch.setBatchNo(DateTime.now().toString("yyyyMMddHHmmss") + String.format("%04d", new Random().nextInt(10000)));
-                // 设置状态为待生产
+                String dateStr = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                String batchNo = String.format("%s%s%02d", dateStr, periodStr, batchCount);
+                newBatch.setBatchNo(batchNo);
                 newBatch.setStatus(0);
                 temuOrderBatchMapper.insert(newBatch);
                 batchId = newBatch.getId();
+
             }
 
             // 2. 创建批次关系记录
@@ -270,11 +303,40 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
             if (latestBatch != null) {
                 batchId = latestBatch.getId();
             } else {
-                // 创建新批次（使用当天日期+随机数）
+                // 查询当前时段已有批次数量
+                List<TemuOrderBatchDO> periodBatchList = temuOrderBatchMapper.selectByCreateTimeRange(periodStart, periodEnd);
+                
+                // 将批次列表按上午下午分组统计
+                int morningCount = 0;
+                int afternoonCount = 0;
+                
+                for (TemuOrderBatchDO batch : periodBatchList) {
+                    LocalTime batchTime = batch.getCreateTime().toLocalTime();
+                    if (batchTime.isBefore(LocalTime.of(12, 0))) {
+                        morningCount++;
+                    } else {
+                        afternoonCount++;
+                    }
+                }
+                
+                // 根据当前时段确定批次数量
+                int batchCount;
+                if (now.getHour() < 12) {
+                    // 上午时段
+                    batchCount = morningCount + 1;
+                } else {
+                    // 下午时段
+                    batchCount = afternoonCount + 1;
+                }
+
+                // 创建新批次（使用当天日期+递增编号）
                 TemuOrderBatchDO newBatch = new TemuOrderBatchDO();
                 newBatch.setBatchCategoryId(batchCategoryId);
-                newBatch.setBatchNo(DateTime.now().toString("yyyyMMddHHmmss")
-                        + String.format("%04d", new Random().nextInt(10000)));
+                // 设置批次号为yyyyMMdd上午或yyyyMMdd下午格式
+                String dateStr = DateTime.now().toString("yyyyMMdd");
+                String periodStr = (now.getHour() < 12) ? "上午" : "下午";
+                String batchNo = String.format("%s%s%02d", dateStr, periodStr, batchCount);
+                newBatch.setBatchNo(batchNo);
                 newBatch.setStatus(0);
 
                 //如果是17:30到凌晨0点下的单 那么生成批次的日期+1 如今天是6月28日 那么批次的创建时间会被设置成6月29日0点0分01秒
@@ -326,6 +388,18 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
                 temuOrderMapper.updateBatch(orders);
             }
         });
+
+        // 获取今日起止时间
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+        // 拉取今日所有批次数据到集合
+        List<TemuOrderBatchDO> todayBatchList = temuOrderBatchMapper.selectByCreateTimeRange(startOfDay, endOfDay);
+
+        // 现在 todayBatchList 就是今日所有批次数据的集合，可以后续分组、编号等操作
+        // 例如输出数量
+        System.out.println("今日批次数量：" + todayBatchList.size());
     }
 
     // 时间段配置解析
