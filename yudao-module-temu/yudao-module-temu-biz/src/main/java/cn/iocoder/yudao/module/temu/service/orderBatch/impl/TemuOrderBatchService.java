@@ -213,7 +213,7 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 				"custom_text_list, product_img_url, category_id, category_name, " +
 				"effective_img_url, unit_price, total_price, default_price, " +
 				"goods_sn, compliance_url, remark, original_quantity, compliance_image_url, compliance_goods_merged_url, " +
-				"is_complete_draw_task, is_complete_producer_task")
+				"is_complete_draw_task, is_complete_producer_task, is_return_order")
 				.in(TemuOrderDO::getId, orderIds)
 				.like(StringUtils.isNotEmpty(temuOrderBatchPageVO.getCustomSku()), TemuOrderDO::getCustomSku, "%" + temuOrderBatchPageVO.getCustomSku() + "%")
 				.orderByDesc(TemuOrderDO::getCreateTime);
@@ -263,12 +263,10 @@ public class TemuOrderBatchService implements ITemuOrderBatchService {
 							return orderDetail;
 						})
 						.collect(Collectors.toList());
-				// 按sku分组排序
+				// 先按isReturnOrder（返单优先，1在前），再按sku升序排序
 				List<TemuOrderDetailDO> sortedOrders = orders.stream()
-						.collect(Collectors.groupingBy(TemuOrderDetailDO::getSku))
-						.entrySet().stream()
-						.sorted(Map.Entry.comparingByKey())
-						.flatMap(entry -> entry.getValue().stream())
+						.sorted(Comparator.comparing((TemuOrderDetailDO o) -> o.getIsReturnOrder() == null ? 0 : -o.getIsReturnOrder())
+								.thenComparing(TemuOrderDetailDO::getSku, Comparator.nullsLast(String::compareTo)))
 						.collect(Collectors.toList());
 				detail.setOrderList(sortedOrders);
 			} else {
