@@ -178,4 +178,9 @@ public class TemuOrderDO extends BaseDO {
 	 */
 	private String sortingSequence;
 
+    /**
+     * 是否找齐：1-是，0-否
+     */
+    @TableField(value = "is_found_all")
+    private Integer isFoundAll;
 }

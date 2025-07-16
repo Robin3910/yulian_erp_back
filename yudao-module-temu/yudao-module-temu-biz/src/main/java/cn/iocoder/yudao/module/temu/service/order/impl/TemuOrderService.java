@@ -1415,5 +1415,16 @@ public class TemuOrderService implements ITemuOrderService {
 			}
 		}
 	}
-	
+
+    @Override
+    public Boolean toggleIsFoundAll(Long orderId) {
+        TemuOrderDO order = temuOrderMapper.selectById(orderId);
+        if (order == null) {
+            return false;
+        }
+        Integer current = order.getIsFoundAll();
+        int next = (current != null && current == 1) ? 0 : 1;
+        order.setIsFoundAll(next);
+        return temuOrderMapper.updateById(order) > 0;
+    }
 }

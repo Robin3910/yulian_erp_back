@@ -84,4 +84,11 @@ public interface ITemuOrderService {
 	Boolean updateOrderStatus(List<TemuOrderDO> reqVOList);
 
     OrderSkuPageRespVO orderSkuPage(TemuOrderRequestVO req, Integer pageNo, Integer pageSize);
+
+    /**
+     * 切换订单的isFoundAll字段（1-0-1交替）
+     * @param orderId 订单ID
+     * @return 是否成功
+     */
+    Boolean toggleIsFoundAll(Long orderId);
 }

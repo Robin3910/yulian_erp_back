@@ -141,4 +141,10 @@ public class AdminTemuOrderController {
             @RequestParam(defaultValue = "10") Integer pageSize) {
         return success(temuOrderService.orderSkuPage(temuOrderRequestVO, pageNo, pageSize));
     }
+
+    @PostMapping("/toggle-is-found-all")
+    @Operation(summary = "切换订单是否找齐状态")
+    public CommonResult<Boolean> toggleIsFoundAll(@RequestParam("orderId") Long orderId) {
+        return success(temuOrderService.toggleIsFoundAll(orderId));
+    }
 }

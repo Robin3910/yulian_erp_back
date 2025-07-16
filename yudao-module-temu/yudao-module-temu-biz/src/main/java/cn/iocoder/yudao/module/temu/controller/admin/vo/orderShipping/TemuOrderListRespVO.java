@@ -69,4 +69,7 @@ public class TemuOrderListRespVO {
     @Schema(description = "平台订单时间")
     private LocalDateTime bookingTime;
 
+    @Schema(description = "是否找齐：1-是，0-否")
+    private Integer isFoundAll;
+
 }
