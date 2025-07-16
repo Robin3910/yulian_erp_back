@@ -632,6 +632,67 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					.append("')");
 		}
 
+		// 新增：定制文字模糊查询（加开关）
+		String isCustomTextQueryEnabled = configApi.getConfigValueByKey("temu.order-shipping.customText-query.enabled");
+		boolean customTextQueryEnabled = false;
+		if (StringUtils.hasText(isCustomTextQueryEnabled)) {
+			try {
+				customTextQueryEnabled = Boolean.parseBoolean(isCustomTextQueryEnabled);
+			} catch (Exception e) {}
+		}
+		if (customTextQueryEnabled && StringUtils.hasText(pageVO.getCustomTextList())) {
+			List<TemuOrderDO> textMatchedOrders = orderMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderDO>()
+					.select(TemuOrderDO::getOrderNo)
+					.like(TemuOrderDO::getCustomTextList, pageVO.getCustomTextList())
+			);
+			if (!textMatchedOrders.isEmpty()) {
+				Set<String> textOrderNos = textMatchedOrders.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.toSet());
+				subQuery.append(" AND order_no IN ('")
+						.append(String.join("','", textOrderNos))
+						.append("')");
+			} else {
+				subQuery.append(" AND 1=0");
+			}
+		}
+		// 新增：批次编号模糊查询（加开关）
+		String isBatchNoQueryEnabled = configApi.getConfigValueByKey("temu.order-shipping.batchNo-query.enabled");
+		boolean batchNoQueryEnabled = false;
+		if (StringUtils.hasText(isBatchNoQueryEnabled)) {
+			try {
+				batchNoQueryEnabled = Boolean.parseBoolean(isBatchNoQueryEnabled);
+			} catch (Exception e) {}
+		}
+		if (batchNoQueryEnabled && StringUtils.hasText(pageVO.getBatchNo())) {
+			List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderBatchDO>()
+					.like(TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())
+			);
+			if (!batchList.isEmpty()) {
+				List<Long> batchIds = batchList.stream().map(TemuOrderBatchDO::getId).collect(Collectors.toList());
+				List<TemuOrderBatchRelationDO> relations = temuOrderBatchRelationMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderBatchRelationDO>()
+						.in(TemuOrderBatchRelationDO::getBatchId, batchIds)
+				);
+				if (!relations.isEmpty()) {
+					List<Long> orderIds = relations.stream().map(TemuOrderBatchRelationDO::getOrderId).collect(Collectors.toList());
+					if (!orderIds.isEmpty()) {
+						Set<String> batchOrderNos = orderMapper.selectBatchIds(orderIds)
+							.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.toSet());
+						subQuery.append(" AND order_no IN ('")
+								.append(String.join("','", batchOrderNos))
+								.append("')");
+					} else {
+						subQuery.append(" AND 1=0");
+					}
+				} else {
+					subQuery.append(" AND 1=0");
+				}
+			} else {
+				subQuery.append(" AND 1=0");
+			}
+		}
+
 		// 优化：处理类目条件 - 当只有类目条件时，使用JOIN查询
 		if (matchedOrders == null && !CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
 			log.info("[buildShippingQueryWrapper] 使用类目JOIN查询优化");

@@ -45,6 +45,12 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	@Schema(description = "是否加急")
 	private Boolean isUrgent;
 
+	@Schema(description = "定制文字模糊查询")
+	private String customTextList;
+
+	@Schema(description = "批次编号")
+	private String batchNo;
+
 	@DateTimeFormat(pattern = "yyyy-MM-dd")
 	@Schema(description = "创建时间", example = "2024-01-01", title = "查询的时间范围")
 	private LocalDate[] createTime;
