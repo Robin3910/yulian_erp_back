@@ -152,26 +152,41 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
         // 获取当前时间
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();
+        // 读取配置项，解析上午/下午时间段
+        String morningConfig = configApi.getConfigValueByKey("temu.batch.morning.period"); // 默认 "0-11"
+        String afternoonConfig = configApi.getConfigValueByKey("temu.batch.afternoon.period"); // 默认 "11-17.5"
+        TimePeriod morningPeriod = parsePeriodConfig(morningConfig, 0.0, 11.0);
+        TimePeriod afternoonPeriod = parsePeriodConfig(afternoonConfig, 11.0, 17.5);
+
+        // 判断当前时段，决定periodStart、periodEnd、periodStr
         LocalDateTime periodStart, periodEnd;
         String periodStr;
-
-        if (now.getHour() < 12) {
-            // 上午时段 (0:00 - 12:00)
-            periodStart = today.atStartOfDay();
-            periodEnd = today.atTime(12, 0, 0);
+        LocalTime nowTime = now.toLocalTime();
+        if (!nowTime.isBefore(morningPeriod.getStartTime()) && nowTime.isBefore(morningPeriod.getEndTime())) {
+            periodStart = today.atTime(morningPeriod.getStartTime());
+            periodEnd = today.atTime(morningPeriod.getEndTime());
             periodStr = "上午";
-        } else {
-            // 下午时段 (12:00 - 24:00)
-            periodStart = today.atTime(12, 0, 0);
-            periodEnd = today.atTime(23, 59, 59);
+        } else if (!nowTime.isBefore(afternoonPeriod.getStartTime()) && nowTime.isBefore(afternoonPeriod.getEndTime())) {
+            periodStart = today.atTime(afternoonPeriod.getStartTime());
+            periodEnd = today.atTime(afternoonPeriod.getEndTime());
             periodStr = "下午";
+        } else {
+            // 夜间，归到次日上午
+            today = today.plusDays(1);
+            periodStart = today.atTime(morningPeriod.getStartTime());
+            periodEnd = today.atTime(morningPeriod.getEndTime());
+            periodStr = "上午";
         }
+        final LocalDate finalToday = today;
+        final String finalPeriodStr = periodStr;
+        final LocalDateTime finalPeriodStart = periodStart;
+        final LocalDateTime finalPeriodEnd = periodEnd;
 
         // 遍历每个batchCategoryId
         batchCategoryOrderMap.forEach((batchCategoryId, orderIds) -> {
             // 1. 查询当天最新的批次
             TemuOrderBatchDO latestBatch = temuOrderBatchMapper.selectLatestBatchByCategoryId(batchCategoryId,
-                    periodStart, periodEnd);
+                    finalPeriodStart, finalPeriodEnd);
 
             Long batchId;
             if (latestBatch != null) {
@@ -187,31 +202,28 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
                 
                 for (TemuOrderBatchDO batch : periodBatchList) {
                     LocalTime batchTime = batch.getCreateTime().toLocalTime();
-                    if (batchTime.isBefore(LocalTime.of(12, 0))) {
+                    if (!batchTime.isBefore(morningPeriod.getStartTime()) && batchTime.isBefore(morningPeriod.getEndTime())) {
                         morningCount++;
-                    } else {
+                    } else if (!batchTime.isBefore(afternoonPeriod.getStartTime()) && batchTime.isBefore(afternoonPeriod.getEndTime())) {
                         afternoonCount++;
                     }
                 }
                 
                 // 根据当前时段确定批次数量
                 int batchCount;
-                if (now.getHour() < 12) {
-                    // 上午时段
+                if ("上午".equals(finalPeriodStr)) {
                     batchCount = morningCount + 1;
                 } else {
-                    // 下午时段
                     batchCount = afternoonCount + 1;
                 }
 
                 // 创建新批次
                 TemuOrderBatchDO newBatch = new TemuOrderBatchDO();
                 newBatch.setBatchCategoryId(batchCategoryId);
-                String dateStr = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-                String batchNo = String.format("%s%s%02d", dateStr, periodStr, batchCount);
+                String dateStr = finalToday.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                String batchNo = String.format("%s%s%02d", dateStr, finalPeriodStr, batchCount);
                 newBatch.setBatchNo(batchNo);
                 newBatch.setStatus(0);
-                System.out.println(batchNo);
                 temuOrderBatchMapper.insert(newBatch);
                 batchId = newBatch.getId();
 
@@ -269,74 +281,74 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
         if (batchCategoryOrderMap == null || batchCategoryOrderMap.isEmpty()) {
             return;
         }
-
-        // 从配置获取时间段定义（配置格式："开始小时-结束小时"，使用小数表示半小时）
+        // 读取配置项，解析上午/下午时间段
         String morningConfig = configApi.getConfigValueByKey("temu.batch.morning.period"); // 默认 "0-11"
         String afternoonConfig = configApi.getConfigValueByKey("temu.batch.afternoon.period"); // 默认 "11-17.5"
-
-        // 解析动态配置（带默认值）
         TimePeriod morningPeriod = parsePeriodConfig(morningConfig, 0.0, 11.0);
         TimePeriod afternoonPeriod = parsePeriodConfig(afternoonConfig, 11.0, 17.5);
 
-        // 获取当前时间并确定目标时间段
+        // 获取当前时间
         LocalDateTime now = LocalDateTime.now();
-        TimePeriod targetPeriod = calculateTargetPeriod(now, morningPeriod, afternoonPeriod);
-
-        // 2. 确定批次日期和时段
-        LocalDate batchDate = now.toLocalDate();
-        // 夜间时段需要切换到第二天的批次
-        if (isNightShift(now, afternoonPeriod)) {
-            batchDate = batchDate.plusDays(1);
+        LocalDate today = now.toLocalDate();
+        // 判断当前时段，决定periodStart、periodEnd、periodStr
+        LocalDateTime periodStart, periodEnd;
+        String periodStr;
+        LocalTime nowTime = now.toLocalTime();
+        if (!nowTime.isBefore(morningPeriod.getStartTime()) && nowTime.isBefore(morningPeriod.getEndTime())) {
+            periodStart = today.atTime(morningPeriod.getStartTime());
+            periodEnd = today.atTime(morningPeriod.getEndTime());
+            periodStr = "上午";
+        } else if (!nowTime.isBefore(afternoonPeriod.getStartTime()) && nowTime.isBefore(afternoonPeriod.getEndTime())) {
+            periodStart = today.atTime(afternoonPeriod.getStartTime());
+            periodEnd = today.atTime(afternoonPeriod.getEndTime());
+            periodStr = "下午";
+        } else {
+            // 夜间，归到次日上午
+            today = today.plusDays(1);
+            periodStart = today.atTime(morningPeriod.getStartTime());
+            periodEnd = today.atTime(morningPeriod.getEndTime());
+            periodStr = "上午";
         }
+        final LocalDate finalToday = today;
+        final String finalPeriodStr = periodStr;
+        final LocalDateTime finalPeriodStart = periodStart;
+        final LocalDateTime finalPeriodEnd = periodEnd;
 
-        // 构建时间段边界
-        LocalDateTime periodStart = LocalDateTime.of(batchDate, targetPeriod.getStartTime());
-        LocalDateTime periodEnd = LocalDateTime.of(batchDate, targetPeriod.getEndTime());
-
-        // 3. 处理批次
+        // 处理批次
         batchCategoryOrderMap.forEach((batchCategoryId, orderIds) -> {
             // 查询指定时间段内的最新批次
             TemuOrderBatchDO latestBatch = temuOrderBatchMapper.selectLatestBatchByCategoryId(
-                    batchCategoryId, periodStart, periodEnd
+                    batchCategoryId, finalPeriodStart, finalPeriodEnd
             );
-
             Long batchId;
             if (latestBatch != null) {
                 batchId = latestBatch.getId();
             } else {
                 // 查询当前时段已有批次数量
-                List<TemuOrderBatchDO> periodBatchList = temuOrderBatchMapper.selectByCreateTimeRange(periodStart, periodEnd);
-                
+                List<TemuOrderBatchDO> periodBatchList = temuOrderBatchMapper.selectByCreateTimeRange(finalPeriodStart, finalPeriodEnd);
                 // 将批次列表按上午下午分组统计
                 int morningCount = 0;
                 int afternoonCount = 0;
-                
                 for (TemuOrderBatchDO batch : periodBatchList) {
                     LocalTime batchTime = batch.getCreateTime().toLocalTime();
-                    if (batchTime.isBefore(LocalTime.of(12, 0))) {
+                    if (!batchTime.isBefore(morningPeriod.getStartTime()) && batchTime.isBefore(morningPeriod.getEndTime())) {
                         morningCount++;
-                    } else {
+                    } else if (!batchTime.isBefore(afternoonPeriod.getStartTime()) && batchTime.isBefore(afternoonPeriod.getEndTime())) {
                         afternoonCount++;
                     }
                 }
-                
                 // 根据当前时段确定批次数量
                 int batchCount;
-                if (now.getHour() < 12) {
-                    // 上午时段
+                if ("上午".equals(finalPeriodStr)) {
                     batchCount = morningCount + 1;
                 } else {
-                    // 下午时段
                     batchCount = afternoonCount + 1;
                 }
-
-                // 创建新批次（使用当天日期+递增编号）
+                // 创建新批次
                 TemuOrderBatchDO newBatch = new TemuOrderBatchDO();
                 newBatch.setBatchCategoryId(batchCategoryId);
-                // 设置批次号为yyyyMMdd上午或yyyyMMdd下午格式
-                String dateStr = DateTime.now().toString("yyyyMMdd");
-                String periodStr = (now.getHour() < 12) ? "上午" : "下午";
-                String batchNo = String.format("%s%s%02d", dateStr, periodStr, batchCount);
+                String dateStr = finalToday.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                String batchNo = String.format("%s%s%02d", dateStr, finalPeriodStr, batchCount);
                 newBatch.setBatchNo(batchNo);
                 newBatch.setStatus(0);
 
@@ -349,7 +361,6 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
                 temuOrderBatchMapper.insert(newBatch);
                 batchId = newBatch.getId();
             }
-
             // 2. 创建批次关系记录
             List<TemuOrderBatchRelationDO> relations = orderIds.stream()
                     .map(orderId -> {
@@ -391,7 +402,7 @@ public class TemuOrderBatchCategoryService implements ITemuOrderBatchCategorySer
         });
 
         // 获取今日起止时间
-        LocalDate today = LocalDate.now();
+         today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
