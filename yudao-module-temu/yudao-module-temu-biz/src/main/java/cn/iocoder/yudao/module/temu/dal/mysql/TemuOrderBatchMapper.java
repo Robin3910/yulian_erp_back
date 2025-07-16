@@ -81,5 +81,12 @@ public interface TemuOrderBatchMapper extends BaseMapperX<TemuOrderBatchDO> {
 												   @Param("endTime") LocalDateTime endTime);
 	//查询当天有多少订单
 	List<TemuOrderBatchDO> selectByCreateTimeRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    /**
+     * 根据批次ID批量查询批次信息
+     * @param ids 批次ID列表
+     * @return 批次信息列表
+     */
+    List<TemuOrderBatchDO> selectBatchByIds(@Param("ids") List<Long> ids);
 }
 

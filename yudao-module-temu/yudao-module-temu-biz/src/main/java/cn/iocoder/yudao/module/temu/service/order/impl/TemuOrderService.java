@@ -80,6 +80,8 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderSkuPageRespVO
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderGroupBySortingSequenceVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderSkuPageItemVO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
 
 @Service
 @Slf4j
@@ -124,6 +126,9 @@ public class TemuOrderService implements ITemuOrderService {
 
 	@Resource
 	private ConfigApi configApi;
+	
+	@Resource
+	private TemuOrderShippingMapper shippingInfoMapper;
 	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
@@ -632,7 +637,17 @@ public class TemuOrderService implements ITemuOrderService {
 		
 		// 同时保存或更新店铺信息
 		saveShopInfo(shopIdLong, shopName);
-		
+		// 异步插入临时物流信息（开关控制）
+		String isTempShippingEnabled = configApi.getConfigValueByKey("is_TempShipping_Enabled");
+		boolean tempShippingEnabled = false;
+		if (StringUtils.hasText(isTempShippingEnabled)) {
+			try {
+				tempShippingEnabled = Boolean.parseBoolean(isTempShippingEnabled);
+			} catch (Exception e) {}
+		}
+		if (tempShippingEnabled) {
+			saveTempShippingInfoBatch(shopIdLong, ordersList);
+		}
 		return count;
 	}
 	
@@ -1236,6 +1251,33 @@ public class TemuOrderService implements ITemuOrderService {
 			temuOrderMapper.updateById(order);
 		}
 	}
+
+    @Async
+    public void saveTempShippingInfoBatch(Long shopId, List<Map<String, Object>> ordersList) {
+        if (ordersList == null || ordersList.isEmpty() || shopId == null) return;
+        LocalDateTime createTime = LocalDate.now().atTime(0, 0, 1);
+        List<TemuOrderShippingInfoDO> shippingList = new ArrayList<>();
+        for (Map<String, Object> orderMap : ordersList) {
+            String orderNo = orderMap.get("orderId") == null ? null : orderMap.get("orderId").toString();
+            if (orderNo == null || orderNo.isEmpty()) continue;
+            TemuOrderShippingInfoDO shipping = new TemuOrderShippingInfoDO();
+            shipping.setOrderNo(orderNo);
+            shipping.setShopId(shopId);
+            shipping.setTrackingNumber("临时虚拟物流" + orderNo);
+            shipping.setCreateTime(createTime);
+            shipping.setUpdateTime(createTime);
+            shipping.setExpressImageUrl("");
+            shipping.setExpressOutsideImageUrl("");
+            shipping.setExpressSkuImageUrl("");
+            shipping.setShippingStatus(0);
+            shipping.setIsUrgent(false);
+            // 其它字段可不赋值
+            shippingList.add(shipping);
+        }
+        if (!shippingList.isEmpty()) {
+            shippingInfoMapper.insertBatch(shippingList);
+        }
+    }
 
 
 	

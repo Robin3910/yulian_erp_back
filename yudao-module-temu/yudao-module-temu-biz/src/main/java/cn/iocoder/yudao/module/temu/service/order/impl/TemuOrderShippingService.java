@@ -60,9 +60,15 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	
 	@Resource
 	private TemuShopMapper temuShopMapper;
-	
+
 	@Resource
 	private WeiXinProducer weiXinProducer;
+
+	@Resource
+	private TemuOrderBatchRelationMapper temuOrderBatchRelationMapper;
+
+	@Resource
+	private TemuOrderBatchMapper temuOrderBatchMapper;
 
 	@Resource
 	private AdminUserMapper adminUserMapper;
@@ -239,8 +245,51 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		
 		// ==================== 步骤6：组装返回结果 ====================
 		long step6StartTime = System.currentTimeMillis();
+		// 6. 组装返回结果时，设置 batchNo 到 TemuOrderListRespVO
+		String isBatchNoEnabled = configApi.getConfigValueByKey("is_BatchNo_Enabled");
+		boolean batchNoEnabled = false;
+		if (StringUtils.hasText(isBatchNoEnabled)) {
+			try {
+				batchNoEnabled = Boolean.parseBoolean(isBatchNoEnabled);
+			} catch (Exception e) {}
+		}
+		Map<Long, String> orderIdToBatchNo = new HashMap<>();
+		Map<String, Long> customSkuToOrderId = new HashMap<>();
+		if (batchNoEnabled) {
+			// 1. 收集所有订单ID，若id为null则用customSku查id
+			List<Long> allOrderIds = new ArrayList<>();
+			for (TemuOrderDO order : orders) {
+				if (order.getId() != null) {
+					allOrderIds.add(order.getId());
+				} else if (order.getCustomSku() != null) {
+					List<TemuOrderDO> bySku = orderMapper.selectByCustomSku(order.getCustomSku());
+					if (bySku != null && !bySku.isEmpty()) {
+						Long foundId = bySku.get(0).getId();
+						allOrderIds.add(foundId);
+						customSkuToOrderId.put(order.getCustomSku(), foundId);
+					}
+				}
+			}
+			if (!allOrderIds.isEmpty()) {
+				List<TemuOrderBatchRelationDO> relations = temuOrderBatchRelationMapper.selectByOrderIds(allOrderIds);
+				Map<Long, Long> orderIdToBatchId = relations.stream().collect(Collectors.toMap(TemuOrderBatchRelationDO::getOrderId, TemuOrderBatchRelationDO::getBatchId));
+				List<Long> batchIds = relations.stream().map(TemuOrderBatchRelationDO::getBatchId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+				if (!batchIds.isEmpty()) {
+					List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectBatchByIds(batchIds);
+					Map<Long, String> batchIdToBatchNo = batchList.stream().collect(Collectors.toMap(TemuOrderBatchDO::getId, TemuOrderBatchDO::getBatchNo));
+					for (Map.Entry<Long, Long> entry : orderIdToBatchId.entrySet()) {
+						Long orderId = entry.getKey();
+						Long batchId = entry.getValue();
+						String batchNo = batchIdToBatchNo.get(batchId);
+						if (batchNo != null) {
+							orderIdToBatchNo.put(orderId, batchNo);
+						}
+					}
+				}
+			}
+		}
 		List<TemuOrderShippingRespVO> voList = buildOrderShippingRespList(allRelatedShippings, orderMap, shopMap,
-				categoryMap);
+				categoryMap, orderIdToBatchNo);
 
 		// 新增：批量查询shippedOperatorId对应的昵称
 		Set<Long> operatorIds = voList.stream()
@@ -776,7 +825,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	private List<TemuOrderShippingRespVO> buildOrderShippingRespList(List<TemuOrderShippingInfoDO> shippingList,
 	                                                                 Map<String, List<TemuOrderDO>> orderMap,
 	                                                                 Map<Long, TemuShopDO> shopMap,
-	                                                                 Map<String, TemuProductCategoryDO> categoryMap) {
+	                                                                 Map<String, TemuProductCategoryDO> categoryMap,
+	                                                                 Map<Long, String> orderIdToBatchNo) {
 		// 按物流单号分组
 		Map<String, List<TemuOrderShippingInfoDO>> shippingGroupMap = shippingList.stream()
 				.collect(Collectors.groupingBy(TemuOrderShippingInfoDO::getTrackingNumber));
@@ -863,6 +913,18 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					// 新增：赋值bookingTime
 					if (order.getBookingTime() != null) {
 						orderVO.setBookingTime(order.getBookingTime());
+					}
+					// 新增：赋值batchNo
+					Long oid = order.getId();
+					if (oid == null && order.getCustomSku() != null) {
+						List<TemuOrderDO> bySku = orderMapper.selectByCustomSku(order.getCustomSku());
+						if (bySku != null && !bySku.isEmpty()) {
+							Long foundId = bySku.get(0).getId();
+							oid = foundId;
+						}
+					}
+					if (orderIdToBatchNo != null && oid != null && orderIdToBatchNo.containsKey(oid)) {
+						orderVO.setBatchNo(orderIdToBatchNo.get(oid));
 					}
 					orderListVOs.add(orderVO);
 				}

@@ -23,4 +23,14 @@
         WHERE create_time BETWEEN #{start} AND #{end}
     </select>
 
+    <select id="selectBatchByIds" resultType="cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderBatchDO">
+        SELECT
+        <include refid="selectFields"/>
+        FROM temu_order_batch
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
 </mapper>

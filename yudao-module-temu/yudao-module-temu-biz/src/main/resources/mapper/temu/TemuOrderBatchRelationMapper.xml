@@ -8,4 +8,13 @@
         WHERE order_id = #{orderId}
     </update>
 
+    <select id="selectByOrderIds" resultType="cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderBatchRelationDO">
+        SELECT * FROM temu_order_batch_relation
+        WHERE order_id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        AND deleted = 0
+    </select>
+
 </mapper> 

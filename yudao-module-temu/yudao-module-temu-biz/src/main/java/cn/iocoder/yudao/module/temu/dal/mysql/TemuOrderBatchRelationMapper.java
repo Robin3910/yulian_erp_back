@@ -17,4 +17,11 @@ public interface TemuOrderBatchRelationMapper extends BaseMapperX<TemuOrderBatch
      * @return 删除的记录数
      */
     int deleteByOrderId(@Param("orderId") Long orderId);
+
+    /**
+     * 根据订单ID批量查询关联关系
+     * @param orderIds 订单ID列表
+     * @return 关联关系列表
+     */
+    List<TemuOrderBatchRelationDO> selectByOrderIds(@Param("orderIds") List<Long> orderIds);
 }
