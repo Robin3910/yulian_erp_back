@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.temu.dal.mysql.OrderStatisticsMapper">
+
+    <!-- 按日统计订单数量 -->
+    <select id="selectOrderCountByDay" resultType="map">
+        SELECT 
+            DATE(create_time) AS time_point,
+            COUNT(id) AS order_count
+        FROM temu_order
+        WHERE 
+            shop_id IN
+            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                #{shopId}
+            </foreach>
+            AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+            AND deleted = 0
+        GROUP BY DATE(create_time)
+        ORDER BY time_point
+    </select>
+
+    <!-- 按周统计订单数量 -->
+    <select id="selectOrderCountByWeek" resultType="map">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%u') AS time_point,
+            COUNT(id) AS order_count
+        FROM temu_order
+        WHERE 
+            shop_id IN
+            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                #{shopId}
+            </foreach>
+            AND create_time BETWEEN #{startDate} AND #{endDate}
+            AND deleted = 0
+        GROUP BY DATE_FORMAT(create_time, '%Y-%u')
+        ORDER BY time_point
+    </select>
+
+    <!-- 按月统计订单数量 -->
+    <select id="selectOrderCountByMonth" resultType="map">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%m') AS time_point,
+            COUNT(id) AS order_count
+        FROM temu_order
+        WHERE 
+            shop_id IN
+            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                #{shopId}
+            </foreach>
+            AND create_time BETWEEN #{startDate} AND #{endDate}
+            AND deleted = 0
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY time_point
+    </select>
+
+</mapper> 

@@ -1,0 +1,22 @@
+package cn.iocoder.yudao.module.temu.dal.mysql;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;
+import java.util.Map;
+
+@Mapper
+public interface OrderStatisticsMapper {
+    // 按日统计
+    List<Map<String, Object>> selectOrderCountByDay(@Param("shopIds") List<Long> shopIds,
+                                                    @Param("startDate") String startDate,
+                                                    @Param("endDate") String endDate);
+    // 按周统计
+    List<Map<String, Object>> selectOrderCountByWeek(@Param("shopIds") List<Long> shopIds,
+                                                     @Param("startDate") String startDate,
+                                                     @Param("endDate") String endDate);
+    // 按月统计
+    List<Map<String, Object>> selectOrderCountByMonth(@Param("shopIds") List<Long> shopIds,
+                                                      @Param("startDate") String startDate,
+                                                      @Param("endDate") String endDate);
+} 
