@@ -563,6 +563,12 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					.append(")");
 		}
 		
+		// 处理 senderId 条件
+		if (pageVO.getSenderId() != null) {
+			subQuery.append(" AND order_no IN (SELECT order_no FROM temu_order WHERE sender_id = ")
+					.append(pageVO.getSenderId()).append(")");
+		}
+
 		// 处理物流单号
 		if (StringUtils.hasText(pageVO.getTrackingNumber())) {
 			subQuery.append(" AND tracking_number LIKE '%").append(pageVO.getTrackingNumber()).append("%'");
