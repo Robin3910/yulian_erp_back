@@ -86,9 +86,19 @@ public interface ITemuOrderService {
     OrderSkuPageRespVO orderSkuPage(TemuOrderRequestVO req, Integer pageNo, Integer pageSize);
 
     /**
-     * 切换订单的isFoundAll字段（1-0-1交替）
+     * 切换或直接设置订单的isFoundAll字段
      * @param orderId 订单ID
+     * @param isFoundAll 目标值（可为null，null时为切换，非null时为直接赋值）
      * @return 是否成功
      */
-    Boolean toggleIsFoundAll(Long orderId);
+    Boolean toggleIsFoundAll(Long orderId, Integer isFoundAll);
+
+    /**
+     * 批量根据sortingSequence更新sender_id
+     * @param sortingSequenceList 中包序号列表
+     * @param senderId 发货人ID
+     * @param conditionFlag 是否强制覆盖
+     * @return 是否成功
+     */
+    Boolean batchUpdateSenderIdBySortingSequence(List<String> sortingSequenceList, Long senderId, Boolean conditionFlag);
 }

@@ -72,4 +72,7 @@ public class TemuOrderListRespVO {
     @Schema(description = "是否找齐：1-是，0-否")
     private Integer isFoundAll;
 
+    @Schema(description = "发货人ID")
+    private Long senderId;
+
 }

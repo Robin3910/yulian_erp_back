@@ -219,7 +219,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 								// 新增：查bookingTime
 								TemuOrderDO::getBookingTime,
 								// 新增：查isFoundAll
-								TemuOrderDO::getIsFoundAll)
+								TemuOrderDO::getIsFoundAll,
+								TemuOrderDO::getSenderId)
 						.in(TemuOrderDO::getOrderNo, allOrderNos));
 		Map<String, List<TemuOrderDO>> orderMap = orders.stream()
 				.collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
@@ -963,6 +964,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				for (TemuOrderDO order : orderList) {
 					TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
 					orderVO.setIsFoundAll(order.getIsFoundAll());
+					orderVO.setSenderId(order.getSenderId());
 					if (order.getCategoryId() != null) {
 						TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
 						if (category != null && category.getOldType() != null && shop != null

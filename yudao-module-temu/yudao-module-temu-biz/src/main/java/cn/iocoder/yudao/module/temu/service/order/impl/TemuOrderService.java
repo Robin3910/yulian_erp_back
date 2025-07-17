@@ -1260,6 +1260,13 @@ public class TemuOrderService implements ITemuOrderService {
         for (Map<String, Object> orderMap : ordersList) {
             String orderNo = orderMap.get("orderId") == null ? null : orderMap.get("orderId").toString();
             if (orderNo == null || orderNo.isEmpty()) continue;
+            // 新增：插入前查是否已存在相同订单号+shopId
+            Long count = shippingInfoMapper.selectCount(
+                new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
+                    .eq(TemuOrderShippingInfoDO::getOrderNo, orderNo)
+                    .eq(TemuOrderShippingInfoDO::getShopId, shopId)
+            );
+            if (count != null && count > 0) continue;
             TemuOrderShippingInfoDO shipping = new TemuOrderShippingInfoDO();
             shipping.setOrderNo(orderNo);
             shipping.setShopId(shopId);
@@ -1417,14 +1424,45 @@ public class TemuOrderService implements ITemuOrderService {
 	}
 
     @Override
-    public Boolean toggleIsFoundAll(Long orderId) {
+    public Boolean toggleIsFoundAll(Long orderId, Integer isFoundAll) {
         TemuOrderDO order = temuOrderMapper.selectById(orderId);
         if (order == null) {
             return false;
         }
-        Integer current = order.getIsFoundAll();
-        int next = (current != null && current == 1) ? 0 : 1;
-        order.setIsFoundAll(next);
+        if (isFoundAll != null) {
+            order.setIsFoundAll(isFoundAll);
+        } else {
+            Integer current = order.getIsFoundAll();
+            int next = (current != null && current == 1) ? 0 : 1;
+            order.setIsFoundAll(next);
+        }
         return temuOrderMapper.updateById(order) > 0;
+    }
+
+    @Override
+    public Boolean batchUpdateSenderIdBySortingSequence(List<String> sortingSequenceList, Long senderId, Boolean conditionFlag) {
+        if (sortingSequenceList == null || sortingSequenceList.isEmpty() || senderId == null) {
+            return false;
+        }
+        // 查找所有匹配的订单
+        List<TemuOrderDO> orders = temuOrderMapper.selectList(
+                new LambdaQueryWrapperX<TemuOrderDO>()
+                        .in(TemuOrderDO::getSortingSequence, sortingSequenceList)
+        );
+        if (orders.isEmpty()) {
+            return false;
+        }
+        boolean updated = false;
+        for (TemuOrderDO order : orders) {
+            // conditionFlag=true: 强制覆盖；false: 只更新sender_id为空的
+            if (Boolean.TRUE.equals(conditionFlag) || order.getSenderId() == null) {
+                TemuOrderDO update = new TemuOrderDO();
+                update.setId(order.getId());
+                update.setSenderId(senderId);
+                temuOrderMapper.updateById(update);
+                updated = true;
+            }
+        }
+        return updated;
     }
 }

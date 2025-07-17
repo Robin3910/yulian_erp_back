@@ -61,6 +61,11 @@ public class TemuOrderShippingPageReqVO extends PageParam {
 	@Schema(description = "发货状态（0：未发货；1：已发货）")
 	private Integer shippingStatus;
 
+    @Schema(description = "发货人ID")
+    private Long senderId;
+
+    @Schema(description = "是否找齐：1-是，0-否")
+    private Integer isFoundAll;
 	
 	@Data
 	@Schema(description = "管理后台 - Temu批量更新订单状态 Request VO")

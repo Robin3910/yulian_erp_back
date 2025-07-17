@@ -183,4 +183,10 @@ public class TemuOrderDO extends BaseDO {
      */
     @TableField(value = "is_found_all")
     private Integer isFoundAll;
+
+	/**
+	 * 发货人ID
+	 */
+	@TableField(value = "sender_id")
+	private Long senderId;
 }

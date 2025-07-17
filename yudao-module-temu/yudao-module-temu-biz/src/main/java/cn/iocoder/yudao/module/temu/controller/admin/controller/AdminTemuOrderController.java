@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchInsertReqVO;
 
 @Tag(name = "Temu管理 - 订单管理")
 @RestController
@@ -144,7 +145,19 @@ public class AdminTemuOrderController {
 
     @PostMapping("/toggle-is-found-all")
     @Operation(summary = "切换订单是否找齐状态")
-    public CommonResult<Boolean> toggleIsFoundAll(@RequestParam("orderId") Long orderId) {
-        return success(temuOrderService.toggleIsFoundAll(orderId));
+    public CommonResult<Boolean> toggleIsFoundAll(@RequestParam("orderId") Long orderId,
+                                                  @RequestParam(value = "isFoundAll", required = false) Integer isFoundAll) {
+        return success(temuOrderService.toggleIsFoundAll(orderId, isFoundAll));
+    }
+
+    /**
+     * 批量插入订单（根据sorting_sequence、发货人id、条件判断）
+     */
+    @PostMapping("/batch-insert")
+    @Operation(summary = "批量插入订单（根据sorting_sequence、发货人id、条件判断）")
+    public CommonResult<Boolean> batchInsertOrder(@RequestBody TemuOrderBatchInsertReqVO reqVO) {
+        return success(temuOrderService.batchUpdateSenderIdBySortingSequence(
+            reqVO.getSortingSequenceList(), reqVO.getSenderId(), reqVO.getConditionFlag()
+        ));
     }
 }
