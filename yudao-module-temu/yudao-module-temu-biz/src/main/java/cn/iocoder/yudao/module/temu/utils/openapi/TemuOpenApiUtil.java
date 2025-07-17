@@ -3,23 +3,20 @@ package cn.iocoder.yudao.module.temu.utils.openapi;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.http.HttpRequest;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.module.temu.api.openapi.dto.OrderInfoDTO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuDeliveryOrderQueryReqVO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -108,7 +105,7 @@ public class TemuOpenApiUtil {
 		log.info("请求的内容是\n:{}", body);
 		return body;
 	}
-	
+
 	public List<OrderInfoDTO.SubOrderForSupplier> getFullOrderList(TreeMap<String, Object> params) {
 		ArrayList<OrderInfoDTO.SubOrderForSupplier> subOrderForSupplierList = new ArrayList<>();
 		params.put("type", "bg.purchaseorderv2.get");
@@ -162,5 +159,82 @@ public class TemuOpenApiUtil {
 
 		// 发送请求并返回结果
 		return request(params);
+	}
+	//请求（失败并重试）
+	public String requestWithRetry(TreeMap<String, Object> params, int maxRetry, long retryIntervalMillis) {
+		TreeMap<String, Object> requestData = createRequest(params);
+		String lastError = null;
+		for (int i = 0; i < maxRetry; i++) {
+			try {
+				log.info("第{}次请求API，参数：{}", i + 1, JSONUtil.toJsonStr(requestData));
+				String body = HttpRequest.post(baseUrl)
+						.body(JSONUtil.toJsonStr(requestData))
+						.timeout(10000) // 可设置超时时间
+						.execute()
+						.body();
+				// 业务判断
+				cn.hutool.json.JSONObject json = JSONUtil.parseObj(body);
+				if (json.getBool("success", false)) {
+					return body;
+				} else {
+					lastError = json.getStr("errorMsg");
+					log.warn("第{}次API请求失败，错误信息：{}", i + 1, lastError);
+				}
+			} catch (Exception e) {
+				lastError = e.getMessage();
+				log.warn("第{}次API请求异常，异常信息：{}", i + 1, lastError, e);
+			}
+			if (i < maxRetry - 1) {
+				log.info("将在{}毫秒后进行第{}次重试...", retryIntervalMillis, i + 2);
+				try {
+					Thread.sleep(retryIntervalMillis); // 重试间隔
+				} catch (InterruptedException ignored) {}
+			}
+		}
+		log.error("API请求失败，重试{}次仍未成功，最后错误：{}", maxRetry, lastError);
+		throw new RuntimeException("API请求失败，重试" + maxRetry + "次仍未成功，最后错误：" + lastError);
+	}
+
+	/**
+	 * 获取发货订单列表v2
+	 *
+	 * @param reqVO 查询参数VO
+	 * @return 发货订单列表
+	 */
+	public String getShipOrderListv2(TemuDeliveryOrderQueryReqVO reqVO) {
+		TreeMap<String, Object> params = new TreeMap<>();
+		params.put("type", "bg.shiporderv2.get");
+		// 优先用reqVO里的分页参数
+		Integer pageSize = reqVO.getPageSize() != null ? reqVO.getPageSize() : 10;
+		Integer pageNo = reqVO.getPageNo() != null ? reqVO.getPageNo() : 1;
+		params.put("pageSize", pageSize);
+		params.put("pageNo", pageNo);
+
+		if (reqVO.getProductSkcIdList() != null) params.put("productSkcIdList", reqVO.getProductSkcIdList());
+		if (reqVO.getIsCustomProduct() != null) params.put("isCustomProduct", reqVO.getIsCustomProduct());
+		if (reqVO.getPageSize() != null) params.put("pageSize", reqVO.getPageSize());
+		if (reqVO.getPageNo() != null) params.put("pageNo", reqVO.getPageNo());
+		if (reqVO.getExpressDeliverySnList() != null) params.put("expressDeliverySnList", reqVO.getExpressDeliverySnList());
+		if (reqVO.getExpressWeightFeedbackStatus() != null) params.put("expressWeightFeedbackStatus", reqVO.getExpressWeightFeedbackStatus());
+		if (reqVO.getIsPrintBoxMark() != null) params.put("isPrintBoxMark", reqVO.getIsPrintBoxMark());
+		if (reqVO.getTargetDeliveryAddress() != null) params.put("targetDeliveryAddress", reqVO.getTargetDeliveryAddress());
+		if (reqVO.getOnlyTaxWarehouseWaitApply() != null) params.put("onlyTaxWarehouseWaitApply", reqVO.getOnlyTaxWarehouseWaitApply());
+		if (reqVO.getSubWarehouseIdList() != null) params.put("subWarehouseIdList", reqVO.getSubWarehouseIdList());
+		if (reqVO.getSubPurchaseOrderSnList() != null) params.put("subPurchaseOrderSnList", reqVO.getSubPurchaseOrderSnList());
+		if (reqVO.getLatestFeedbackStatusList() != null) params.put("latestFeedbackStatusList", reqVO.getLatestFeedbackStatusList());
+		if (reqVO.getUrgencyType() != null) params.put("urgencyType", reqVO.getUrgencyType());
+		if (reqVO.getTargetReceiveAddress() != null) params.put("targetReceiveAddress", reqVO.getTargetReceiveAddress());
+		if (reqVO.getDeliverTimeFrom() != null) params.put("deliverTimeFrom", reqVO.getDeliverTimeFrom());
+		if (reqVO.getDeliverTimeTo() != null) params.put("deliverTimeTo", reqVO.getDeliverTimeTo());
+		if (reqVO.getSkcExtCodeList() != null) params.put("skcExtCodeList", reqVO.getSkcExtCodeList());
+		if (reqVO.getDeliveryOrderSnList() != null) params.put("deliveryOrderSnList", reqVO.getDeliveryOrderSnList());
+		if (reqVO.getInventoryRegion() != null) params.put("inventoryRegion", reqVO.getInventoryRegion());
+		if (reqVO.getIsVmi() != null) params.put("isVmi", reqVO.getIsVmi());
+		if (reqVO.getSortType() != null) params.put("sortType", reqVO.getSortType());
+		if (reqVO.getIsJit() != null) params.put("isJit", reqVO.getIsJit());
+		if (reqVO.getSortFieldName() != null) params.put("sortFieldName", reqVO.getSortFieldName());
+		if (reqVO.getStatus() != null) params.put("status", reqVO.getStatus());
+
+		return requestWithRetry(params, 10, 1000);
 	}
 }
