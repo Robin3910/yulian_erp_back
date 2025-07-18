@@ -28,4 +28,10 @@ public class TemuOrderStatisticsController {
     public CommonResult<OrderStatisticsRespVO> getOrderStatistics(@Valid @RequestBody OrderStatisticsReqVO reqVO) {
         return CommonResult.success(orderStatisticsService.getOrderStatistics(reqVO));
     }
+
+    @PostMapping("/return")
+    @Operation(summary = "获取返单统计数据")
+    public CommonResult<OrderStatisticsRespVO> getReturnOrderStatistics(@Valid @RequestBody OrderStatisticsReqVO reqVO) {
+        return CommonResult.success(orderStatisticsService.getReturnOrderStatistics(reqVO));
+    }
 }

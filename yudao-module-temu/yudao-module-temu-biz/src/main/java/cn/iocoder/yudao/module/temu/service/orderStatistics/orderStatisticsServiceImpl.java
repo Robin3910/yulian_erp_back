@@ -80,6 +80,62 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
     }
 
     /**
+     * 返单统计方法，根据统计粒度（日/周/月）返回统计结果
+     * @param reqVO 请求参数，包括店铺ID、起止日期、统计粒度
+     * @return 统计结果，包含时间点、订单数量、汇总信息等
+     */
+    @Override
+    public OrderStatisticsRespVO getReturnOrderStatistics(OrderStatisticsReqVO reqVO) {
+        List<Map<String, Object>> dbResult;
+        String granularity = reqVO.getGranularity();
+        List<Long> shopIds = reqVO.getShopIds();
+        String startDate = reqVO.getStartDate();
+        String endDate = reqVO.getEndDate();
+        // 兼容全选店铺逻辑：shopIds为null、空、或包含-1L时，统计所有店铺
+        if (shopIds == null || shopIds.isEmpty() || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
+            shopIds = null;
+        }
+        if ("day".equals(granularity)) {
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByDay(shopIds, startDate, endDate);
+        } else if ("week".equals(granularity)) {
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByWeek(shopIds, startDate, endDate);
+        } else if ("month".equals(granularity)) {
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByMonth(shopIds, startDate, endDate);
+        } else {
+            return emptyResp(granularity);
+        }
+        Map<String, Integer> dataMap = new LinkedHashMap<>();
+        for (Map<String, Object> row : dbResult) {
+            String timePoint = String.valueOf(row.get("time_point"));
+            Integer count = ((Number)row.get("order_count")).intValue();
+            dataMap.put(timePoint, count);
+        }
+        List<String> timePoints = buildTimePoints(startDate, endDate, granularity);
+        List<Integer> values = new ArrayList<>();
+        for (String tp : timePoints) {
+            values.add(dataMap.getOrDefault(tp, 0));
+        }
+        int total = values.stream().mapToInt(Integer::intValue).sum();
+        int max = values.stream().mapToInt(Integer::intValue).max().orElse(0);
+        int min = values.stream().mapToInt(Integer::intValue).min().orElse(0);
+        double avg = values.isEmpty() ? 0 : (double)total / values.size();
+        double roundedAvg = BigDecimal.valueOf(avg)
+                .setScale(2, RoundingMode.HALF_UP)
+                .doubleValue();
+        OrderStatisticsRespVO resp = new OrderStatisticsRespVO();
+        resp.setTimePoints(timePoints);
+        resp.setValues(values);
+        OrderStatisticsRespVO.Summary summary = new OrderStatisticsRespVO.Summary();
+        summary.setTotalOrders(total);
+        summary.setAverageDaily(roundedAvg);
+        summary.setMaxOrders(max);
+        summary.setMinOrders(min);
+        resp.setSummary(summary);
+        resp.setGranularity(granularity);
+        return resp;
+    }
+
+    /**
      * 构建所有时间点（如所有天、周、月），用于补全无订单的时间点
      */
     private List<String> buildTimePoints(String start, String end, String granularity) {

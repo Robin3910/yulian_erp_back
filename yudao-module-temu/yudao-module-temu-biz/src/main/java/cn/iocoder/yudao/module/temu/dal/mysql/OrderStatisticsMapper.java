@@ -19,4 +19,16 @@ public interface OrderStatisticsMapper {
     List<Map<String, Object>> selectOrderCountByMonth(@Param("shopIds") List<Long> shopIds,
                                                       @Param("startDate") String startDate,
                                                       @Param("endDate") String endDate);
+    // 按日统计返单
+    List<Map<String, Object>> selectReturnOrderCountByDay(@Param("shopIds") List<Long> shopIds,
+                                                         @Param("startDate") String startDate,
+                                                         @Param("endDate") String endDate);
+    // 按周统计返单
+    List<Map<String, Object>> selectReturnOrderCountByWeek(@Param("shopIds") List<Long> shopIds,
+                                                          @Param("startDate") String startDate,
+                                                          @Param("endDate") String endDate);
+    // 按月统计返单
+    List<Map<String, Object>> selectReturnOrderCountByMonth(@Param("shopIds") List<Long> shopIds,
+                                                           @Param("startDate") String startDate,
+                                                           @Param("endDate") String endDate);
 } 

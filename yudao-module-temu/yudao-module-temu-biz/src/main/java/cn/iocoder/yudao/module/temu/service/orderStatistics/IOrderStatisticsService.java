@@ -5,4 +5,5 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderStatistics.OrderSta
 
 public interface IOrderStatisticsService {
     OrderStatisticsRespVO getOrderStatistics(OrderStatisticsReqVO reqVO);
+    OrderStatisticsRespVO getReturnOrderStatistics(OrderStatisticsReqVO reqVO);
 }
