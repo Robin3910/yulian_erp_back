@@ -10,6 +10,7 @@ public class TemuOrderBatchCategoryRespVO {
     private Long id;
     private String batchCategoryId;
     private Long categoryId;
+    private String categoryName;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private String creator;

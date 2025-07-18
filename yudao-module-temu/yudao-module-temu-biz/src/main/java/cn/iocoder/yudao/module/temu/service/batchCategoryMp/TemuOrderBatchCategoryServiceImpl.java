@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.temu.service.batchCategoryMp;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.batchCategoryMp.TemuOrderBatchCategoryRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderBatchCategoryMpDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchCategoryMpMapper;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuProductCategoryMapper;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuProductCategoryDO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -11,6 +13,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +23,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TemuOrderBatchCategoryServiceImpl extends ServiceImpl<TemuOrderBatchCategoryMpMapper, TemuOrderBatchCategoryMpDO> implements TemuOrderBatchCategoryService {
+    @Resource
+    private TemuProductCategoryMapper productCategoryMapper;
     /**
      * 批量逻辑删除（根据主键ID集合）
      * @param ids 主键ID集合
@@ -37,12 +42,19 @@ public class TemuOrderBatchCategoryServiceImpl extends ServiceImpl<TemuOrderBatc
      */
     @Override
     public List<TemuOrderBatchCategoryRespVO> listByBatchCategoryId(String batchCategoryId) {
-        LambdaQueryWrapper<TemuOrderBatchCategoryMpDO> wrapper = new LambdaQueryWrapper<>();
-        if (batchCategoryId != null && !batchCategoryId.isEmpty()) {
-            wrapper.eq(TemuOrderBatchCategoryMpDO::getBatchCategoryId, batchCategoryId);
-        }
-        List<TemuOrderBatchCategoryMpDO> list = this.list(wrapper);
-        return list.stream().map(this::convertToVO).collect(Collectors.toList());
+        List<TemuOrderBatchCategoryMpDO> list = baseMapper.selectList(
+            new LambdaQueryWrapper<TemuOrderBatchCategoryMpDO>()
+                .eq(batchCategoryId != null && !batchCategoryId.isEmpty(), TemuOrderBatchCategoryMpDO::getBatchCategoryId, batchCategoryId)
+                .eq(TemuOrderBatchCategoryMpDO::getDeleted, false)
+        );
+        return list.stream().map(doObj -> {
+            TemuOrderBatchCategoryRespVO vo = convertToVO(doObj);
+            TemuProductCategoryDO category = productCategoryMapper.selectByCategoryId(doObj.getCategoryId());
+            if (category != null) {
+                vo.setCategoryName(category.getCategoryName());
+            }
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -52,12 +64,19 @@ public class TemuOrderBatchCategoryServiceImpl extends ServiceImpl<TemuOrderBatc
      */
     @Override
     public List<TemuOrderBatchCategoryRespVO> listByCategoryId(Long categoryId) {
-        LambdaQueryWrapper<TemuOrderBatchCategoryMpDO> wrapper = new LambdaQueryWrapper<>();
-        if (categoryId != null) {
-            wrapper.eq(TemuOrderBatchCategoryMpDO::getCategoryId, categoryId);
-        }
-        List<TemuOrderBatchCategoryMpDO> list = this.list(wrapper);
-        return list.stream().map(this::convertToVO).collect(Collectors.toList());
+        List<TemuOrderBatchCategoryMpDO> list = baseMapper.selectList(
+            new LambdaQueryWrapper<TemuOrderBatchCategoryMpDO>()
+                .eq(categoryId != null, TemuOrderBatchCategoryMpDO::getCategoryId, categoryId)
+                .eq(TemuOrderBatchCategoryMpDO::getDeleted, false)
+        );
+        return list.stream().map(doObj -> {
+            TemuOrderBatchCategoryRespVO vo = convertToVO(doObj);
+            TemuProductCategoryDO category = productCategoryMapper.selectByCategoryId(doObj.getCategoryId());
+            if (category != null) {
+                vo.setCategoryName(category.getCategoryName());
+            }
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
