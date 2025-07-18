@@ -30,8 +30,10 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         List<Long> shopIds = reqVO.getShopIds();
         String startDate = reqVO.getStartDate();
         String endDate = reqVO.getEndDate();
-        // 校验店铺ID参数
-        if (shopIds == null || shopIds.isEmpty()) return emptyResp(granularity);
+        // 兼容全选店铺逻辑：shopIds为null、空、或包含-1L时，统计所有店铺
+        if (shopIds == null || shopIds.isEmpty() || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
+            shopIds = null; // 传null给Mapper，SQL里不加店铺条件
+        }
         // 根据粒度调用不同SQL
         if ("day".equals(granularity)) {
             dbResult = orderStatisticsMapper.selectOrderCountByDay(shopIds, startDate, endDate);

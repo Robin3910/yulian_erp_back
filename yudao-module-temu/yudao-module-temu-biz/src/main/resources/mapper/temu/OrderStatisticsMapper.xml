@@ -9,10 +9,13 @@
             COUNT(id) AS order_count
         FROM temu_order
         WHERE 
-            shop_id IN
-            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
-                #{shopId}
-            </foreach>
+            1=1
+            <if test="shopIds != null and shopIds.size() > 0">
+                AND shop_id IN
+                <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                    #{shopId}
+                </foreach>
+            </if>
             AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE(create_time)
@@ -26,10 +29,13 @@
             COUNT(id) AS order_count
         FROM temu_order
         WHERE 
-            shop_id IN
-            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
-                #{shopId}
-            </foreach>
+            1=1
+            <if test="shopIds != null and shopIds.size() > 0">
+                AND shop_id IN
+                <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                    #{shopId}
+                </foreach>
+            </if>
             AND create_time BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE_FORMAT(create_time, '%Y-%u')
@@ -43,10 +49,13 @@
             COUNT(id) AS order_count
         FROM temu_order
         WHERE 
-            shop_id IN
-            <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
-                #{shopId}
-            </foreach>
+            1=1
+            <if test="shopIds != null and shopIds.size() > 0">
+                AND shop_id IN
+                <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+                    #{shopId}
+                </foreach>
+            </if>
             AND create_time BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE_FORMAT(create_time, '%Y-%m')
