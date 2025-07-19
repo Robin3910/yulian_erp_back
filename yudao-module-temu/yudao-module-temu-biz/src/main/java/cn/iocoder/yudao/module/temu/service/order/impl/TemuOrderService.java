@@ -315,7 +315,11 @@ public class TemuOrderService implements ITemuOrderService {
 				TemuOrderDO order = new TemuOrderDO();
 				
 				// 设置基本信息
-				order.setShopId(shopIdLong);
+
+				// 如果订单详情中带有shopId，说明是合并店铺发货，则使用订单详情中的shopId，最外层的shopId就可以忽略掉
+				String orderShopId = convertToString(orderMap.get("shopId"));
+				order.setShopId(StrUtil.isNotEmpty(orderShopId) ? Long.parseLong(orderShopId) : shopIdLong);
+				
 				order.setOrderNo(convertToString(orderMap.get("orderId")));
 				order.setProductTitle(convertToString(orderMap.get("title")));
 				order.setProductImgUrl(convertToString(orderMap.get("product_img_url")));
