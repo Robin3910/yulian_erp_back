@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import java.util.Objects;
 import java.util.Set;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import java.util.HashMap;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -340,8 +342,16 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
             List<String> finalOrderNos = updatedOrders.stream()
                     .map(TemuOrderDO::getOrderNo)
                     .collect(Collectors.toList());
-            Map<String, TemuOrderShippingInfoDO> shippingMap = temuOrderShippingMapper.selectListByOrderNos(finalOrderNos).stream()
-                    .collect(Collectors.toMap(TemuOrderShippingInfoDO::getOrderNo, shipping -> shipping));
+            Map<String, TemuOrderShippingInfoDO> shippingInfoMap = temuOrderShippingMapper.selectListByOrderNos(finalOrderNos).stream()
+                    .collect(Collectors.toMap(
+                            TemuOrderShippingInfoDO::getOrderNo,
+                            Function.identity(),
+                            (existing, replacement) -> {
+                                log.info("[searchOrderBySnOrSku][订单号({})存在重复记录，保留最新记录]", existing.getOrderNo());
+                                return replacement;  // 使用新值（最后一个）
+                            },
+                            HashMap::new
+                    ));
             // 创建返回结果列表
             List<TemuImageSearchOrderRespVO> resultList = new ArrayList<>();
 
@@ -355,7 +365,7 @@ public class TemuImageSearchServiceImpl implements TemuImageSearchService {
                     respVO.setAliasName(shop.getAliasName());
                 }
                 // 设置物流相关字段
-                TemuOrderShippingInfoDO shipping = shippingMap.get(order.getOrderNo());
+                TemuOrderShippingInfoDO shipping = shippingInfoMap.get(order.getOrderNo());
                 if (shipping != null) {
                     respVO.setTrackingNumber(shipping.getTrackingNumber());
                     respVO.setExpressImageUrl(shipping.getExpressImageUrl());
