@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderL
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderUrgentAlertReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
@@ -1078,7 +1079,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				// 如果数据库中已经有加急记录，则不再发送告警
 				if (urgentCount == 0) {
 					// 获取shopId为88888888的店铺webhook地址
-					TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+					TemuShopDO shop = temuShopMapper.selectByShopId(77777777L);
 					if (shop != null && shop.getWebhook() != null) {
 						String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
 								temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
@@ -1328,7 +1329,7 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				// 如果数据库中已经有加急记录，则不再发送告警
 				if (urgentCount == 0) {
 					// 获取shopId为88888888的店铺webhook地址
-					TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
+					TemuShopDO shop = temuShopMapper.selectByShopId(77777777L);
 					if (shop != null && shop.getWebhook() != null) {
 						String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
 								temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
@@ -1446,6 +1447,57 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			}
 		}
 		return 0;
+	}
+	
+	/**
+	 * 发送紧急物流告警
+	 * 
+	 * @param reqVO 告警请求信息
+	 * @return 是否发送成功
+	 */
+	public Boolean sendUrgentAlert(TemuOrderUrgentAlertReqVO reqVO) {
+		try {
+			if (reqVO == null) {
+				return true;
+			}
+
+			// 只处理小于24小时的订单
+			if (!Boolean.TRUE.equals(reqVO.getIsLessThan24h())) {
+				return true;
+			}
+
+			// 参数校验
+			if (StrUtil.hasBlank(reqVO.getOrderNo(), reqVO.getTrackingNumber()) || reqVO.getShopId() == null) {
+				return false;
+			}
+
+			// 1. 获取shopId为77777777的店铺webhook地址
+			TemuShopDO webhookShop = temuShopMapper.selectByShopId(77777777L);
+			if (webhookShop == null || webhookShop.getWebhook() == null) {
+				return false;
+			}
+
+			// 2. 获取订单所属店铺信息
+			TemuShopDO orderShop = temuShopMapper.selectByShopId(reqVO.getShopId());
+			String shopName = orderShop != null ? orderShop.getShopName() : "未知店铺";
+
+			// 3. 构建告警消息
+			StringBuilder messageBuilder = new StringBuilder();
+			messageBuilder.append("⚠️ 紧急物流告警！\n\n");
+			
+			// 添加订单信息
+			messageBuilder.append("店铺：").append(shopName).append("\n");
+			messageBuilder.append("订单号：").append(reqVO.getOrderNo()).append("\n");
+			messageBuilder.append("物流单号：").append(reqVO.getTrackingNumber()).append("\n");
+			messageBuilder.append("\n⏰ 该订单剩余时间小于24小时，请尽快处理！");
+
+			// 4. 发送企业微信告警
+			weiXinProducer.sendMessage(webhookShop.getWebhook(), messageBuilder.toString());
+			return true;
+
+		} catch (Exception e) {
+			return false;
+		}
 	}
 	
 }

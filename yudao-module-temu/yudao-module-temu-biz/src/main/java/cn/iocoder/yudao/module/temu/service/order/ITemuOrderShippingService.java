@@ -1,10 +1,8 @@
 package cn.iocoder.yudao.module.temu.service.order;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.*;
+
 import java.util.List;
 
 public interface ITemuOrderShippingService {
@@ -60,4 +58,12 @@ public interface ITemuOrderShippingService {
      * @return 加急未发货订单总数
      */
     TemuOrderShippingCountRespVO getUrgentOrderCount(TemuOrderShippingCountReqVO reqVO);
+
+    /**
+     * 发送紧急物流告警
+     *
+     * @param reqVO 是否小于24小时
+     **/
+    Boolean sendUrgentAlert(TemuOrderUrgentAlertReqVO reqVO);
+
 }

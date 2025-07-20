@@ -21,6 +21,7 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper.log;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderUrgentAlertReqVO;
 
 @Tag(name = "Temu管理 - 待发货列表管理")
 @RestController
@@ -39,6 +40,18 @@ public class AdminTemuOrderShippingController {
             TemuOrderShippingPageReqVO pageVO) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
         return success(shippingService.getOrderShippingPageByUser(pageVO, userId));
+    }
+
+    @PostMapping("/send-urgent-alert")
+    @Operation(summary = "发送紧急物流告警")
+    public CommonResult<Boolean> sendUrgentAlert(@Valid @RequestBody List<TemuOrderUrgentAlertReqVO> reqVOs) {
+        // 遍历处理每个告警请求
+        for (TemuOrderUrgentAlertReqVO reqVO : reqVOs) {
+            if (!shippingService.sendUrgentAlert(reqVO)) {
+                return success(false);
+            }
+        }
+        return success(true);
     }
 
     @PostMapping("/batch-save")
