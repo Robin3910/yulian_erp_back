@@ -902,6 +902,27 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				.collect(Collectors.groupingBy(TemuOrderShippingInfoDO::getTrackingNumber));
 		
 		List<TemuOrderShippingRespVO> voList = new ArrayList<>();
+
+		// 收集所有发货人ID
+		Set<Long> senderIds = new HashSet<>();
+		for (List<TemuOrderDO> orders : orderMap.values()) {
+			for (TemuOrderDO order : orders) {
+				if (order.getSenderId() != null) {
+					senderIds.add(order.getSenderId());
+				}
+			}
+		}
+
+		// 批量查询发货人信息
+		Map<Long, String> senderNicknameMap = new HashMap<>();
+		if (!senderIds.isEmpty()) {
+			List<AdminUserDO> senderList = adminUserMapper.selectBatchIds(senderIds);
+			senderNicknameMap = senderList.stream()
+					.collect(Collectors.toMap(
+							AdminUserDO::getId,
+							AdminUserDO::getNickname
+					));
+		}
 		
 		// 对分组后的Map按照每组最新创建时间降序排序
 		List<Map.Entry<String, List<TemuOrderShippingInfoDO>>> sortedEntries = new ArrayList<>(
@@ -971,6 +992,10 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					TemuOrderListRespVO orderVO = BeanUtils.toBean(order, TemuOrderListRespVO.class);
 					orderVO.setIsFoundAll(order.getIsFoundAll());
 					orderVO.setSenderId(order.getSenderId());
+					// 设置发货人姓名
+					if (order.getSenderId() != null) {
+						orderVO.setSenderName(senderNicknameMap.get(order.getSenderId()));
+					}
 					if (order.getCategoryId() != null) {
 						TemuProductCategoryDO category = categoryMap.get(order.getCategoryId());
 						if (category != null && category.getOldType() != null && shop != null

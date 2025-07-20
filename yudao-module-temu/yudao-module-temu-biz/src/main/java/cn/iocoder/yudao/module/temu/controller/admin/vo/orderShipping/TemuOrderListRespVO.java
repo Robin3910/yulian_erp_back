@@ -75,4 +75,6 @@ public class TemuOrderListRespVO {
     @Schema(description = "发货人ID")
     private Long senderId;
 
+    @Schema(description = "发货人姓名")
+    private String senderName;
 }
