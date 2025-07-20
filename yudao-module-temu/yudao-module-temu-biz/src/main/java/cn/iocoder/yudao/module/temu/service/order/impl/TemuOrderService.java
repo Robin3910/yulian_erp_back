@@ -1255,11 +1255,28 @@ public class TemuOrderService implements ITemuOrderService {
     @Async
     public void saveTempShippingInfoBatch(Long shopId, List<Map<String, Object>> ordersList) {
         if (ordersList == null || ordersList.isEmpty() || shopId == null) return;
-        LocalDateTime createTime = LocalDate.now().atTime(0, 0, 1);
-        List<TemuOrderShippingInfoDO> shippingList = new ArrayList<>();
+        
+        // 使用Set进行去重
+        Set<String> processedOrders = new HashSet<>();
+        List<Map<String, Object>> uniqueOrders = new ArrayList<>();
+        
+        // 去重处理
         for (Map<String, Object> orderMap : ordersList) {
             String orderNo = orderMap.get("orderId") == null ? null : orderMap.get("orderId").toString();
             if (orderNo == null || orderNo.isEmpty()) continue;
+            
+            // 使用shopId和orderNo组合作为唯一标识
+            String uniqueKey = shopId + "_" + orderNo;
+            if (processedOrders.add(uniqueKey)) {  // 如果添加成功，说明是新的组合
+                uniqueOrders.add(orderMap);
+            }
+        }
+        
+        LocalDateTime createTime = LocalDate.now().atTime(0, 0, 1);
+        List<TemuOrderShippingInfoDO> shippingList = new ArrayList<>();
+        
+        for (Map<String, Object> orderMap : uniqueOrders) {
+            String orderNo = orderMap.get("orderId").toString();
             // 新增：插入前查是否已存在相同订单号+shopId
             Long count = shippingInfoMapper.selectCount(
                 new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
@@ -1267,6 +1284,7 @@ public class TemuOrderService implements ITemuOrderService {
                     .eq(TemuOrderShippingInfoDO::getShopId, shopId)
             );
             if (count != null && count > 0) continue;
+            
             TemuOrderShippingInfoDO shipping = new TemuOrderShippingInfoDO();
             shipping.setOrderNo(orderNo);
             shipping.setShopId(shopId);
@@ -1281,6 +1299,7 @@ public class TemuOrderService implements ITemuOrderService {
             // 其它字段可不赋值
             shippingList.add(shipping);
         }
+        
         if (!shippingList.isEmpty()) {
             shippingInfoMapper.insertBatch(shippingList);
         }
