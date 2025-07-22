@@ -2,6 +2,11 @@ package cn.iocoder.yudao.module.temu.service.deliveryOrder.impl;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuDeliveryOrderSimpleVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkQueryReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelQueryReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.print.TemuPrintDataKeyRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOpenapiShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOpenapiShopMapper;
 import cn.iocoder.yudao.module.temu.service.deliveryOrder.TemuDeliveryOrderConvertService;
@@ -11,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import cn.iocoder.yudao.module.temu.utils.openapi.TemuOpenApiUtil;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuDeliveryOrderQueryReqVO;
 
@@ -144,5 +151,307 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         }
 
         return vo;
+    }
+
+    /**
+     * 查询物流面单信息
+     * @param reqVO 查询参数
+     * @return
+     */
+    @Override
+    public List<TemuBoxMarkRespVO> queryBoxMark(TemuBoxMarkQueryReqVO reqVO) {
+        try {
+            // 1. 获取默认店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            if (shop == null) {
+                throw new RuntimeException("未找到默认店铺信息");
+            }
+
+            // 2. 初始化Temu开放API工具
+            TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
+            openApiUtil.setAppKey(shop.getAppKey());
+            openApiUtil.setAppSecret(shop.getAppSecret());
+            openApiUtil.setAccessToken(shop.getToken());
+            openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
+
+            // 3. 构建API请求参数
+            Map<String, Object> params = new HashMap<>();
+            params.put("type", "bg.logistics.boxmarkinfo.get");
+            params.put("deliveryOrderSnList", reqVO.getDeliveryOrderSnList());
+
+            // 4. 执行API请求
+            String apiResult = openApiUtil.callApi(params);
+
+            // 5. 解析API返回结果
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(apiResult);
+            
+            // 6. 检查API调用是否成功
+            if (!rootNode.path("success").asBoolean()) {
+                throw new RuntimeException("箱唛查询失败: " + rootNode.path("errorMsg").asText());
+            }
+
+            // 7. 转换结果
+            List<TemuBoxMarkRespVO> resultList = new ArrayList<>();
+            JsonNode resultNode = rootNode.path("result");
+            if (resultNode.isArray()) {
+                for (JsonNode item : resultNode) {
+                    TemuBoxMarkRespVO vo = convertToBoxMarkVO(item);
+                    resultList.add(vo);
+                }
+            }
+
+            return resultList;
+        } catch (Exception e) {
+            throw new RuntimeException("箱唛查询失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 将JsonNode转换为BoxMarkVO对象
+     */
+    private TemuBoxMarkRespVO convertToBoxMarkVO(JsonNode item) {
+        TemuBoxMarkRespVO vo = new TemuBoxMarkRespVO();
+        
+        // 设置基本字段
+        vo.setVolumeType(item.path("volumeType").asInt());
+        vo.setSupplierId(item.path("supplierId").asInt());
+        vo.setIsCustomProduct(item.path("isCustomProduct").asBoolean());
+        vo.setDeliveryMethod(item.path("deliveryMethod").asInt());
+        vo.setPackageIndex(item.path("packageIndex").asInt());
+        vo.setExpressDeliverySn(item.path("expressDeliverySn").asText());
+        vo.setProductName(item.path("productName").asText());
+        vo.setSubWarehouseEnglishName(item.path("subWarehouseEnglishName").asText());
+        vo.setIsClothCat(item.path("isClothCat").asBoolean());
+        vo.setIsFirst(item.path("isFirst").asBoolean());
+        vo.setPurchaseStockType(item.path("purchaseStockType").asInt());
+        vo.setTotalPackageNum(item.path("totalPackageNum").asInt());
+        vo.setExpressCompany(item.path("expressCompany").asText());
+        vo.setProductSkcId(item.path("productSkcId").asInt());
+        vo.setNonClothSkuExtCode(item.path("nonClothSkuExtCode").asText());
+        vo.setDeliveryOrderSn(item.path("deliveryOrderSn").asText());
+        vo.setSupplierName(item.path("supplierName").asText());
+        vo.setSettlementType(item.path("settlementType").asInt());
+        vo.setSkcExtCode(item.path("skcExtCode").asText());
+        vo.setDeliverTime(item.path("deliverTime").asLong());
+        vo.setSubWarehouseId(item.path("subWarehouseId").asInt());
+        vo.setUrgencyType(item.path("urgencyType").asInt());
+        vo.setProductSkcName(item.path("productSkcName").asText());
+        vo.setPackageSn(item.path("packageSn").asText());
+        vo.setExpressEnglishCompany(item.path("expressEnglishCompany").asText());
+        vo.setPackageSkcNum(item.path("packageSkcNum").asInt());
+        vo.setSubWarehouseName(item.path("subWarehouseName").asText());
+        vo.setSubPurchaseOrderSn(item.path("subPurchaseOrderSn").asText());
+        vo.setDriverName(item.path("driverName").asText());
+        vo.setDriverPhone(item.path("driverPhone").asText());
+        vo.setPurchaseTime(item.path("purchaseTime").asLong());
+        vo.setStorageAttrName(item.path("storageAttrName").asText());
+        vo.setDeliverSkcNum(item.path("deliverSkcNum").asInt());
+        vo.setDeliveryStatus(item.path("deliveryStatus").asInt());
+
+        // 处理productSkuIdList
+        List<Integer> skuIdList = new ArrayList<>();
+        JsonNode skuIdListNode = item.path("productSkuIdList");
+        if (skuIdListNode.isArray()) {
+            for (JsonNode skuId : skuIdListNode) {
+                skuIdList.add(skuId.asInt());
+            }
+        }
+        vo.setProductSkuIdList(skuIdList);
+
+        // 处理greyKeyHitMap
+        Map<String, Boolean> greyKeyHitMap = new HashMap<>();
+        JsonNode greyKeyHitMapNode = item.path("greyKeyHitMap");
+        if (greyKeyHitMapNode.isObject()) {
+            greyKeyHitMapNode.fields().forEachRemaining(entry -> 
+                greyKeyHitMap.put(entry.getKey(), entry.getValue().asBoolean())
+            );
+        }
+        vo.setGreyKeyHitMap(greyKeyHitMap);
+
+        // 处理nonClothMainSpecVOList
+        vo.setNonClothMainSpecVOList(convertSpecVOList(item.path("nonClothMainSpecVOList")));
+
+        // 处理nonClothSecondarySpecVOList
+        vo.setNonClothSecondarySpecVOList(convertSpecVOList(item.path("nonClothSecondarySpecVOList")));
+
+        return vo;
+    }
+
+    /**
+     * 转换规格列表
+     */
+    private List<TemuBoxMarkRespVO.SpecVO> convertSpecVOList(JsonNode specListNode) {
+        List<TemuBoxMarkRespVO.SpecVO> specList = new ArrayList<>();
+        if (specListNode.isArray()) {
+            for (JsonNode specNode : specListNode) {
+                TemuBoxMarkRespVO.SpecVO specVO = new TemuBoxMarkRespVO.SpecVO();
+                specVO.setSpecId(specNode.path("specId").asInt());
+                specVO.setParentSpecName(specNode.path("parentSpecName").asText());
+                specVO.setParentSpecId(specNode.path("parentSpecId").asInt());
+                specVO.setSpecName(specNode.path("specName").asText());
+                specList.add(specVO);
+            }
+        }
+        return specList;
+    }
+
+    /**
+     * 查询定制sku条码信息
+     * @param reqVO 查询参数
+     * @return
+     */
+    @Override
+    public TemuCustomGoodsLabelRespVO queryCustomGoodsLabel(TemuCustomGoodsLabelQueryReqVO reqVO) {
+        try {
+            // 1. 获取默认店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            if (shop == null) {
+                throw new RuntimeException("未找到默认店铺信息");
+            }
+
+            // 2. 初始化Temu开放API工具
+            TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
+            openApiUtil.setAppKey(shop.getAppKey());
+            openApiUtil.setAppSecret(shop.getAppSecret());
+            openApiUtil.setAccessToken(shop.getToken());
+            openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
+
+            // 3. 构建API请求参数
+            Map<String, Object> params = new HashMap<>();
+            params.put("type", "bg.goods.custom.label.get");
+            if (reqVO.getProductSkuIdList() != null) params.put("productSkuIdList", reqVO.getProductSkuIdList());
+            if (reqVO.getProductSkcIdList() != null) params.put("productSkcIdList", reqVO.getProductSkcIdList());
+            if (reqVO.getPersonalProductSkuIdList() != null) params.put("personalProductSkuIdList", reqVO.getPersonalProductSkuIdList());
+            if (reqVO.getCreateTimeEnd() != null) params.put("createTimeEnd", reqVO.getCreateTimeEnd());
+            if (reqVO.getPageSize() != null) params.put("pageSize", reqVO.getPageSize());
+            if (reqVO.getPage() != null) params.put("page", reqVO.getPage());
+            if (reqVO.getCreateTimeStart() != null) params.put("createTimeStart", reqVO.getCreateTimeStart());
+            if (reqVO.getLabelCode() != null) params.put("labelCode", reqVO.getLabelCode());
+
+            // 4. 执行API请求
+            String apiResult = openApiUtil.callApi(params);
+
+            // 5. 解析API返回结果
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(apiResult);
+            
+            // 6. 检查API调用是否成功
+            if (!rootNode.path("success").asBoolean()) {
+                throw new RuntimeException("定制品商品条码查询失败: " + rootNode.path("errorMsg").asText());
+            }
+
+            // 7. 转换结果
+            TemuCustomGoodsLabelRespVO respVO = objectMapper.treeToValue(rootNode.path("result"), TemuCustomGoodsLabelRespVO.class);
+            return respVO;
+
+        } catch (Exception e) {
+            throw new RuntimeException("定制品商品条码查询失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 获取物流面单打印信息
+     * @param reqVO 查询参数
+     * @return
+     */
+    @Override
+    public TemuPrintDataKeyRespVO getBoxMarkPrintDataKey(TemuBoxMarkQueryReqVO reqVO) {
+        try {
+            // 1. 获取默认店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            if (shop == null) {
+                throw new RuntimeException("未找到默认店铺信息");
+            }
+
+            // 2. 初始化Temu开放API工具
+            TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
+            openApiUtil.setAppKey(shop.getAppKey());
+            openApiUtil.setAppSecret(shop.getAppSecret());
+            openApiUtil.setAccessToken(shop.getToken());
+            openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
+
+            // 3. 构建API请求参数
+            Map<String, Object> params = new HashMap<>();
+            params.put("type", "bg.logistics.boxmarkinfo.get");
+            params.put("deliveryOrderSnList", reqVO.getDeliveryOrderSnList());
+            params.put("return_data_key", true);
+
+            // 4. 执行API请求
+            String apiResult = openApiUtil.callApi(params);
+
+            // 5. 解析API返回结果
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(apiResult);
+            
+            // 6. 检查API调用是否成功
+            if (!rootNode.path("success").asBoolean()) {
+                throw new RuntimeException("获取物流面单打印数据Key失败: " + rootNode.path("errorMsg").asText());
+            }
+
+            // 7. 转换结果
+            TemuPrintDataKeyRespVO respVO = new TemuPrintDataKeyRespVO();
+            respVO.setDataKey(rootNode.path("result").asText());
+            return respVO;
+
+        } catch (Exception e) {
+            throw new RuntimeException("获取物流面单打印数据Key失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 获取定制sku条码打印信息
+     * @param reqVO 查询参数
+     * @return
+     */
+    @Override
+    public TemuPrintDataKeyRespVO getCustomGoodsLabelPrintDataKey(TemuCustomGoodsLabelQueryReqVO reqVO) {
+        try {
+            // 1. 获取默认店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            if (shop == null) {
+                throw new RuntimeException("未找到默认店铺信息");
+            }
+
+            // 2. 初始化Temu开放API工具
+            TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
+            openApiUtil.setAppKey(shop.getAppKey());
+            openApiUtil.setAppSecret(shop.getAppSecret());
+            openApiUtil.setAccessToken(shop.getToken());
+            openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
+
+            // 3. 构建API请求参数
+            Map<String, Object> params = new HashMap<>();
+            params.put("type", "bg.goods.custom.label.get");
+            if (reqVO.getProductSkuIdList() != null) params.put("productSkuIdList", reqVO.getProductSkuIdList());
+            if (reqVO.getProductSkcIdList() != null) params.put("productSkcIdList", reqVO.getProductSkcIdList());
+            if (reqVO.getPersonalProductSkuIdList() != null) params.put("personalProductSkuIdList", reqVO.getPersonalProductSkuIdList());
+            if (reqVO.getCreateTimeEnd() != null) params.put("createTimeEnd", reqVO.getCreateTimeEnd());
+            if (reqVO.getPageSize() != null) params.put("pageSize", reqVO.getPageSize());
+            if (reqVO.getPage() != null) params.put("page", reqVO.getPage());
+            if (reqVO.getCreateTimeStart() != null) params.put("createTimeStart", reqVO.getCreateTimeStart());
+            if (reqVO.getLabelCode() != null) params.put("labelCode", reqVO.getLabelCode());
+            params.put("return_data_key", true);
+
+            // 4. 执行API请求
+            String apiResult = openApiUtil.callApi(params);
+
+            // 5. 解析API返回结果
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(apiResult);
+            
+            // 6. 检查API调用是否成功
+            if (!rootNode.path("success").asBoolean()) {
+                throw new RuntimeException("获取定制sku条码打印数据Key失败: " + rootNode.path("errorMsg").asText());
+            }
+
+            // 7. 转换结果
+            TemuPrintDataKeyRespVO respVO = new TemuPrintDataKeyRespVO();
+            respVO.setDataKey(rootNode.path("result").asText());
+            return respVO;
+
+        } catch (Exception e) {
+            throw new RuntimeException("获取定制sku条码打印数据Key失败: " + e.getMessage(), e);
+        }
     }
 }

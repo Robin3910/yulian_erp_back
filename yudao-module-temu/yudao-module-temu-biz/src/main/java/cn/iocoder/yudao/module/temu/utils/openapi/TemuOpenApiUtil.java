@@ -13,6 +13,7 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 import lombok.NoArgsConstructor;
@@ -237,4 +238,32 @@ public class TemuOpenApiUtil {
 
 		return requestWithRetry(params, 10, 1000);
 	}
+
+	/**
+	 * 调用Temu开放平台API
+	 *
+	 * @param params API请求参数
+	 * @return API响应结果
+	 */
+	public String callApi(Map<String, Object> params) {
+		// 1. 添加公共参数
+		params.put("app_key", this.getAppKey());
+		params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
+		params.put("access_token", this.getAccessToken());
+		params.put("data_type", "JSON");
+
+		// 2. 生成签名
+		String sign = createSign(new TreeMap<>(params)); // Assuming createSign is the correct method for signing
+		params.put("sign", sign);
+
+		// 3. 发送HTTP请求
+		String response = HttpRequest.post(this.getBaseUrl())
+				.body(JSONUtil.toJsonStr(params)) // Changed to .body for JSON
+				.execute()
+				.body();
+
+		// 4. 处理响应
+		return response; // No specific error handling added as per original code
+	}
+
 }
