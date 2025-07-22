@@ -711,6 +711,12 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			return queryWrapper;
 		}
 
+		// 新增：处理是否找齐条件
+		if (pageVO.getIsFoundAll() != null) {
+			subQuery.append(" AND order_no IN (SELECT order_no FROM temu_order WHERE is_found_all = ")
+					.append(pageVO.getIsFoundAll()).append(")");
+		}
+
 		// 按物流单号分组，如果指定了订单号或订单状态，则同时按订单号分组
 		if (StringUtils.hasText(pageVO.getOrderNo()) || pageVO.getOrderStatus() != null) {
 			subQuery.append(" GROUP BY tracking_number, order_no");
