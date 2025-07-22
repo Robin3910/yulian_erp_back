@@ -8,13 +8,7 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderListRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderUrgentAlertReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
@@ -58,6 +52,9 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	private final TemuShopMapper shopMapper;
 	private final TemuProductCategoryMapper categoryMapper;
 	private final TemuUserShopMapper userShopMapper;
+
+	@Resource
+	private TemuOrderBatchCategoryMapper temuOrderBatchCategoryMapper;
 	
 	@Resource
 	private TemuShopMapper temuShopMapper;
@@ -842,7 +839,41 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					.append(" AND s.create_time <= '").append(endTimeStr).append("'");
 		}
 
-		// 处理类目条件
+		// 处理批次条件（order_no IN）
+		String isBatchNoQueryEnabled = configApi.getConfigValueByKey("temu.order-shipping.batchNo-query.enabled");
+		boolean batchNoQueryEnabled = false;
+		if (StringUtils.hasText(isBatchNoQueryEnabled)) {
+			try {
+				batchNoQueryEnabled = Boolean.parseBoolean(isBatchNoQueryEnabled);
+			} catch (Exception e) {}
+		}
+		if (batchNoQueryEnabled && StringUtils.hasText(pageVO.getBatchNo())) {
+			List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderBatchDO>()
+					.like(TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())
+			);
+			if (!batchList.isEmpty()) {
+				List<Long> batchIds = batchList.stream().map(TemuOrderBatchDO::getId).collect(Collectors.toList());
+				List<TemuOrderBatchRelationDO> relations = temuOrderBatchRelationMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderBatchRelationDO>()
+						.in(TemuOrderBatchRelationDO::getBatchId, batchIds)
+				);
+				if (!relations.isEmpty()) {
+					List<Long> orderIds = relations.stream().map(TemuOrderBatchRelationDO::getOrderId).collect(Collectors.toList());
+					if (!orderIds.isEmpty()) {
+						Set<String> batchOrderNos = orderMapper.selectBatchIds(orderIds)
+							.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.toSet());
+						if (!batchOrderNos.isEmpty()) {
+							joinQuery.append(" AND o.order_no IN ('")
+								.append(String.join("','", batchOrderNos))
+								.append("')");
+						}
+					}
+				}
+			}
+		}
+
+		// 处理类目条件（category_id IN）
 		if (!CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
 			joinQuery.append(" AND o.category_id IN ('")
 					.append(String.join("','", pageVO.getCategoryIds()))
@@ -1504,6 +1535,73 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		} catch (Exception e) {
 			return false;
 		}
+	}
+	
+	/**
+	 * 查询近三天的批次信息
+	 * 
+	 * @return 批次信息列表
+	 */
+	public List<TemuOrderBatchRespVO> getRecentBatches() {
+		// 计算三天前的时间
+		LocalDateTime threeDaysAgo = LocalDateTime.now().minusDays(3);
+		
+		// 查询近三天的批次信息
+		List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectList(
+			new LambdaQueryWrapperX<TemuOrderBatchDO>()
+				.ge(TemuOrderBatchDO::getCreateTime, threeDaysAgo)
+				.eq(TemuOrderBatchDO::getDeleted, false)
+				.orderByDesc(TemuOrderBatchDO::getCreateTime)
+		);
+
+		if (CollUtil.isEmpty(batchList)) {
+			return new ArrayList<>();
+		}
+
+		// 获取所有批次类目ID
+		Set<String> batchCategoryIds = batchList.stream()
+				.map(TemuOrderBatchDO::getBatchCategoryId)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toSet());
+
+		// 查询批次类目信息
+		Map<String, List<String>> batchCategoryIdToCategories = new HashMap<>();
+		if (!batchCategoryIds.isEmpty()) {
+			// 查询所有相关的批次类目记录
+			List<TemuOrderBatchCategoryDO> categories = temuOrderBatchCategoryMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderBatchCategoryDO>()
+					.in(TemuOrderBatchCategoryDO::getBatchCategoryId, batchCategoryIds)
+			);
+			
+			// 按 batchCategoryId 分组
+			for (TemuOrderBatchCategoryDO category : categories) {
+				String batchCategoryId = category.getBatchCategoryId();
+				String categoryId = category.getCategoryId();
+				if (batchCategoryId != null && categoryId != null) {
+					batchCategoryIdToCategories.computeIfAbsent(
+						batchCategoryId, 
+						k -> new ArrayList<>()
+					).add(categoryId);
+				}
+			}
+		}
+
+		// 转换为 VO 对象，并设置 categoryIds
+		List<TemuOrderBatchRespVO> voList = new ArrayList<>(batchList.size());
+		for (TemuOrderBatchDO batch : batchList) {
+			TemuOrderBatchRespVO vo = BeanUtils.toBean(batch, TemuOrderBatchRespVO.class);
+			// 设置 categoryIds
+			if (batch.getBatchCategoryId() != null) {
+				vo.setCategoryIds(batchCategoryIdToCategories.getOrDefault(
+					batch.getBatchCategoryId(), new ArrayList<>()
+				));
+			} else {
+				vo.setCategoryIds(new ArrayList<>());
+			}
+			voList.add(vo);
+		}
+
+		return voList;
 	}
 	
 }

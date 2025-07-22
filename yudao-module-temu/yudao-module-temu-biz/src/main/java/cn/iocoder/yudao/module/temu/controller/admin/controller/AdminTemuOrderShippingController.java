@@ -5,10 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.*;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,7 +18,6 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper.log;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderUrgentAlertReqVO;
 
 @Tag(name = "Temu管理 - 待发货列表管理")
 @RestController
@@ -99,6 +95,12 @@ public class AdminTemuOrderShippingController {
     public CommonResult<TemuOrderShippingCountRespVO> getUrgentOrderCount(
             @Valid TemuOrderShippingCountReqVO reqVO) {
         return success(shippingService.getUrgentOrderCount(reqVO));
+    }
+
+    @GetMapping("/recent-batches")
+    @Operation(summary = "查询近三天的批次信息")
+    public CommonResult<List<TemuOrderBatchRespVO>> getRecentBatches() {
+        return success(shippingService.getRecentBatches());
     }
 
 }

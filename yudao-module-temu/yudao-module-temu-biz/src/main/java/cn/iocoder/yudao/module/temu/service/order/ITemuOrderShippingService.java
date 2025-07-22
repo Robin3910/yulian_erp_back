@@ -66,4 +66,10 @@ public interface ITemuOrderShippingService {
      **/
     Boolean sendUrgentAlert(TemuOrderUrgentAlertReqVO reqVO);
 
+    /**
+     * 获取近三天的批次信息
+     *
+     * @return 批次信息
+     */
+    List<TemuOrderBatchRespVO> getRecentBatches();
 }
