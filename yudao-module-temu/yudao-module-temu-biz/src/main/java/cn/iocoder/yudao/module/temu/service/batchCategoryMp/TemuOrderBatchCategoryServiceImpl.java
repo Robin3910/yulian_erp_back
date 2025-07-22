@@ -16,6 +16,9 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.batchCategoryMp.TemuOrderBatchCategoryPageReqVO;
 
 /**
  * Temu订单批次类目 业务实现类
@@ -33,50 +36,6 @@ public class TemuOrderBatchCategoryServiceImpl extends ServiceImpl<TemuOrderBatc
     @Override
     public boolean deleteBatch(List<Long> ids) {
             return this.removeByIds(ids);
-    }
-
-    /**
-     * 根据 batchCategoryId 查询批次类目列表
-     * @param batchCategoryId 批次所属类目id，可为空
-     * @return 查询结果VO列表
-     */
-    @Override
-    public List<TemuOrderBatchCategoryRespVO> listByBatchCategoryId(String batchCategoryId) {
-        List<TemuOrderBatchCategoryMpDO> list = baseMapper.selectList(
-            new LambdaQueryWrapper<TemuOrderBatchCategoryMpDO>()
-                .eq(batchCategoryId != null && !batchCategoryId.isEmpty(), TemuOrderBatchCategoryMpDO::getBatchCategoryId, batchCategoryId)
-                .eq(TemuOrderBatchCategoryMpDO::getDeleted, false)
-        );
-        return list.stream().map(doObj -> {
-            TemuOrderBatchCategoryRespVO vo = convertToVO(doObj);
-            TemuProductCategoryDO category = productCategoryMapper.selectByCategoryId(doObj.getCategoryId());
-            if (category != null) {
-                vo.setCategoryName(category.getCategoryName());
-            }
-            return vo;
-        }).collect(Collectors.toList());
-    }
-
-    /**
-     * 根据 categoryId 查询批次类目列表
-     * @param categoryId 商品品类ID，可为空
-     * @return 查询结果VO列表
-     */
-    @Override
-    public List<TemuOrderBatchCategoryRespVO> listByCategoryId(Long categoryId) {
-        List<TemuOrderBatchCategoryMpDO> list = baseMapper.selectList(
-            new LambdaQueryWrapper<TemuOrderBatchCategoryMpDO>()
-                .eq(categoryId != null, TemuOrderBatchCategoryMpDO::getCategoryId, categoryId)
-                .eq(TemuOrderBatchCategoryMpDO::getDeleted, false)
-        );
-        return list.stream().map(doObj -> {
-            TemuOrderBatchCategoryRespVO vo = convertToVO(doObj);
-            TemuProductCategoryDO category = productCategoryMapper.selectByCategoryId(doObj.getCategoryId());
-            if (category != null) {
-                vo.setCategoryName(category.getCategoryName());
-            }
-            return vo;
-        }).collect(Collectors.toList());
     }
 
     /**
@@ -103,4 +62,21 @@ public class TemuOrderBatchCategoryServiceImpl extends ServiceImpl<TemuOrderBatc
         BeanUtils.copyProperties(doObj, vo);
         return vo;
     }
+
+    @Override
+    public PageResult<TemuOrderBatchCategoryRespVO> page(TemuOrderBatchCategoryPageReqVO reqVO) {
+        Page<TemuOrderBatchCategoryMpDO> page = new Page<>(reqVO.getPageNo(), reqVO.getPageSize());
+        List<TemuOrderBatchCategoryMpDO> records = baseMapper.selectPage(page, reqVO);
+        List<TemuOrderBatchCategoryRespVO> voList = records.stream().map(doObj -> {
+            TemuOrderBatchCategoryRespVO vo = convertToVO(doObj);
+            TemuProductCategoryDO category = productCategoryMapper.selectByCategoryId(doObj.getCategoryId());
+            if (category != null) {
+                vo.setCategoryName(category.getCategoryName());
+            }
+            return vo;
+        }).collect(Collectors.toList());
+        return new PageResult<>(voList, page.getTotal(), reqVO.getPageNo(), reqVO.getPageSize());
+    }
+
+    
 }

@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.batchCategoryMp.TemuOrderBatchCategoryPageReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.batchCategoryMp.TemuOrderBatchCategoryRespVO;
 import cn.iocoder.yudao.module.temu.service.batchCategoryMp.TemuOrderBatchCategoryService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,25 +33,20 @@ public class TemuOrderBatchCategoryMpController {
         return success(result);
     }
 
-    // 2. 按 batchCategoryId 查询
-    @GetMapping("/list")
-    public CommonResult<List<TemuOrderBatchCategoryRespVO>> listByBatchCategoryId(@RequestParam(value = "batchCategoryId", required = false) String batchCategoryId) {
-        List<TemuOrderBatchCategoryRespVO> list = service.listByBatchCategoryId(batchCategoryId);
-        return success(list);
+    // 通用多条件分页查询
+    @PostMapping("/page")
+    public CommonResult<PageResult<TemuOrderBatchCategoryRespVO>> page(@RequestBody TemuOrderBatchCategoryPageReqVO reqVO) {
+        PageResult<TemuOrderBatchCategoryRespVO> pageResult = service.page(reqVO);
+        return success(pageResult);
     }
-
-    // 3. 按 categoryId 查询
-    @GetMapping("/list-by-category")
-    public CommonResult<List<TemuOrderBatchCategoryRespVO>> listByCategoryId(@RequestParam(value = "categoryId", required = false) Long categoryId) {
-        List<TemuOrderBatchCategoryRespVO> list = service.listByCategoryId(categoryId);
-        return success(list);
-    }
-
+       
+    
     // 4. 修改 batchCategoryId
     @PutMapping("/update-batch-category-id")
     public CommonResult<Boolean> updateBatchCategoryId(@RequestParam("batchCategoryId") String batchCategoryId,
-                                                      @RequestParam("categoryId") Long categoryId) {
+                                                        @RequestParam("categoryId") Long categoryId) {
         boolean result = service.updateBatchCategoryId(batchCategoryId, categoryId);
         return success(result);
     }
-}
+    
+       }

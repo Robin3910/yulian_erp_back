@@ -2,5 +2,22 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchCategoryMpMapper">
 
-
+    <select id="selectPage" resultType="cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderBatchCategoryMpDO">
+        SELECT obc.*
+        FROM temu_order_batch_category obc
+        LEFT JOIN temu_product_category pc ON obc.category_id = pc.category_id
+        <where>
+            <if test="reqVO.batchCategoryId != null and reqVO.batchCategoryId != ''">
+                AND obc.batch_category_id = #{reqVO.batchCategoryId}
+            </if>
+            <if test="reqVO.categoryId != null">
+                AND obc.category_id = #{reqVO.categoryId}
+            </if>
+            <if test="reqVO.categoryName != null and reqVO.categoryName != ''">
+                AND pc.category_name LIKE CONCAT('%', #{reqVO.categoryName}, '%')
+            </if>
+            AND obc.deleted = 0
+        </where>
+        ORDER BY obc.id DESC
+    </select>
 </mapper>
