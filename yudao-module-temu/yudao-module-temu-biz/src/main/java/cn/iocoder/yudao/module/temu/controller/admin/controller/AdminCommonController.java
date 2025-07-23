@@ -43,13 +43,13 @@ public class AdminCommonController {
 	@RequestMapping("/shop/list")
 	public CommonResult<?> shopList() {
 		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
-		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin");
-		return CommonResult.success(commonService.listShop());
-//		if (isAdmin) {
-//			return CommonResult.success(commonService.listShop());
-//		} else {
-//			return CommonResult.success(commonService.listShop(loginUserId));
-//		}
+		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin", "art_staff", "production_staff", "运营人员");
+//		return CommonResult.success(commonService.listShop());
+		if (isAdmin) {
+			return CommonResult.success(commonService.listShop());
+		} else {
+			return CommonResult.success(commonService.listShop(loginUserId));
+		}
 	}
 	
 	//根据角色标识获取角色下所有用户
