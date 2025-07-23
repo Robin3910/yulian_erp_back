@@ -43,9 +43,7 @@ public class AdminTemuOrderShippingController {
     public CommonResult<Boolean> sendUrgentAlert(@Valid @RequestBody List<TemuOrderUrgentAlertReqVO> reqVOs) {
         // 遍历处理每个告警请求
         for (TemuOrderUrgentAlertReqVO reqVO : reqVOs) {
-            if (!shippingService.sendUrgentAlert(reqVO)) {
-                return success(false);
-            }
+            shippingService.sendUrgentAlert(reqVO); // 只做处理，不判断返回值
         }
         return success(true);
     }
