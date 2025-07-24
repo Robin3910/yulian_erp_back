@@ -147,17 +147,15 @@ public class TemuOpenApiUtil {
 	 * @return 发货订单列表
 	 */
 	public String getShipOrderList(TreeMap<String, Object> params) {
-		params.put("type", "bg.goods.salesv2.get");
-		Integer pageSize = 1;
-		Integer pageNo = 1;
-		params.put("pageSize", pageSize);
-		params.put("pageNo", pageNo);
-
+		params.put("type", "bg.purchaseorderv2.get");
+//		Integer pageSize = 2;
+//		Integer pageNo = 1;
+//		params.put("pageSize", pageSize);
+//		params.put("pageNo", pageNo);
 //		// 创建快递单号列表
 //		List<String> expressDeliverySnList = new ArrayList<>();
 //		expressDeliverySnList.add("SF3190241519922");
 //		params.put("expressDeliverySnList", expressDeliverySnList);
-
 		// 发送请求并返回结果
 		return request(params);
 	}
