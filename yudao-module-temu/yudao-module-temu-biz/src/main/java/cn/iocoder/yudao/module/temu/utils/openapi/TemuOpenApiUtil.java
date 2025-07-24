@@ -234,7 +234,7 @@ public class TemuOpenApiUtil {
 		if (reqVO.getSortFieldName() != null) params.put("sortFieldName", reqVO.getSortFieldName());
 		if (reqVO.getStatus() != null) params.put("status", reqVO.getStatus());
 
-		return requestWithRetry(params, 10, 1000);
+		return requestWithRetry(params, 20, 1000);
 	}
 
 	/**

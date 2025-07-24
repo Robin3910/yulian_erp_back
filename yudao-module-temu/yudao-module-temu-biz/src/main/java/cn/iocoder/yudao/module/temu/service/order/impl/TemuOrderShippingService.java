@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.order.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -13,14 +14,21 @@ import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
+import cn.iocoder.yudao.module.temu.service.deliveryOrder.TemuDeliveryOrderConvertService;
 import com.aliyun.oss.ServiceException;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import cn.iocoder.yudao.module.temu.dal.event.TrackingNumberValidationEvent;
 
+import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -30,11 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import cn.hutool.core.collection.CollUtil;
-
 import java.util.Objects;
-
-import javax.annotation.Resource;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuWorkerTaskDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
@@ -47,11 +51,13 @@ import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
 @RequiredArgsConstructor
 public class TemuOrderShippingService implements ITemuOrderShippingService {
 	
+	private final TemuDeliveryOrderConvertService temuDeliveryOrderConvertService;
 	private final TemuOrderShippingMapper shippingInfoMapper;
 	private final TemuOrderMapper orderMapper;
 	private final TemuShopMapper shopMapper;
 	private final TemuProductCategoryMapper categoryMapper;
 	private final TemuUserShopMapper userShopMapper;
+	private final ApplicationEventPublisher eventPublisher;
 
 	@Resource
 	private TemuOrderBatchCategoryMapper temuOrderBatchCategoryMapper;
@@ -1477,6 +1483,39 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			try {
 				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
 				log.info("批量保存成功，数量：{}", affectedRows);
+
+				// 从配置中获取是否开启序号保存
+				String isValidate = configApi.getConfigValueByKey("temu.is_validate");
+				log.info("是否开启YPL物流信息校验功能: {}", isValidate);
+				boolean flag = false; // 默认值
+				if (StrUtil.isNotEmpty(isValidate)) {
+					try {
+						flag = Boolean.parseBoolean(isValidate);
+					} catch (Exception e) {
+						log.warn("是否开启YPL物流信息校验功能的配置格式错误，使用默认值");
+					}
+				}
+				if(flag) {
+					// 仅当所有 saveRequestVO 的 shopId 都为 634418222478497 时才执行后续逻辑
+					boolean allShopIdMatch = saveRequestVOs.stream()
+							.allMatch(vo -> "634418222478497".equals(String.valueOf(vo.getShopId())));
+					if (!allShopIdMatch) {
+						return 0;
+					}
+					// 收集所有的物流单号并发布校验事件
+					List<String> trackingNumbers = saveRequestVOs.stream()
+							.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
+							.filter(StringUtils::hasText)
+							.distinct()
+							.collect(Collectors.toList());
+					// 物流单号不为空时发布校验事件
+					if (!trackingNumbers.isEmpty()) {
+						// 发布物流单号校验事件（核心事件驱动机制）
+						// 注意：此处发布的事件是同步触发的，但实际处理可能异步执行
+						eventPublisher.publishEvent(new TrackingNumberValidationEvent(trackingNumbers));
+						log.info("[batchSaveOrderShippingTest] 已发布物流单号校验事件，trackingNumbers={}", trackingNumbers);
+					}
+				}
 				return affectedRows;
 			} catch (Exception e) {
 				log.error("批量保存失败", e);
@@ -1603,5 +1642,33 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 
 		return voList;
 	}
-	
+
+	/**
+	 * 物流单号校验事件处理器 - 采用事务绑定的异步处理模式
+	 * 核心特性：
+	 * 1. 异步执行：通过 @Async 指定线程池
+	 * 2. 事务绑定：确保在数据库事务提交后执行（AFTER_COMMIT）
+	 * 3. 事件驱动：与主业务逻辑解耦
+	 * @param event 包含待校验物流单号的包装事件
+	 */
+	@Async("taskExecutor")
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void handleTrackingNumberValidation(TrackingNumberValidationEvent event) {
+		try {
+			// 从事件中提取物流单号集合
+			List<String> trackingNumbers = event.getTrackingNumbers();
+			log.info("[handleTrackingNumberValidation] 开始异步校验物流单号，trackingNumbers={}", trackingNumbers);
+
+			// 调用temuApi验证物流单号与erp是否一致
+			TemuOrderTrackingValidateRespVO validateResult = temuDeliveryOrderConvertService.validateTrackingNumber(trackingNumbers);
+			if (!validateResult.getSuccess()) {
+				log.warn("[handleTrackingNumberValidation] 物流单号校验失败：{}", validateResult.getErrorMessage());
+			} else {
+				log.info("[handleTrackingNumberValidation] 物流单号校验成功");
+			}
+		} catch (Exception e) {
+			log.error("[handleTrackingNumberValidation] 物流单号校验异常", e);
+		}
+	}
+
 }

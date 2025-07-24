@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMar
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelQueryReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderTrackingValidateRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.print.TemuPrintDataKeyRespVO;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -27,7 +28,7 @@ public interface TemuDeliveryOrderConvertService {
     List<TemuBoxMarkRespVO> queryBoxMark(TemuBoxMarkQueryReqVO reqVO);
 
     /**
-     * 查询定制sku商品条码信息
+     * 查询定制sku条码信息
      *
      * @param reqVO 查询参数
      * @return 定制sku条码信息
@@ -49,4 +50,12 @@ public interface TemuDeliveryOrderConvertService {
      * @return 打印数据Key
      */
     TemuPrintDataKeyRespVO getCustomGoodsLabelPrintDataKey(TemuCustomGoodsLabelQueryReqVO reqVO);
+
+    /**
+     * 验证物流单号
+     *
+     * @param trackingNumbers 物流单号列表
+     * @return 验证结果
+     */
+    TemuOrderTrackingValidateRespVO validateTrackingNumber(List<String> trackingNumbers);
 }

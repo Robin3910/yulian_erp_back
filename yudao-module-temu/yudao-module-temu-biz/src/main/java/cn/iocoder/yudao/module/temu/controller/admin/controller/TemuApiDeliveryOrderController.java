@@ -8,18 +8,18 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMar
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelQueryReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.goods.TemuCustomGoodsLabelRespVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderTrackingValidateRespVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.print.TemuPrintDataKeyRespVO;
 import cn.iocoder.yudao.module.temu.service.deliveryOrder.TemuDeliveryOrderConvertService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.List;
+
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "TemuApi - 发货管理 ")
 @RestController
@@ -83,6 +83,12 @@ public class TemuApiDeliveryOrderController {
         } catch (Exception e) {
             return CommonResult.error(500, "获取定制sku条码打印数据失败: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/validate-tracking")
+    @Operation(summary = "验证物流单号")
+    public CommonResult<TemuOrderTrackingValidateRespVO> validateTrackingNumber(@RequestParam("trackingNumbers") List<String> trackingNumbers) {
+        return success(convertService.validateTrackingNumber(trackingNumbers));
     }
 
 }
