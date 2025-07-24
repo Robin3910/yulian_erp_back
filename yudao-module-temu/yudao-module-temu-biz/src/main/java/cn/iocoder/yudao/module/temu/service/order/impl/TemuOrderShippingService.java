@@ -1340,6 +1340,54 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		if (CollectionUtils.isEmpty(saveRequestVOs)) {
 			return 0;
 		}
+				
+		// ================== 1. 修正shopId ==================
+		// 检查是否启用shopId修正功能
+		String isShopIdCorrectionEnabled = configApi.getConfigValueByKey("temu.order-shipping.shopId-correction.enabled");
+		boolean shopIdCorrectionEnabled = false;
+		if (StringUtils.hasText(isShopIdCorrectionEnabled)) {
+			try {
+				shopIdCorrectionEnabled = Boolean.parseBoolean(isShopIdCorrectionEnabled);
+			} catch (Exception e) {
+				log.warn("[batchSaveOrderShipping] 解析shopId修正开关配置失败", e);
+			}
+		}
+		
+		if (shopIdCorrectionEnabled) {
+			log.info("[batchSaveOrderShipping] shopId修正功能已启用，开始修正shopId");
+			// 收集所有订单号
+			Set<String> orderNos = saveRequestVOs.stream()
+					.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getOrderNo)
+					.collect(Collectors.toSet());
+			
+			// 批量查询订单信息
+			List<TemuOrderDO> orders = orderMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderDO>()
+							.select(TemuOrderDO::getOrderNo, TemuOrderDO::getShopId)
+							.in(TemuOrderDO::getOrderNo, orderNos));
+			
+			// 构建订单号到shopId的映射
+			Map<String, Long> orderNoToShopId = orders.stream()
+					.collect(Collectors.toMap(TemuOrderDO::getOrderNo, TemuOrderDO::getShopId));
+			
+			// 更新saveRequestVOs中的shopId
+			for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
+				Long correctShopId = orderNoToShopId.get(vo.getOrderNo());
+				if (correctShopId != null) {
+					// 记录修改日志
+					if (!Objects.equals(vo.getShopId(), correctShopId)) {
+						log.info("[batchSaveOrderShipping] 修正shopId, orderNo={}, oldShopId={}, newShopId={}",
+								vo.getOrderNo(), vo.getShopId(), correctShopId);
+					}
+					vo.setShopId(correctShopId);
+				} else {
+					log.warn("[batchSaveOrderShipping] 未找到订单对应的shopId, orderNo={}", vo.getOrderNo());
+				}
+			}
+		} else {
+			log.info("[batchSaveOrderShipping] shopId修正功能未启用，跳过修正步骤");
+		}
+
 		// 1. 参数校验（强制要求 trackingNumber 非空）
 		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
 			if (saveRequestVO == null) {
