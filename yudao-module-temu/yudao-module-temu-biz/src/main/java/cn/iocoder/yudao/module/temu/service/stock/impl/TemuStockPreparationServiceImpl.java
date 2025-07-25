@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.stock.impl;
 
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -64,7 +65,6 @@ public class TemuStockPreparationServiceImpl implements TemuStockPreparationServ
         if (reqVO.getSubPurchaseOrderSnList() != null && !reqVO.getSubPurchaseOrderSnList().isEmpty()) {
             params.put("subPurchaseOrderSnList", reqVO.getSubPurchaseOrderSnList());
         }
-        // log.info("[getStockPreparationPage][时间参数] from:{}, to:{}", reqVO.getPurchaseTimeFrom(), reqVO.getPurchaseTimeTo());
         if (reqVO.getPurchaseTimeFrom() != null) {
             params.put("purchaseTimeFrom", reqVO.getPurchaseTimeFrom());
         }
@@ -86,21 +86,33 @@ public class TemuStockPreparationServiceImpl implements TemuStockPreparationServ
             // 解析订单列表
             result.getJSONArray("subOrderForSupplierList").forEach(item -> {
                 JSONObject order = (JSONObject) item;
-                JSONObject skuDetail = order.getJSONArray("skuQuantityDetailList").getJSONObject(0);
-                
                 TemuStockPreparationVO vo = new TemuStockPreparationVO();
-                vo.setClassName(skuDetail.getStr("className"));
-                vo.setThumbUrlList(skuDetail.getJSONArray("thumbUrlList").toList(String.class));
-                vo.setProductSkuId(skuDetail.getStr("productSkuId"));
-                vo.setPurchaseTime(order.getStr("purchaseTime"));
-                vo.setSupplierId(order.getStr("supplierId"));
+                
+                // 设置订单基本信息
                 vo.setSubPurchaseOrderSn(order.getStr("subPurchaseOrderSn"));
-                vo.setSupplierName(order.getStr("supplierName"));
-                vo.setPurchaseQuantity(skuDetail.getInt("purchaseQuantity"));
                 vo.setProductName(order.getStr("productName"));
                 vo.setProductSkcId(order.getStr("productSkcId"));
                 vo.setCategory(order.getStr("category"));
-                vo.setFulfilmentProductSkuId(skuDetail.getStr("fulfilmentProductSkuId"));
+                vo.setSupplierId(order.getStr("supplierId"));
+                vo.setSupplierName(order.getStr("supplierName"));
+                vo.setPurchaseTime(order.getStr("purchaseTime"));
+                
+                // 解析SKU详情列表
+                List<TemuStockPreparationVO.SkuDetail> skuDetails = new ArrayList<>();
+                JSONArray skuList = order.getJSONArray("skuQuantityDetailList");
+                skuList.forEach(skuItem -> {
+                    JSONObject skuDetail = (JSONObject) skuItem;
+                    TemuStockPreparationVO.SkuDetail detail = new TemuStockPreparationVO.SkuDetail();
+                    
+                    detail.setClassName(skuDetail.getStr("className"));
+                    detail.setThumbUrlList(skuDetail.getJSONArray("thumbUrlList").toList(String.class));
+                    detail.setProductSkuId(skuDetail.getStr("productSkuId"));
+                    detail.setFulfilmentProductSkuId(skuDetail.getStr("fulfilmentProductSkuId"));
+                    detail.setPurchaseQuantity(skuDetail.getInt("purchaseQuantity"));
+                    
+                    skuDetails.add(detail);
+                });
+                vo.setSkuQuantityDetailList(skuDetails);
                 
                 list.add(vo);
             });
