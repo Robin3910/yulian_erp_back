@@ -1467,8 +1467,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				return false;
 			}
 
-			// 1. 获取shopId为77777777的店铺webhook地址
-			TemuShopDO webhookShop = temuShopMapper.selectByShopId(77777777L);
+			// 1. 获取shopId为66666666L的店铺webhook地址
+			TemuShopDO webhookShop = temuShopMapper.selectByShopId(66666666L);
 			if (webhookShop == null || webhookShop.getWebhook() == null) {
 				return false;
 			}
