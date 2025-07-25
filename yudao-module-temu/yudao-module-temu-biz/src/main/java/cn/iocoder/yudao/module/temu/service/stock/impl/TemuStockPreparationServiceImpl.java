@@ -68,6 +68,9 @@ public class TemuStockPreparationServiceImpl implements TemuStockPreparationServ
         if (reqVO.getPurchaseTimeFrom() != null) {
             params.put("purchaseTimeFrom", reqVO.getPurchaseTimeFrom());
         }
+        if (reqVO.getStatusList() != null && !reqVO.getStatusList().isEmpty()) {
+            params.put("statusList", reqVO.getStatusList());
+        }
 
         try {
             // 4. 调用API获取结果
@@ -96,6 +99,7 @@ public class TemuStockPreparationServiceImpl implements TemuStockPreparationServ
                 vo.setSupplierId(order.getStr("supplierId"));
                 vo.setSupplierName(order.getStr("supplierName"));
                 vo.setPurchaseTime(order.getStr("purchaseTime"));
+                vo.setStatus(order.getInt("status"));
                 
                 // 解析SKU详情列表
                 List<TemuStockPreparationVO.SkuDetail> skuDetails = new ArrayList<>();

@@ -30,6 +30,10 @@ public class TemuStockPreparationVO {
     @Schema(description = "下单时间", example = "2024-01-20 10:00:00")
     private String purchaseTime;
 
+    @Schema(description = "订单状态", example = "1", 
+            allowableValues = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"})
+    private Integer status; // 0-待接单；1-已接单，待发货；2-已送货；3-已收货；4-已拒收；5-已验收，全部退回；6-已验收；7-已入库；8-作废；9-已超时
+
     @Schema(description = "SKU详情列表")
     private List<SkuDetail> skuQuantityDetailList;
 
