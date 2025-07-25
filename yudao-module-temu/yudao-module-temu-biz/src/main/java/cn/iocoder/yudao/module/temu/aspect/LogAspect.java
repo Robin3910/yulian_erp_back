@@ -46,6 +46,7 @@ public class LogAspect {
      * 以及 AdminTemuOrderBatchController 下的 dispatchTask、completeBatchOrderTaskByAdmin、completeBatchOrderTask、updateStatus、updateStatusByTask 方法
      * 以及 AdminTemuOrderController 下的 beatchUpdateStatus、batchSave 方法
      * 以及 PayWalletController 下的 createWalletRecharge、submitPayOrder 方法
+     * 以及 AdminTemuShopOldTypeController 下的 batchSaveOldTypeSkc 方法
      */
     @Around("execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuCategoryController.createCategory(..)) || " +
             "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuCategoryController.updateProductCategory(..)) || " +
@@ -59,7 +60,8 @@ public class LogAspect {
             "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderController.beatchUpdateStatus(..)) || " +
             "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuOrderController.batchSave(..)) || " +
             "execution(* cn.iocoder.yudao.module.pay.controller.admin.wallet.PayWalletController.createWalletRecharge(..)) || " +
-            "execution(* cn.iocoder.yudao.module.pay.controller.admin.wallet.PayWalletController.submitPayOrder(..))")
+            "execution(* cn.iocoder.yudao.module.pay.controller.admin.wallet.PayWalletController.submitPayOrder(..)) || " +
+            "execution(* cn.iocoder.yudao.module.temu.controller.admin.controller.AdminTemuShopOldTypeController.batchSaveOldTypeSkc(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         // 检查是否启用操作日志功能
         String enableLogStr = configApi.getConfigValueByKey("yulian.operation_log.enabled");
