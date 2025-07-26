@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -87,8 +90,12 @@ public class TemuApiDeliveryOrderController {
 
     @GetMapping("/validate-tracking")
     @Operation(summary = "验证物流单号")
-    public CommonResult<TemuOrderTrackingValidateRespVO> validateTrackingNumber(@RequestParam("trackingNumbers") List<String> trackingNumbers) {
-        return success(convertService.validateTrackingNumber(trackingNumbers));
+    public CommonResult<TemuOrderTrackingValidateRespVO> validateTrackingNumber(
+            @RequestParam("trackingNumbers") Set<String> trackingNumbers,
+            @RequestParam(value = "shopId", defaultValue = "634418222478497") String shopId) {
+        Map<String, Set<String>> shopTrackingNumbers = new HashMap<>();
+        shopTrackingNumbers.put(shopId, trackingNumbers);
+        return success(convertService.validateTrackingNumber(shopTrackingNumbers));
     }
 
 }

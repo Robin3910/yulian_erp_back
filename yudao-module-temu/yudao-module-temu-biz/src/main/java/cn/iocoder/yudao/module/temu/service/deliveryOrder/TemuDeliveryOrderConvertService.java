@@ -12,6 +12,8 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.print.TemuPrintDataKeyRe
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public interface TemuDeliveryOrderConvertService {
 
@@ -54,8 +56,8 @@ public interface TemuDeliveryOrderConvertService {
     /**
      * 验证物流单号
      *
-     * @param trackingNumbers 物流单号列表
+     * @param shopTrackingNumbers 按shopId分组的物流单号列表，key为shopId，value为该shopId下的物流单号列表
      * @return 验证结果
      */
-    TemuOrderTrackingValidateRespVO validateTrackingNumber(List<String> trackingNumbers);
+    TemuOrderTrackingValidateRespVO validateTrackingNumber(Map<String, Set<String>> shopTrackingNumbers);
 }

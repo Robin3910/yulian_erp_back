@@ -11,7 +11,6 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderT
 import cn.iocoder.yudao.module.temu.controller.admin.vo.print.TemuPrintDataKeyRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOpenapiShopDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
-import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuShopDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOpenapiShopMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
@@ -28,9 +27,10 @@ import java.util.stream.Collectors;
 
 import cn.iocoder.yudao.module.temu.utils.openapi.TemuOpenApiUtil;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuDeliveryOrderQueryReqVO;
-import java.util.function.Function;
 import org.springframework.util.StringUtils;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
+import lombok.Data;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 
 @Service
 @RequiredArgsConstructor
@@ -105,7 +105,7 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         vo.setExpressDeliverySn(item.path("expressDeliverySn").asText());
         vo.setExpressCompany(item.path("expressCompany").asText());
         vo.setExpressCompanyId(item.path("expressCompanyId").asLong());
-        vo.setSupplierId(item.path("supplierId").asLong());
+        vo.setShopId(item.path("supplierId").asLong());
         vo.setSubPurchaseOrderSn(item.path("subPurchaseOrderSn").asText());
         vo.setUrgencyType(item.path("urgencyType").asInt());
         vo.setDeliverPackageNum(item.path("deliverPackageNum").asInt());
@@ -470,100 +470,305 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         }
     }
 
+    // ======================= 【主方法】物流校验相关 =======================
     /**
      * 校验temu平台和erp的物流信息是否一致
-     * @param trackingNumbers 物流单号列表
-     * @return
+     * 主要校验逻辑：
+     * 1. 按shopId分组处理物流单号
+     * 2. 对每个shopId：
+     *   2.1 调用Temu API获取平台数据
+     *   2.2 查询本地数据库获取ERP数据
+     *   2.3 对比平台和本地数据的差异
+     * 3. 如有差异，发送企业微信告警
+     * @param shopTrackingNumbers 按shopId分组的物流单号列表，key为shopId，value为该shopId下的物流单号列表
+     * @return 校验结果，包含成功/失败状态、错误信息、物流单号与备货单号的映射等
      */
     @Override
-    public TemuOrderTrackingValidateRespVO validateTrackingNumber(List<String> trackingNumbers) {
+    public TemuOrderTrackingValidateRespVO validateTrackingNumber(Map<String, Set<String>> shopTrackingNumbers) {
         TemuOrderTrackingValidateRespVO respVO = new TemuOrderTrackingValidateRespVO();
         respVO.setSuccess(true);
         StringBuilder errorMsg = new StringBuilder();
 
         try {
-            // 1. 获取Temu平台数据
-            PageResult<TemuDeliveryOrderSimpleVO> temuResult = getTemuPlatformData(trackingNumbers);
-            
-            // 1.1 检查哪些物流单号在Temu平台查不到数据
-            Set<String> temuTrackingNumbers = temuResult.getList().stream()
-                    .map(TemuDeliveryOrderSimpleVO::getExpressDeliverySn)
-                    .collect(Collectors.toSet());
-            
-            List<String> notFoundTrackingNumbers = trackingNumbers.stream()
-                    .filter(trackingNumber -> !temuTrackingNumbers.contains(trackingNumber))
-                    .collect(Collectors.toList());
-            
-            if (!notFoundTrackingNumbers.isEmpty()) {
-                errorMsg.append("平台查询不到物流单号：")
-                        .append(String.join("，", notFoundTrackingNumbers))
-                        .append("；");
-                respVO.setSuccess(false);
-            }
-
-            // 2. 获取本地物流信息
-            List<TemuOrderShippingInfoDO> shippingInfos = getLocalShippingInfo(trackingNumbers);
-
-            // 3. 收集物流信息的trackingNumber和orderNo映射关系
-            Map<String, List<String>> temuTrackingToOrders = collectTemuTrackingOrders(temuResult);
-            Map<String, List<String>> localTrackingToOrders = collectLocalTrackingOrders(shippingInfos);
-
-            // 4. 校验每个在Temu平台能查到的物流单号
-            for (String trackingNumber : trackingNumbers) {
-                // 跳过在Temu平台查不到的物流单号
-                if (notFoundTrackingNumbers.contains(trackingNumber)) {
+            // 存储所有平台返回的结果
+            ValidationResults results = new ValidationResults();
+            // 遍历每个shopId，分别校验其物流单号
+            for (Map.Entry<String, Set<String>> entry : shopTrackingNumbers.entrySet()) {
+                String shopId = entry.getKey();
+                // 目前只校验634418222478497的物流信息
+                if (!"634418222478497".equals(shopId)) {
+                    log.info("[validateTrackingNumber] 跳过非634418222478497店铺的物流校验，shopId={}", shopId);
                     continue;
                 }
-                validateSingleTrackingNumber(trackingNumber, temuResult, temuTrackingToOrders,
-                        localTrackingToOrders, errorMsg, respVO);
+                validateShopTrackingNumbers(shopId, entry.getValue(), results, errorMsg);
+                if (!results.isSuccess()) {
+                    respVO.setSuccess(false);
+                }
             }
-
+            // 设置返回结果
             if (!respVO.getSuccess()) {
                 respVO.setErrorMessage(errorMsg.toString());
-                // 发送企业微信告警
-                sendWeChatAlert(errorMsg.toString());
             }
-
-            // 设置返回结果
-            respVO.setTrackingNumberToOrderNos(temuTrackingToOrders);
-            respVO.setTrackingNumberToSkus(collectTemuTrackingSkus(temuResult));
+            respVO.setTrackingNumberToOrderNos(results.getTemuTrackingToOrders());
+            respVO.setTrackingNumberToSkus(results.getTemuTrackingToSkus());
 
         } catch (Exception e) {
-            respVO.setSuccess(false);
-            respVO.setErrorMessage("校验失败：" + e.getMessage());
-            log.error("[validateTrackingNumber] 验证物流单号时发生错误，物流单号列表：{}", trackingNumbers, e);
-            // 发送企业微信告警
-            sendWeChatAlert("校验失败：" + e.getMessage());
+            handleGlobalException(e, shopTrackingNumbers, respVO);
         }
-
         return respVO;
     }
 
     /**
-     * 获取Temu平台数据
+     * 校验单个店铺的物流单号集合
+     * 核心步骤：
+     * 1. 获取平台数据
+     * 2. 检查平台查不到的物流单号
+     * 3. 获取并校验本地数据
+     * @param shopId 店铺ID
+     * @param trackingNumbers 物流单号列表
+     * @param results 校验结果收集器
+     * @param errorMsg 错误信息收集器
      */
-    private PageResult<TemuDeliveryOrderSimpleVO> getTemuPlatformData(List<String> trackingNumbers) {
+    private void validateShopTrackingNumbers(String shopId, Set<String> trackingNumbers, 
+            ValidationResults results, StringBuilder errorMsg) {
+        String shopName = getShopName(shopId);
         try {
-            TemuDeliveryOrderQueryReqVO queryReqVO = new TemuDeliveryOrderQueryReqVO();
-            queryReqVO.setExpressDeliverySnList(trackingNumbers);
-            return queryTemuLogisticsPage(queryReqVO);
+            // 1. 获取平台数据
+            PageResult<TemuDeliveryOrderSimpleVO> temuResult = getTemuPlatformData(shopId, trackingNumbers);
+
+            // 2. 检查平台查不到的物流单号
+            List<String> notFoundTrackingNumbers = checkNotFoundTrackingNumbers(
+                    shopName, trackingNumbers, temuResult, errorMsg);
+            if (!notFoundTrackingNumbers.isEmpty()) {
+                results.setSuccess(false);
+            }
+            // 3. 获取本地数据并校验
+            // 注意：即使有平台查不到的物流单号，我们仍然继续校验其他可以查到的物流单号
+            validateLocalData(shopId, shopName, trackingNumbers, temuResult, results, errorMsg);
         } catch (RuntimeException e) {
-            throw new RuntimeException(String.format(e.getMessage()), e);
+            handleShopException(e, shopId, shopName, trackingNumbers, results, errorMsg);
         }
     }
 
-    /**
-     * 获取本地物流信息
-     */
-    private List<TemuOrderShippingInfoDO> getLocalShippingInfo(List<String> trackingNumbers) {
-        return shippingInfoMapper.selectList(
+    // 获取temuApi平台数据
+    private PageResult<TemuDeliveryOrderSimpleVO> getTemuPlatformData(String shopId, Set<String> trackingNumbers) {
+        TemuDeliveryOrderQueryReqVO queryReqVO = new TemuDeliveryOrderQueryReqVO();
+        queryReqVO.setExpressDeliverySnList(trackingNumbers);
+        queryReqVO.setShopId(shopId);
+        return queryTemuLogisticsPage(queryReqVO);
+    }
+
+    // 校验本地数据
+    private void validateLocalData(String shopId, String shopName, Set<String> trackingNumbers,
+            PageResult<TemuDeliveryOrderSimpleVO> temuResult, ValidationResults results, StringBuilder errorMsg) {
+        // 1. 获取本地物流信息
+        List<TemuOrderShippingInfoDO> shippingInfos = shippingInfoMapper.selectList(
                 new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-                        .in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers));
+                        .in(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumbers)
+                        .eq(TemuOrderShippingInfoDO::getShopId, Long.parseLong(shopId)));
+        // 2. 收集映射关系
+        Map<String, List<String>> temuTrackingToOrders = collectTemuTrackingOrders(temuResult);
+        Map<String, List<String>> localTrackingToOrders = collectLocalTrackingOrders(shippingInfos);
+        // 3. 校验每个物流单号
+        // 先获取平台能查到的物流单号
+        Set<String> temuTrackingNumbers = temuResult.getList().stream()
+                .map(TemuDeliveryOrderSimpleVO::getExpressDeliverySn)
+                .collect(Collectors.toSet());
+        for (String trackingNumber : trackingNumbers) {
+            // 如果平台查不到该物流单号，跳过（因为已经在前面的checkNotFoundTrackingNumbers中处理过了）
+            if (!temuTrackingNumbers.contains(trackingNumber)) {
+                continue;
+            }
+            // 校验订单数量和内容
+            if (validateSingleTrackingNumber(shopName, trackingNumber, 
+                    temuTrackingToOrders, localTrackingToOrders, temuResult, errorMsg)) {
+                results.setSuccess(false);
+            }
+        }
+        // 4. 合并结果
+        results.getTemuTrackingToOrders().putAll(temuTrackingToOrders);
+        results.getTemuTrackingToSkus().putAll(collectTemuTrackingSkus(temuResult));
     }
 
     /**
-     * 收集Temu平台的物流单号与备货单号的映射关系
+     * 检查平台查不到的物流单号
+     * 对于平台查不到的物流单号：
+     * 1. 收集到notFoundTrackingNumbers列表
+     * 2. 添加到错误信息
+     * 3. 发送告警
      */
+    private List<String> checkNotFoundTrackingNumbers(String shopName, Set<String> trackingNumbers,
+            PageResult<TemuDeliveryOrderSimpleVO> temuResult, StringBuilder errorMsg) {
+        Set<String> temuTrackingNumbers = temuResult.getList().stream()
+                .map(TemuDeliveryOrderSimpleVO::getExpressDeliverySn)
+                .collect(Collectors.toSet());
+
+        List<String> notFoundTrackingNumbers = trackingNumbers.stream()
+                .filter(trackingNumber -> !temuTrackingNumbers.contains(trackingNumber))
+                .collect(Collectors.toList());
+
+        if (!notFoundTrackingNumbers.isEmpty()) {
+            String alertMsg = String.format("店铺：%s - 平台查询不到物流单号：%s",
+                    shopName, String.join("，", notFoundTrackingNumbers));
+            errorMsg.append(alertMsg).append("；");
+            // 对每个未找到的物流单号发送告警
+            for (String trackingNumber : notFoundTrackingNumbers) {
+                sendWeChatAlert(String.format("店铺：%s\n物流单号：%s\n平台查询不到该物流单号",
+                        shopName, trackingNumber));
+            }
+        }
+        return notFoundTrackingNumbers;
+    }
+    /**
+     * 校验单个物流单号
+     * 校验内容：
+     * 1. 校验备货单 总数是否匹配
+     * 2. 校验备货单 内容是否一致
+     * 3. 校验定制SKU 数量和内容是否匹配
+     * @return 是否有错误
+     */
+    private boolean validateSingleTrackingNumber(String shopName, String trackingNumber,
+            Map<String, List<String>> temuTrackingToOrders, Map<String, List<String>> localTrackingToOrders,
+            PageResult<TemuDeliveryOrderSimpleVO> temuResult, StringBuilder errorMsg) {
+        List<String> temuOrders = temuTrackingToOrders.get(trackingNumber);
+        List<String> localOrders = localTrackingToOrders.get(trackingNumber);
+
+        // 1. 校验备货单数量
+        if (temuOrders == null || localOrders == null || temuOrders.size() != localOrders.size()) {
+            String alertMsg = String.format("店铺：%s\n物流单号：%s\n备货单数量不匹配：平台%d个，本地%d个",
+                    shopName, trackingNumber, 
+                    temuOrders == null ? 0 : temuOrders.size(), 
+                    localOrders == null ? 0 : localOrders.size());
+            sendWeChatAlert(alertMsg);
+            errorMsg.append(alertMsg).append("；");
+            return true;
+        }
+        // 2. 校验备货单内容
+        if (!new HashSet<>(temuOrders).equals(new HashSet<>(localOrders))) {
+            Set<String> temuOnly = new HashSet<>(temuOrders);
+            temuOnly.removeAll(new HashSet<>(localOrders));
+            Set<String> localOnly = new HashSet<>(localOrders);
+            localOnly.removeAll(new HashSet<>(temuOrders));
+
+            StringBuilder alertMsg = new StringBuilder()
+                    .append("店铺：").append(shopName).append("\n")
+                    .append("物流单号：").append(trackingNumber).append("\n");
+
+            if (!temuOnly.isEmpty()) {
+                alertMsg.append("本地缺少备货单：").append(String.join("，", temuOnly)).append("\n");
+            }
+            if (!localOnly.isEmpty()) {
+                alertMsg.append("本地多出备货单：").append(String.join("，", localOnly)).append("\n");
+            }
+
+            sendWeChatAlert(alertMsg.toString());
+            errorMsg.append(alertMsg).append("；");
+            return true;
+        }
+
+        // 3. 校验 定制SKU信息
+        return validateSkuInfo(shopName, trackingNumber, temuOrders, temuResult, errorMsg);
+    }
+    /**
+     * 校验SKU信息
+     * 1. 获取平台定制SKU信息（过滤skuNum=0）
+     * 2. 按备货单号分组统计定制SKU数量
+     * 3. 比对每个备货单号下的定制SKU数量
+     * 4. 如果数量一致，比对定制SKU内容
+     */
+    private boolean validateSkuInfo(String shopName, String trackingNumber, List<String> orderNos,
+            PageResult<TemuDeliveryOrderSimpleVO> temuResult, StringBuilder errorMsg) {
+        // 1. 获取平台定制SKU信息（已经过滤掉skuNum=0的数据）
+        List<TemuDeliveryOrderSimpleVO> deliveryOrders = temuResult.getList().stream()
+                .filter(order -> order.getExpressDeliverySn().equals(trackingNumber))
+                .collect(Collectors.toList());
+
+        // 2. 按备货单号分组统计平台定制SKU数量
+        Map<String, Integer> temuOrderSkuCounts = new HashMap<>();  // key: 备货单号, value: 定制SKU数量
+        Map<String, Set<Long>> temuOrderSkuIds = new HashMap<>();   // key: 备货单号, value: 定制SKU ID集合
+        for (TemuDeliveryOrderSimpleVO order : deliveryOrders) {
+            String orderNo = order.getSubPurchaseOrderSn();
+            int skuCount = 0;
+            Set<Long> skuIds = new HashSet<>();
+            for (TemuDeliveryOrderSimpleVO.PackageDetailVO detail : order.getPackageDetailList()) {
+                if (detail.getSkuNum() > 0) {
+                    skuCount++;
+                    skuIds.add(detail.getProductSkuId());
+                }
+            }
+            temuOrderSkuCounts.put(orderNo, skuCount);
+            temuOrderSkuIds.put(orderNo, skuIds);
+        }
+
+        // 3. 按备货单号分组获取本地定制SKU数量
+        Map<String, List<TemuOrderDO>> localOrderGroups = orderMapper.selectList(
+                new LambdaQueryWrapperX<TemuOrderDO>()
+                        .in(TemuOrderDO::getOrderNo, orderNos))
+                .stream()
+                .collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
+
+        // 4. 分别比对每个备货单号下的定制SKU数量
+        boolean hasError = false;
+        for (Map.Entry<String, Integer> entry : temuOrderSkuCounts.entrySet()) {
+            String orderNo = entry.getKey();
+            int temuSkuCount = entry.getValue();
+            int localSkuCount = localOrderGroups.getOrDefault(orderNo, Collections.emptyList()).size();
+
+            if (temuSkuCount != localSkuCount) {
+                String alertMsg = String.format("店铺：%s\n物流单号：%s\n备货单号：%s\n定制SKU数量不匹配：平台%d个，本地%d个",
+                        shopName, trackingNumber, orderNo, temuSkuCount, localSkuCount);
+                sendWeChatAlert(alertMsg);
+                errorMsg.append(alertMsg).append("；");
+                hasError = true;
+            } else {
+                // 5. 如果数量一致，比对定制SKU内容
+                Set<Long> temuSkuIds = temuOrderSkuIds.get(orderNo);
+                Set<Long> localSkuIds = localOrderGroups.get(orderNo).stream()
+                        .map(order -> Long.parseLong(order.getCustomSku()))
+                        .collect(Collectors.toSet());
+
+                // 找出平台有但本地没有的定制SKU
+                Set<Long> temuOnly = new HashSet<>(temuSkuIds);
+                temuOnly.removeAll(localSkuIds);
+                // 找出本地有但平台没有的定制SKU
+                Set<Long> localOnly = new HashSet<>(localSkuIds);
+                localOnly.removeAll(temuSkuIds);
+
+                if (!temuOnly.isEmpty() || !localOnly.isEmpty()) {
+                    StringBuilder alertMsg = new StringBuilder()
+                            .append("店铺：").append(shopName).append("\n")
+                            .append("物流单号：").append(trackingNumber).append("\n")
+                            .append("备货单号：").append(orderNo).append("\n");
+
+                    if (!temuOnly.isEmpty()) {
+                        alertMsg.append("本地缺少定制SKU：").append(String.join("，", 
+                                temuOnly.stream().map(String::valueOf).collect(Collectors.toList()))).append("\n");
+                    }
+                    if (!localOnly.isEmpty()) {
+                        alertMsg.append("本地多出定制SKU：").append(String.join("，", 
+                                localOnly.stream().map(String::valueOf).collect(Collectors.toList()))).append("\n");
+                    }
+
+                    sendWeChatAlert(alertMsg.toString());
+                    errorMsg.append(alertMsg).append("；");
+                    hasError = true;
+                }
+            }
+        }
+        // 检查是否有本地有但平台没有的备货单号
+        Set<String> extraLocalOrders = new HashSet<>(localOrderGroups.keySet());
+        extraLocalOrders.removeAll(temuOrderSkuCounts.keySet());
+        if (!extraLocalOrders.isEmpty()) {
+            String alertMsg = String.format("店铺名称：%s\n物流单号：%s\n本地多出备货单号：%s", 
+                    shopName, trackingNumber, String.join("，", extraLocalOrders));
+            sendWeChatAlert(alertMsg);
+            errorMsg.append(alertMsg).append("；");
+            hasError = true;
+        }
+
+        return hasError;
+    }
+    // 收集Temu平台的物流单号与备货单号的映射关系
     private Map<String, List<String>> collectTemuTrackingOrders(PageResult<TemuDeliveryOrderSimpleVO> temuResult) {
         Map<String, List<String>> temuTrackingToOrders = new HashMap<>();
         for (TemuDeliveryOrderSimpleVO delivery : temuResult.getList()) {
@@ -572,10 +777,7 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         }
         return temuTrackingToOrders;
     }
-
-    /**
-     * 收集本地的物流单号与备货单号的映射关系
-     */
+    // 收集本地的物流单号与备货单号的映射关系
     private Map<String, List<String>> collectLocalTrackingOrders(List<TemuOrderShippingInfoDO> shippingInfos) {
         return shippingInfos.stream()
                 .collect(Collectors.groupingBy(
@@ -583,10 +785,7 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
                         Collectors.mapping(TemuOrderShippingInfoDO::getOrderNo, Collectors.toList())
                 ));
     }
-
-    /**
-     * 收集Temu平台的物流单号与定制SKU（官网数量）信息的映射关系
-     */
+    // 收集Temu平台的物流单号与定制SKU（官网数量）信息的映射关系
     private Map<String, List<TemuOrderTrackingValidateRespVO.SkuInfo>> collectTemuTrackingSkus(
             PageResult<TemuDeliveryOrderSimpleVO> temuResult) {
         Map<String, List<TemuOrderTrackingValidateRespVO.SkuInfo>> temuTrackingToSkus = new HashMap<>();
@@ -604,244 +803,58 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         }
         return temuTrackingToSkus;
     }
-
-    /**
-     * 校验单个物流单号
-     */
-    private void validateSingleTrackingNumber(String trackingNumber,
-            PageResult<TemuDeliveryOrderSimpleVO> temuResult,
-            Map<String, List<String>> temuTrackingToOrders,
-            Map<String, List<String>> localTrackingToOrders,
-            StringBuilder errorMsg,
+    // 获取店铺名称
+    private String getShopName(String shopId) {
+        try {
+            TemuShopDO shop = temuShopMapper.selectByShopId(Long.parseLong(shopId));
+            return shop != null ? shop.getShopName() : "店铺ID:" + shopId;
+        } catch (Exception e) {
+            return "店铺ID:" + shopId;
+        }
+    }
+    // 处理店铺级别的异常 主要处理店铺不存在的情况，其他异常继续向上抛出
+    private void handleShopException(RuntimeException e, String shopId, String shopName,
+                                     Set<String> trackingNumbers, ValidationResults results, StringBuilder errorMsg) {
+        if (e.getMessage().contains("未找到对应的店铺信息")) {
+            String alertMsg = String.format("店铺：%s\n物流单号列表：%s\n错误信息：%s",
+                    shopName, String.join("，", trackingNumbers), e.getMessage());
+            sendWeChatAlert(alertMsg);
+            errorMsg.append(alertMsg).append("；");
+            results.setSuccess(false);
+        } else {
+            throw e; // 其他错误继续向上抛出
+        }
+    }
+    // 处理全局异常
+    private void handleGlobalException(Exception e, Map<String, Set<String>> shopTrackingNumbers,
             TemuOrderTrackingValidateRespVO respVO) {
-        
-        List<String> temuOrders = temuTrackingToOrders.getOrDefault(trackingNumber, Collections.emptyList());
-        List<String> localOrderNos = localTrackingToOrders.getOrDefault(trackingNumber, Collections.emptyList());
-
-        // 校验订单数量
-        if (temuOrders.size() != localOrderNos.size()) {
-            errorMsg.append(String.format("物流单号：%s-备货单数量不匹配：平台%d个，本地%d个；",
-                    trackingNumber, temuOrders.size(), localOrderNos.size()));
-            respVO.setSuccess(false);
-            return;
+        respVO.setSuccess(false);
+        String errorMessage = e.getMessage();
+        if (errorMessage.contains("未找到对应的店铺信息")) {
+            String shopId = errorMessage.substring(errorMessage.indexOf("shopId=") + 7);
+            String shopName = getShopName(shopId);
+            Set<String> affectedTrackingNumbers = shopTrackingNumbers.get(shopId);
+            errorMessage = String.format("店铺：%s\n物流单号列表：%s\n错误信息：%s",
+                    shopName, 
+                    affectedTrackingNumbers != null ? String.join("，", affectedTrackingNumbers) : "无",
+                    errorMessage);
         }
-
-        // 校验订单内容
-        if (!new HashSet<>(temuOrders).equals(new HashSet<>(localOrderNos))) {
-            Set<String> temuOrderSet = new HashSet<>(temuOrders);
-            Set<String> localOrderSet = new HashSet<>(localOrderNos);
-            Set<String> temuOnly = new HashSet<>(temuOrderSet);
-            temuOnly.removeAll(localOrderSet);
-            Set<String> localOnly = new HashSet<>(localOrderSet);
-            localOnly.removeAll(temuOrderSet);
-
-            if (!temuOnly.isEmpty()) {
-                errorMsg.append(String.format("物流单号：%s-本地缺少备货单：%s；",
-                        trackingNumber, String.join("，", temuOnly)));
-            }
-            if (!localOnly.isEmpty()) {
-                errorMsg.append(String.format("物流单号：%s-本地多出备货单：%s；",
-                        trackingNumber, String.join("，", localOnly)));
-            }
-            respVO.setSuccess(false);
-            return;
-        }
-
-        // 3. 校验定制sku信息
-        if (respVO.getSuccess()) {
-            validateSkuInfo(trackingNumber, temuResult, temuOrders, errorMsg, respVO);
-        }
+        respVO.setErrorMessage("校验失败：" + errorMessage);
+        log.error("[validateTrackingNumber] 验证物流单号时发生错误，物流单号列表：{}", shopTrackingNumbers, e);
+        sendWeChatAlert(errorMessage);
     }
-
-    /**
-     * 校验定制SKU信息
-     */
-    private void validateSkuInfo(String trackingNumber, PageResult<TemuDeliveryOrderSimpleVO> temuResult,
-            List<String> temuOrders, StringBuilder errorMsg, TemuOrderTrackingValidateRespVO respVO) {
-        // 获取Temu平台和本地的定制SKU信息
-        Map<String, List<TemuDeliveryOrderSimpleVO.PackageDetailVO>> temuOrderSkus = getTemuOrderSkus(temuResult, trackingNumber);
-        List<TemuOrderDO> orderList = getLocalOrders(temuOrders);
-        Map<String, List<TemuOrderDO>> localOrderSkus = orderList.stream()
-                .collect(Collectors.groupingBy(TemuOrderDO::getOrderNo));
-
-        StringBuilder skuDiffMsg = new StringBuilder();
-        boolean hasSkuError = false;
-
-        // 按orderNo逐个比对
-        for (String orderNo : temuOrders) {
-            if (validateOrderSkus(trackingNumber, orderNo, temuOrderSkus.get(orderNo),
-                    localOrderSkus.get(orderNo), skuDiffMsg)) {
-                hasSkuError = true;
-            }
-        }
-
-        if (hasSkuError) {
-            errorMsg.append(skuDiffMsg);
-            respVO.setSuccess(false);
-        }
+    // 校验结果的内部类
+    @Data
+    private static class ValidationResults {
+        /** 是否校验成功 */
+        private boolean success = true;
+        /** 物流单号到备货单号的映射 */
+        private final Map<String, List<String>> temuTrackingToOrders = new HashMap<>();
+        /** 物流单号到SKU信息的映射 */
+        private final Map<String, List<TemuOrderTrackingValidateRespVO.SkuInfo>> temuTrackingToSkus = new HashMap<>();
     }
-
-    /**
-     * 获取Temu平台备货单的定制SKU信息
-     */
-    private Map<String, List<TemuDeliveryOrderSimpleVO.PackageDetailVO>> getTemuOrderSkus(
-            PageResult<TemuDeliveryOrderSimpleVO> temuResult, String trackingNumber) {
-        Map<String, List<TemuDeliveryOrderSimpleVO.PackageDetailVO>> temuOrderSkus = new HashMap<>();
-        for (TemuDeliveryOrderSimpleVO delivery : temuResult.getList()) {
-            if (delivery.getExpressDeliverySn().equals(trackingNumber)) {
-                // 过滤掉skuNum为0的数据
-                List<TemuDeliveryOrderSimpleVO.PackageDetailVO> validSkus = delivery.getPackageDetailList().stream()
-                        .filter(detail -> detail.getSkuNum() > 0)
-                        .collect(Collectors.toList());
-                temuOrderSkus.put(delivery.getSubPurchaseOrderSn(), validSkus);
-            }
-        }
-        return temuOrderSkus;
-    }
-
-    /**
-     * 获取本地备货单信息
-     */
-    private List<TemuOrderDO> getLocalOrders(List<String> orderNos) {
-        return orderMapper.selectList(
-                new LambdaQueryWrapperX<TemuOrderDO>()
-                        .in(TemuOrderDO::getOrderNo, orderNos));
-    }
-
-    /**
-     * 校验单个备货单的定制SKU信息
-     * @return 是否有错误
-     */
-    private boolean validateOrderSkus(String trackingNumber, String orderNo,
-                                    List<TemuDeliveryOrderSimpleVO.PackageDetailVO> temuSkuList,
-                                    List<TemuOrderDO> localSkuList,
-                                    StringBuilder errorMsg) {
-        // 如果任一方的SKU列表为null，说明数据不一致
-        if (temuSkuList == null || localSkuList == null) {
-            if (temuSkuList == null && localSkuList != null) {
-                String localSkuInfo = localSkuList.stream()
-                        .map(order -> String.format("SKU%s", order.getCustomSku()))
-                        .collect(Collectors.joining("，"));
-                errorMsg.append(String.format("物流单号：%s-备货单：%s-平台无定制SKU，erp有%s；",
-                        trackingNumber, orderNo, localSkuInfo));
-            } else if (temuSkuList != null && localSkuList == null) {
-                List<TemuDeliveryOrderSimpleVO.PackageDetailVO> validTemuSkus = temuSkuList.stream()
-                        .filter(detail -> detail.getSkuNum() > 0)
-                        .collect(Collectors.toList());
-                String temuSkuInfo = validTemuSkus.stream()
-                        .map(detail -> String.format("定制SKU%d", detail.getProductSkuId()))
-                        .collect(Collectors.joining("，"));
-                errorMsg.append(String.format("物流单号：%s-备货单：%s-平台有%s，erp无定制SKU；",
-                        trackingNumber, orderNo, temuSkuInfo));
-            }
-            return true;
-        }
-
-        // 过滤掉数量为0的SKU
-        temuSkuList = temuSkuList.stream()
-                .filter(detail -> detail.getSkuNum() > 0)
-                .collect(Collectors.toList());
-
-        // 1. 首先校验定制SKU的总数量（包括重复的）
-        if (temuSkuList.size() != localSkuList.size()) {
-            errorMsg.append(String.format("物流单号：%s-备货单号：%s-定制SKU总数不匹配：Temu平台%d个，erp%d个；",
-                    trackingNumber, orderNo, temuSkuList.size(), localSkuList.size()));
-            return true;
-        }
-
-        // 2. 校验定制SKU的内容是否一致
-        List<Long> temuSkuIds = temuSkuList.stream()
-                .map(TemuDeliveryOrderSimpleVO.PackageDetailVO::getProductSkuId)
-                .sorted()
-                .collect(Collectors.toList());
-
-        List<Long> localSkuIds = localSkuList.stream()
-                .map(order -> Long.parseLong(order.getCustomSku()))
-                .sorted()
-                .collect(Collectors.toList());
-
-        if (!temuSkuIds.equals(localSkuIds)) {
-            // 找出差异
-            Map<Long, Long> temuSkuCount = temuSkuIds.stream()
-                    .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-            Map<Long, Long> localSkuCount = localSkuIds.stream()
-                    .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-            
-            // 收集本地缺少的SKU
-            List<String> missingSKUs = new ArrayList<>();
-            // 收集本地多出的SKU
-            List<String> extraSKUs = new ArrayList<>();
-
-            // 以Temu平台数据为准进行比对
-            for (Map.Entry<Long, Long> entry : temuSkuCount.entrySet()) {
-                Long skuId = entry.getKey();
-                Long temuCount = entry.getValue();
-                Long localCount = localSkuCount.getOrDefault(skuId, 0L);
-                
-                if (localCount < temuCount) {
-                    missingSKUs.add(String.format("定制SKU：%d(缺少%d个)", skuId, temuCount - localCount));
-                } else if (localCount > temuCount) {
-                    extraSKUs.add(String.format("定制SKU：%d(多出%d个)", skuId, localCount - temuCount));
-                }
-            }
-
-            // 查找本地多出的SKU（在本地有但在Temu平台没有的）
-            for (Map.Entry<Long, Long> entry : localSkuCount.entrySet()) {
-                if (!temuSkuCount.containsKey(entry.getKey())) {
-                    extraSKUs.add(String.format("定制SKU：%d(多出%d个)", entry.getKey(), entry.getValue()));
-                }
-            }
-
-            // 组装错误信息
-            errorMsg.append(String.format("物流单号：%s-备货单号：%s-定制SKU不一致：", trackingNumber, orderNo));
-            if (!missingSKUs.isEmpty()) {
-                errorMsg.append(String.format("缺少：%s", String.join("，", missingSKUs)));
-            }
-            if (!extraSKUs.isEmpty()) {
-                if (!missingSKUs.isEmpty()) {
-                    errorMsg.append("；");
-                }
-                errorMsg.append(String.format("多出：%s", String.join("，", extraSKUs)));
-            }
-            errorMsg.append("；");
-            return true;
-        }
-
-        // 3. 校验每个定制SKU的官网数量
-        Map<Long, Integer> temuSkuQuantities = temuSkuList.stream()
-                .collect(Collectors.groupingBy(
-                        TemuDeliveryOrderSimpleVO.PackageDetailVO::getProductSkuId,
-                        Collectors.summingInt(TemuDeliveryOrderSimpleVO.PackageDetailVO::getSkuNum)));
-
-        Map<Long, Integer> localSkuQuantities = localSkuList.stream()
-                .collect(Collectors.groupingBy(
-                        order -> Long.parseLong(order.getCustomSku()),
-                        Collectors.summingInt(TemuOrderDO::getOriginalQuantity)));
-
-        boolean hasQuantityError = false;
-        for (Map.Entry<Long, Integer> entry : temuSkuQuantities.entrySet()) {
-            Long skuId = entry.getKey();
-            Integer temuQuantity = entry.getValue();
-            Integer localQuantity = localSkuQuantities.get(skuId);
-
-            if (!temuQuantity.equals(localQuantity)) {
-                hasQuantityError = true;
-                if (temuQuantity > localQuantity) {
-                    errorMsg.append(String.format("物流单号：%s-备货单号：%s-定制SKU：%d-官网数量缺少%d个；",
-                            trackingNumber, orderNo, skuId, temuQuantity - localQuantity));
-                } else {
-                    errorMsg.append(String.format("物流单号：%s-备货单号：%s-定制SKU：%d-官网数量多出%d个；",
-                            trackingNumber, orderNo, skuId, localQuantity - temuQuantity));
-                }
-            }
-        }
-
-        return hasQuantityError;
-    }
-
     /**
      * 发送企业微信告警
-     *
      * @param message 告警消息
      */
     private void sendWeChatAlert(String message) {
@@ -852,17 +865,15 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
                 log.error("[sendWeChatAlert] 未配置告警webhook地址");
                 return;
             }
-
             // 2. 构建告警消息
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append("⚠️ 物流校验告警！\n");
-
             // 3. 格式化消息内容
             String[] alerts = message.split(";");
             for (String alert : alerts) {
                 if (StringUtils.hasText(alert)) {
                     // 将每条告警信息的不同部分用换行分隔
-                    String[] parts = alert.trim().split("-");
+                    String[] parts = alert.trim().split(",");
                     for (String part : parts) {
                         if (StringUtils.hasText(part)) {
                             messageBuilder.append(part.trim()).append("\n");
@@ -870,8 +881,6 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
                     }
                 }
             }
-
-
             // 4. 发送企业微信告警
             weiXinProducer.sendMessage(webhookShop.getWebhook(), messageBuilder.toString());
             log.info("[sendWeChatAlert] 发送企业微信告警成功");

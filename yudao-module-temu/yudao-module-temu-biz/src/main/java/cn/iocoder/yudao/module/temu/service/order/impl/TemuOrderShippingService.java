@@ -1416,24 +1416,21 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					}
 				}
 				if(flag) {
-					// 仅当所有 saveRequestVO 的 shopId 都为 634418222478497 时才执行后续逻辑
-					boolean allShopIdMatch = saveRequestVOs.stream()
-							.allMatch(vo -> "634418222478497".equals(String.valueOf(vo.getShopId())));
-					if (!allShopIdMatch) {
-						return 0;
+					// 收集所有的物流单号并按shopId分组
+					Map<String, Set<String>> shopTrackingNumbers = new HashMap<>();
+					for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
+						if (vo.getTrackingNumber() != null && StringUtils.hasText(vo.getTrackingNumber())) {
+							String shopId = String.valueOf(vo.getShopId());
+							shopTrackingNumbers.computeIfAbsent(shopId, k -> new HashSet<>())
+									.add(vo.getTrackingNumber());
+						}
 					}
-					// 收集所有的物流单号并发布校验事件
-					List<String> trackingNumbers = saveRequestVOs.stream()
-							.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
-							.filter(StringUtils::hasText)
-							.distinct()
-							.collect(Collectors.toList());
 					// 物流单号不为空时发布校验事件
-					if (!trackingNumbers.isEmpty()) {
+					if (!shopTrackingNumbers.isEmpty()) {
 						// 发布物流单号校验事件（核心事件驱动机制）
 						// 注意：此处发布的事件是同步触发的，但实际处理可能异步执行
-						eventPublisher.publishEvent(new TrackingNumberValidationEvent(trackingNumbers));
-						log.info("[batchSaveOrderShippingTest] 已发布物流单号校验事件，trackingNumbers={}", trackingNumbers);
+						eventPublisher.publishEvent(new TrackingNumberValidationEvent(shopTrackingNumbers));
+						log.info("[batchSaveOrderShipping] 已发布物流单号校验事件，shopTrackingNumbers={}", shopTrackingNumbers);
 					}
 				}
 				return affectedRows;
@@ -1572,10 +1569,11 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	public void handleTrackingNumberValidation(TrackingNumberValidationEvent event) {
 		try {
 			// 从事件中提取物流单号集合
-			List<String> trackingNumbers = event.getTrackingNumbers();
-			log.info("[handleTrackingNumberValidation] 开始异步校验物流单号，trackingNumbers={}", trackingNumbers);
+			Map<String, Set<String>> shopTrackingNumbers = event.getShopTrackingNumbers();
+			log.info("[handleTrackingNumberValidation] 开始异步校验物流单号，shopTrackingNumbers={}", shopTrackingNumbers);
+			
 			// 调用temuApi验证物流单号与erp是否一致
-			TemuOrderTrackingValidateRespVO validateResult = temuDeliveryOrderConvertService.validateTrackingNumber(trackingNumbers);
+			TemuOrderTrackingValidateRespVO validateResult = temuDeliveryOrderConvertService.validateTrackingNumber(shopTrackingNumbers);
 			if (!validateResult.getSuccess()) {
 				log.warn("[handleTrackingNumberValidation] 物流单号校验失败：{}", validateResult.getErrorMessage());
 			} else {
