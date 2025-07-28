@@ -24,13 +24,22 @@
             temu_order_return
         <where>
             <if test="reqVO.orderNo != null and reqVO.orderNo != ''">
-                AND order_no = #{reqVO.orderNo}
+                AND order_no LIKE CONCAT('%', #{reqVO.orderNo}, '%')
+            </if>
+            <if test="reqVO.sku != null and reqVO.sku != ''">
+                AND sku LIKE CONCAT('%', #{reqVO.sku}, '%')
+            </if>
+            <if test="reqVO.skc != null and reqVO.skc != ''">
+                AND skc LIKE CONCAT('%', #{reqVO.skc}, '%')
+            </if>
+            <if test="reqVO.customSku != null and reqVO.customSku != ''">
+                AND custom_sku LIKE CONCAT('%', #{reqVO.customSku}, '%')
             </if>
             <if test="reqVO.repeatReason != null and reqVO.repeatReason != ''">
                 AND repeat_reason = #{reqVO.repeatReason}
             </if>
-            <if test="reqVO.createdAt != null and reqVO.createdAt.length == 2">
-                AND created_at BETWEEN #{reqVO.createdAt[0]} AND #{reqVO.createdAt[1]}
+            <if test="reqVO.beginTime != null and reqVO.endTime != null">
+                AND created_at BETWEEN #{reqVO.beginTime} AND #{reqVO.endTime}
             </if>
         </where>
         ORDER BY created_at DESC
@@ -43,13 +52,22 @@
         /*+ IGNORE_TENANT_LINE */
         <where>
             <if test="reqVO.orderNo != null and reqVO.orderNo != ''">
-                AND order_no = #{reqVO.orderNo}
+                AND order_no LIKE CONCAT('%', #{reqVO.orderNo}, '%')
+            </if>
+            <if test="reqVO.sku != null and reqVO.sku != ''">
+                AND sku LIKE CONCAT('%', #{reqVO.sku}, '%')
+            </if>
+            <if test="reqVO.skc != null and reqVO.skc != ''">
+                AND skc LIKE CONCAT('%', #{reqVO.skc}, '%')
+            </if>
+            <if test="reqVO.customSku != null and reqVO.customSku != ''">
+                AND custom_sku LIKE CONCAT('%', #{reqVO.customSku}, '%')
             </if>
             <if test="reqVO.repeatReason != null and reqVO.repeatReason != ''">
                 AND repeat_reason = #{reqVO.repeatReason}
             </if>
-            <if test="reqVO.createdAt != null and reqVO.createdAt.length == 2">
-                AND created_at BETWEEN #{reqVO.createdAt[0]} AND #{reqVO.createdAt[1]}
+            <if test="reqVO.beginTime != null and reqVO.endTime != null">
+                AND created_at BETWEEN #{reqVO.beginTime} AND #{reqVO.endTime}
             </if>
         </where>
     </select>
