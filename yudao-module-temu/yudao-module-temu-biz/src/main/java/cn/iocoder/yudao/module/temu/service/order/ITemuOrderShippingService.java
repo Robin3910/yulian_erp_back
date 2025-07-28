@@ -20,7 +20,7 @@ public interface ITemuOrderShippingService {
     /**
      * 获得待发货订单分页
      *
-     * @param pageReqVO 分页查询参数
+     * @param pageVO 分页查询参数
      * @return 待发货订单分页结果
      */
     PageResult<TemuOrderShippingRespVO> getOrderShippingPage(TemuOrderShippingPageReqVO pageVO);
@@ -41,15 +41,6 @@ public interface ITemuOrderShippingService {
      * @return 待发货订单分页结果
      */
     PageResult<TemuOrderShippingRespVO> getOrderShippingPageByUser(TemuOrderShippingPageReqVO pageVO, Long userId);
-
-    /**
-     * 测试方法
-     * 批量保存发货面单信息（附带编号）
-     *
-     * @param saveRequestVOs
-     * @return
-     */
-    int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs);
 
     /**
      * 查询加急未发货订单总数

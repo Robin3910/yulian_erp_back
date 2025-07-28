@@ -11,7 +11,7 @@ public class TemuDeliveryOrderSimpleVO {
     private String expressDeliverySn;       // 快递单号
     private String expressCompany;          // 快递公司名称
     private Long expressCompanyId;          // 快递公司id
-    private Long supplierId;                // 供应商id
+    private Long shopId;                // 店铺id
     private String subPurchaseOrderSn;      // 采购子单号
     private Integer urgencyType;            // 是否紧急
     private Integer deliverPackageNum;      // 实发包裹数
