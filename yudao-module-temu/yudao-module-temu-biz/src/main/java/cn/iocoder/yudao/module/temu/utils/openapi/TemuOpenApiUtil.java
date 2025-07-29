@@ -56,7 +56,7 @@ public class TemuOpenApiUtil {
 	//生成签名
 	private String createSign(TreeMap<String, Object> params) {
 		//用key按ASCII码升序排序，
-		log.info("排序的结果是{}", params);
+//		log.info("排序的结果是{}", params);
 		StringBuilder stringBuilder = new StringBuilder();
 		for (String key : params.keySet()) {
 			stringBuilder.append(key);
@@ -71,7 +71,7 @@ public class TemuOpenApiUtil {
 			
 		}
 		stringBuilder.append(appSecret);
-		log.info("签名拼接结果\n{}", appSecret + stringBuilder);
+//		log.info("签名拼接结果\n{}", appSecret + stringBuilder);
 		//生成大写的MD5
 		return DigestUtil.md5Hex(appSecret + stringBuilder).toUpperCase();
 	}
@@ -100,10 +100,10 @@ public class TemuOpenApiUtil {
 	public String request(TreeMap<String, Object> params) {
 		//创建请求参数
 		TreeMap<String, Object> requestData = createRequest(params);
-		log.info("参数拼接的结果\n{}", JSONUtil.toJsonStr(requestData));
+//		log.info("参数拼接的结果\n{}", JSONUtil.toJsonStr(requestData));
 		//发送请求
 		String body = HttpRequest.post(baseUrl).body(JSONUtil.toJsonStr(requestData)).execute().body();
-		log.info("请求的内容是\n:{}", body);
+//		log.info("请求的内容是\n:{}", body);
 		return body;
 	}
 

@@ -13,4 +13,11 @@ public interface TemuStockPreparationService {
      * @return 备货单分页列表
      */
     PageResult<TemuStockPreparationVO> getStockPreparationPage(TemuStockPreparationPageReqVO reqVO);
+
+    /**
+     * 保存备货单
+     *
+     * @return 成功保存的订单数量
+     */
+    int saveStockPreparation();
 } 
