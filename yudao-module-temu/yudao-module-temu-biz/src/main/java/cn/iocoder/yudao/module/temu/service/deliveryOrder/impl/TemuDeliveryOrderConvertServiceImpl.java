@@ -500,18 +500,42 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
                     log.info("[validateTrackingNumber] 跳过非634418222478497店铺的物流校验，shopId={}", shopId);
                     continue;
                 }
-                validateShopTrackingNumbers(shopId, entry.getValue(), results, errorMsg);
-                if (!results.isSuccess()) {
-                    respVO.setSuccess(false);
+                
+                // 将物流单号分批处理，每批最多20个
+                Set<String> trackingNumbers = entry.getValue();
+                List<Set<String>> batches = new ArrayList<>();
+                Iterator<String> iterator = trackingNumbers.iterator();
+                Set<String> currentBatch = new HashSet<>();
+                
+                while (iterator.hasNext()) {
+                    String trackingNumber = iterator.next();
+                    currentBatch.add(trackingNumber);
+                    
+                    if (currentBatch.size() >= 20 || !iterator.hasNext()) {
+                        batches.add(new HashSet<>(currentBatch));
+                        currentBatch.clear();
+                    }
+                }
+                
+                // 处理每一批物流单号
+                for (Set<String> batch : batches) {
+                    validateShopTrackingNumbers(shopId, batch, results, errorMsg);
+                    if (!results.isSuccess()) {
+                        respVO.setSuccess(false);
+                    }
                 }
             }
-            // 设置返回结果
-            if (!respVO.getSuccess()) {
+            
+            // 如果有错误信息，设置到响应中
+            if (errorMsg.length() > 0) {
                 respVO.setErrorMessage(errorMsg.toString());
+                // 发送企业微信告警
+                sendWeChatAlert(errorMsg.toString());
             }
+            // 设置物流单号与订单号的映射关系
             respVO.setTrackingNumberToOrderNos(results.getTemuTrackingToOrders());
+            // 设置物流单号与SKU信息的映射关系
             respVO.setTrackingNumberToSkus(results.getTemuTrackingToSkus());
-
         } catch (Exception e) {
             handleGlobalException(e, shopTrackingNumbers, respVO);
         }
@@ -555,6 +579,9 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
         TemuDeliveryOrderQueryReqVO queryReqVO = new TemuDeliveryOrderQueryReqVO();
         queryReqVO.setExpressDeliverySnList(trackingNumbers);
         queryReqVO.setShopId(shopId);
+        // 设置足够大的页面大小，确保一次性获取所有数据
+        queryReqVO.setPageSize(100);
+        queryReqVO.setPageNo(1);
         return queryTemuLogisticsPage(queryReqVO);
     }
 
