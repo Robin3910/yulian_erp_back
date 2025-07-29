@@ -147,4 +147,37 @@ public class TemuOperationLogController {
         ExcelUtils.write(response, "批量下单记录.xls", "数据", OrderPlacementRecordRespVO.class, list);
     }
 
+    // 大客户的账单页面。
+    @GetMapping("/bill/order-VipPlacement")
+    @Operation(summary = "获得Vip批量下单记录分页")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:query')")
+    public CommonResult<PageResult<OrderPlacementRecordRespVO>> getOrderVipPlacementRecordPage(
+            @Valid OrderPlacementRecordPageReqVO pageReqVO) {
+        PageResult<OrderPlacementRecordRespVO> pageResult = operationLogService
+                .getOrderVipPlacementRecordPage(pageReqVO);
+        return success(pageResult);
+    }
+
+    @GetMapping("/bill/order-VipPlacement/amount-statistics")
+    @Operation(summary = "获得Vip批量下单记录总金额统计")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:query')")
+    public CommonResult<OrderPlacementAmountStatisticsRespVO> getOrderVipPlacementAmountStatistics(
+            @Valid OrderPlacementRecordPageReqVO pageReqVO) {
+        OrderPlacementAmountStatisticsRespVO statistics = operationLogService
+                .getOrderVipPlacementAmountStatistics(pageReqVO);
+        return success(statistics);
+    }
+
+    @GetMapping("/bill/order-VipPlacement/export-excel")
+    @Operation(summary = "导出批量下单记录 Excel")
+    @PreAuthorize("@ss.hasPermission('temu:operation-log:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportOrderVipPlacementRecordExcel(@Valid OrderPlacementRecordPageReqVO pageReqVO,
+                                                   HttpServletResponse response) throws IOException {
+        pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<OrderPlacementRecordRespVO> list = operationLogService.getOrderVipPlacementRecordList(pageReqVO);
+        // 导出 Excel
+        ExcelUtils.write(response, "批量下单记录.xls", "数据", OrderPlacementRecordRespVO.class, list);
+    }
+
 }

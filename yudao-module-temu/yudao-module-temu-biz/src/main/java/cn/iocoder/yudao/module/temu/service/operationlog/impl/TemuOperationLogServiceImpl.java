@@ -17,10 +17,12 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacem
 import cn.iocoder.yudao.module.temu.controller.admin.vo.operationlog.OrderPlacementAmountStatisticsRespVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOperationLogDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuVipOrderPlacementRecordDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOperationLogMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderMapper;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderPlacementRecordMapper;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderPlacementRecordDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuVipOrderPlacementRecordMapper;
 import cn.iocoder.yudao.module.temu.service.operationlog.TemuOperationLogService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +63,8 @@ public class TemuOperationLogServiceImpl implements TemuOperationLogService {
 
     @Resource
     private TemuOrderPlacementRecordMapper temuOrderPlacementRecordMapper;
+    @Resource
+    private TemuVipOrderPlacementRecordMapper temuVipOrderPlacementRecordMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -326,5 +330,75 @@ public class TemuOperationLogServiceImpl implements TemuOperationLogService {
         statistics.setTotalPrice(totalPrice);
         
         return statistics;
+    }
+
+
+    //大客户对接账单
+    @Override
+    public PageResult<OrderPlacementRecordRespVO> getOrderVipPlacementRecordPage(OrderPlacementRecordPageReqVO pageReqVO) {
+        // 构造分页查询条件
+        // 这里只做简单条件，复杂条件可扩展
+        PageResult<TemuVipOrderPlacementRecordDO> pageResult = temuVipOrderPlacementRecordMapper.selectPage(pageReqVO, new LambdaQueryWrapperX<TemuVipOrderPlacementRecordDO>()
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOrderNo, pageReqVO.getOrderNo())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSku, pageReqVO.getSku())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSkc, pageReqVO.getSkc())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getCustomSku, pageReqVO.getCustomSku())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getCategoryId, pageReqVO.getCategoryId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getIsReturnOrder, pageReqVO.getIsReturnOrder())
+                .betweenIfPresent(TemuVipOrderPlacementRecordDO::getOperationTime, pageReqVO.getOperationTime())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getShopId, pageReqVO.getShopId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOperator, pageReqVO.getOperator())
+                .orderByDesc(TemuVipOrderPlacementRecordDO::getOperationTime)
+        );
+        // 转VO
+        List<OrderPlacementRecordRespVO> voList = BeanUtils.toBean(pageResult.getList(), OrderPlacementRecordRespVO.class);
+        return new PageResult<>(voList, pageResult.getTotal());
+    }
+    @Override
+    public OrderPlacementAmountStatisticsRespVO getOrderVipPlacementAmountStatistics(OrderPlacementRecordPageReqVO pageReqVO) {
+        // 构造查询条件
+        List<TemuVipOrderPlacementRecordDO> list = temuVipOrderPlacementRecordMapper.selectList(new LambdaQueryWrapperX<TemuVipOrderPlacementRecordDO>()
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOrderNo, pageReqVO.getOrderNo())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSku, pageReqVO.getSku())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSkc, pageReqVO.getSkc())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getCustomSku, pageReqVO.getCustomSku())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getCategoryId, pageReqVO.getCategoryId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getIsReturnOrder, pageReqVO.getIsReturnOrder())
+                .betweenIfPresent(TemuVipOrderPlacementRecordDO::getOperationTime, pageReqVO.getOperationTime())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getShopId, pageReqVO.getShopId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOperator, pageReqVO.getOperator())
+        );
+
+        // 计算总金额
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        for (TemuVipOrderPlacementRecordDO record : list) {
+            if (record.getTotalPrice() != null) {
+                totalPrice = totalPrice.add(record.getTotalPrice());
+            }
+        }
+
+        OrderPlacementAmountStatisticsRespVO statistics = new OrderPlacementAmountStatisticsRespVO();
+        statistics.setTotalPrice(totalPrice);
+
+        return statistics;
+    }
+
+    @Override
+    public List<OrderPlacementRecordRespVO> getOrderVipPlacementRecordList(OrderPlacementRecordPageReqVO pageReqVO) {
+        // 构造查询条件，不分页
+        List<TemuVipOrderPlacementRecordDO> list = temuVipOrderPlacementRecordMapper.selectList(new LambdaQueryWrapperX<TemuVipOrderPlacementRecordDO>()
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOrderNo, pageReqVO.getOrderNo())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSku, pageReqVO.getSku())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getSkc, pageReqVO.getSkc())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getCustomSku, pageReqVO.getCustomSku())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getCategoryId, pageReqVO.getCategoryId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getIsReturnOrder, pageReqVO.getIsReturnOrder())
+                .betweenIfPresent(TemuVipOrderPlacementRecordDO::getOperationTime, pageReqVO.getOperationTime())
+                .inIfPresent(TemuVipOrderPlacementRecordDO::getShopId, pageReqVO.getShopId())
+                .eqIfPresent(TemuVipOrderPlacementRecordDO::getOperator, pageReqVO.getOperator())
+                .orderByDesc(TemuVipOrderPlacementRecordDO::getOperationTime)
+        );
+        // 转VO
+        return BeanUtils.toBean(list, OrderPlacementRecordRespVO.class);
     }
 }
