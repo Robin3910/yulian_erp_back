@@ -9,6 +9,9 @@ import java.util.List;
 @Data
 public class TemuCustomGoodsLabelQueryReqVO {
 
+    @Schema(description = "店铺ID", required = true)
+    private String shopId;
+
     @Schema(description = "货品sku id列表")
     private List<Long> productSkuIdList;
 

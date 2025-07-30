@@ -179,10 +179,10 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
     @Override
     public List<TemuBoxMarkRespVO> queryBoxMark(TemuBoxMarkQueryReqVO reqVO) {
         try {
-            // 1. 获取默认店铺信息
-            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            // 1. 获取店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId(reqVO.getShopId());
             if (shop == null) {
-                throw new RuntimeException("未找到默认店铺信息");
+                throw new RuntimeException("未找到店铺信息，shopId=" + reqVO.getShopId());
             }
 
             // 2. 初始化Temu开放API工具
@@ -322,10 +322,10 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
     @Override
     public TemuCustomGoodsLabelRespVO queryCustomGoodsLabel(TemuCustomGoodsLabelQueryReqVO reqVO) {
         try {
-            // 1. 获取默认店铺信息
-            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            // 1. 获取店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId(reqVO.getShopId());
             if (shop == null) {
-                throw new RuntimeException("未找到默认店铺信息");
+                throw new RuntimeException("未找到店铺信息，shopId=" + reqVO.getShopId());
             }
 
             // 2. 初始化Temu开放API工具
@@ -376,10 +376,10 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
     @Override
     public TemuPrintDataKeyRespVO getBoxMarkPrintDataKey(TemuBoxMarkQueryReqVO reqVO) {
         try {
-            // 1. 获取默认店铺信息
-            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            // 1. 获取店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId(reqVO.getShopId());
             if (shop == null) {
-                throw new RuntimeException("未找到默认店铺信息");
+                throw new RuntimeException("未找到店铺信息，shopId=" + reqVO.getShopId());
             }
 
             // 2. 初始化Temu开放API工具
@@ -425,10 +425,10 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
     @Override
     public TemuPrintDataKeyRespVO getCustomGoodsLabelPrintDataKey(TemuCustomGoodsLabelQueryReqVO reqVO) {
         try {
-            // 1. 获取默认店铺信息
-            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId("634418222478497");
+            // 1. 获取店铺信息
+            TemuOpenapiShopDO shop = temuOpenapiShopMapper.selectByShopId(reqVO.getShopId());
             if (shop == null) {
-                throw new RuntimeException("未找到默认店铺信息");
+                throw new RuntimeException("未找到店铺信息，shopId=" + reqVO.getShopId());
             }
 
             // 2. 初始化Temu开放API工具

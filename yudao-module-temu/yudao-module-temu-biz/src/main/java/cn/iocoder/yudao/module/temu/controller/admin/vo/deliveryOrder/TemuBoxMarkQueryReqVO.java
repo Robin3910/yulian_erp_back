@@ -10,6 +10,9 @@ import java.util.List;
 @Data
 public class TemuBoxMarkQueryReqVO {
 
+    @Schema(description = "店铺ID", required = true)
+    private String shopId;
+
     @Schema(description = "发货单号列表", required = true)
     @NotEmpty(message = "发货单号列表不能为空")
     private List<String> deliveryOrderSnList;
