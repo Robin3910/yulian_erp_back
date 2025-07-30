@@ -498,18 +498,8 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
             // 遍历每个shopId，分别校验其物流单号
             for (Map.Entry<String, Set<String>> entry : shopTrackingNumbers.entrySet()) {
                 String shopId = entry.getKey();
-                // 从配置中获取需要校验的shopId列表
-                String configShopIds = configApi.getConfigValueByKey("temu.logistics.validate.shop.ids");
-                Set<String> validateShopIds = new HashSet<>();
-                if (StringUtils.hasText(configShopIds)) {
-                    // 将配置的shopId字符串转换为Set集合（支持多个shopId，用逗号分隔）
-                    validateShopIds.addAll(Arrays.asList(configShopIds.split(" ")));
-                } else {
-                    // 如果配置为空，保持原有逻辑，只校验默认店铺
-                    validateShopIds.add("634418222478497");
-                }
-                // 判断当前shopId是否需要校验
-                if (!validateShopIds.contains(shopId)) {
+                // 只查询店铺是否存在，不查询敏感信息
+                if (temuOpenapiShopMapper.checkShopExists(shopId) == null) {
                     log.info("[validateTrackingNumber] 跳过未配置的店铺物流校验，shopId={}", shopId);
                     continue;
                 }

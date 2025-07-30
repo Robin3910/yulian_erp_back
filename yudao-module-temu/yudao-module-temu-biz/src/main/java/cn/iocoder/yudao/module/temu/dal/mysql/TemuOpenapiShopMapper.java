@@ -20,6 +20,12 @@ public interface TemuOpenapiShopMapper {
     TemuOpenapiShopDO selectByShopId(String shopId);
 
     /**
+     * 检查店铺是否存在
+     */
+    @Select("SELECT shop_id FROM temu_openapi_shop WHERE shop_id = #{shopId} LIMIT 1")
+    TemuOpenapiShopDO checkShopExists(String shopId);
+
+    /**
      * 分页查询店铺列表
      */
     default PageResult<TemuOpenapiShopPageRespVO> selectPage(TemuOpenapiShopPageReqVO reqVO) {
