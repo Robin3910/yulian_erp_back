@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.temu.service.deliveryOrder.impl;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuDeliveryOrderSimpleVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkQueryReqVO;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder.TemuBoxMarkRespVO;
@@ -19,6 +20,7 @@ import cn.iocoder.yudao.module.temu.dal.mysql.TemuShopMapper;
 import cn.iocoder.yudao.module.temu.service.deliveryOrder.TemuDeliveryOrderConvertService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jdk.nashorn.internal.runtime.regexp.joni.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
     private final TemuOrderMapper orderMapper;
     private final TemuShopMapper temuShopMapper;
     private final WeiXinProducer weiXinProducer;
+    private final ConfigApi configApi;
 
     /**
      * 查询Temu平台物流信息，并将结果转换为VO列表
@@ -495,9 +498,19 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
             // 遍历每个shopId，分别校验其物流单号
             for (Map.Entry<String, Set<String>> entry : shopTrackingNumbers.entrySet()) {
                 String shopId = entry.getKey();
-                // 目前只校验634418222478497的物流信息
-                if (!"634418222478497".equals(shopId)) {
-                    log.info("[validateTrackingNumber] 跳过非634418222478497店铺的物流校验，shopId={}", shopId);
+                // 从配置中获取需要校验的shopId列表
+                String configShopIds = configApi.getConfigValueByKey("temu.logistics.validate.shop.ids");
+                Set<String> validateShopIds = new HashSet<>();
+                if (StringUtils.hasText(configShopIds)) {
+                    // 将配置的shopId字符串转换为Set集合（支持多个shopId，用逗号分隔）
+                    validateShopIds.addAll(Arrays.asList(configShopIds.split(" ")));
+                } else {
+                    // 如果配置为空，保持原有逻辑，只校验默认店铺
+                    validateShopIds.add("634418222478497");
+                }
+                // 判断当前shopId是否需要校验
+                if (!validateShopIds.contains(shopId)) {
+                    log.info("[validateTrackingNumber] 跳过未配置的店铺物流校验，shopId={}", shopId);
                     continue;
                 }
                 
@@ -529,8 +542,6 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
             // 如果有错误信息，设置到响应中
             if (errorMsg.length() > 0) {
                 respVO.setErrorMessage(errorMsg.toString());
-                // 发送企业微信告警
-                sendWeChatAlert(errorMsg.toString());
             }
             // 设置物流单号与订单号的映射关系
             respVO.setTrackingNumberToOrderNos(results.getTemuTrackingToOrders());
@@ -865,10 +876,11 @@ public class TemuDeliveryOrderConvertServiceImpl implements TemuDeliveryOrderCon
                     shopName, 
                     affectedTrackingNumbers != null ? String.join("，", affectedTrackingNumbers) : "无",
                     errorMessage);
+            // 只在店铺信息错误时发送告警
+            sendWeChatAlert(errorMessage);
         }
         respVO.setErrorMessage("校验失败：" + errorMessage);
         log.error("[validateTrackingNumber] 验证物流单号时发生错误，物流单号列表：{}", shopTrackingNumbers, e);
-        sendWeChatAlert(errorMessage);
     }
     // 校验结果的内部类
     @Data
