@@ -16,6 +16,12 @@
                     #{shopId}
                 </foreach>
             </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
+                </foreach>
+            </if>
             AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE(create_time)
@@ -34,6 +40,12 @@
                 AND shop_id IN
                 <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
                     #{shopId}
+                </foreach>
+            </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
                 </foreach>
             </if>
             AND create_time BETWEEN #{startDate} AND #{endDate}
@@ -56,6 +68,12 @@
                     #{shopId}
                 </foreach>
             </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
+                </foreach>
+            </if>
             AND create_time BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE_FORMAT(create_time, '%Y-%m')
@@ -74,6 +92,12 @@
                 AND shop_id IN
                 <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
                     #{shopId}
+                </foreach>
+            </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
                 </foreach>
             </if>
             AND is_return_order = 1
@@ -97,6 +121,12 @@
                     #{shopId}
                 </foreach>
             </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
+                </foreach>
+            </if>
             AND is_return_order = 1
             AND create_time BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
@@ -118,11 +148,30 @@
                     #{shopId}
                 </foreach>
             </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND category_id IN
+                <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                    #{categoryId}
+                </foreach>
+            </if>
             AND is_return_order = 1
             AND create_time BETWEEN #{startDate} AND #{endDate}
             AND deleted = 0
         GROUP BY DATE_FORMAT(create_time, '%Y-%m')
         ORDER BY time_point
+    </select>
+
+    <!-- 获取所有可选的类目列表 -->
+    <select id="selectAllCategories" resultType="map">
+        SELECT DISTINCT
+            category_id AS categoryId,
+            category_name AS categoryName
+        FROM temu_order
+        WHERE 
+            category_id IS NOT NULL 
+            AND category_id != ''
+            AND deleted = 0
+        ORDER BY category_name
     </select>
 
 </mapper> 
