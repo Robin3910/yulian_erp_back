@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.controller;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
@@ -28,7 +29,9 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.TemuOrderBatchInse
 public class AdminTemuOrderController {
 	@Resource
 	private ITemuOrderService temuOrderService;
-	
+	@Resource
+	private PermissionService permissionService;
+
 	@GetMapping("/page")
 	@Operation(summary = "获取订单管理信息")
 	public CommonResult<?> list(TemuOrderRequestVO temuOrderRequestVO) {
@@ -95,7 +98,13 @@ public class AdminTemuOrderController {
 	@PostMapping("/batch-save-order")
 	@Operation(summary = "批量下单")
 	public CommonResult<Integer> batchSave(@Valid @RequestBody List<TemuOrderBatchOrderReqVO> requestVO) {
-		return success(temuOrderService.batchSaveOrder(requestVO));
+		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+		boolean isVip = permissionService.hasAnyRoles(loginUserId, "big_customer" );
+		if (isVip){
+			return success(temuOrderService.VipBatchSaveOrder(requestVO));
+		}else {
+			return success(temuOrderService.batchSaveOrder(requestVO));
+		}
 	}
 	
 	//根据订单ID获取合规单信息和商品码

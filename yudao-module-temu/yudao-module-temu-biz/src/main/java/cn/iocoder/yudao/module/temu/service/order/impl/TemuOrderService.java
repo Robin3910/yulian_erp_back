@@ -16,7 +16,6 @@ import cn.iocoder.yudao.module.pay.enums.wallet.PayWalletBizTypeEnum;
 import cn.iocoder.yudao.module.pay.service.wallet.PayWalletService;
 import cn.iocoder.yudao.module.system.dal.dataobject.dict.DictTypeDO;
 import cn.iocoder.yudao.module.system.dal.mysql.dict.DictTypeMapper;
-import cn.iocoder.yudao.module.system.enums.DictTypeConstants;
 import cn.iocoder.yudao.module.temu.api.category.IPriceRule;
 import cn.iocoder.yudao.module.temu.api.category.factory.PriceRuleFactory;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
@@ -27,7 +26,6 @@ import cn.iocoder.yudao.module.temu.enums.TemuOrderStatusEnum;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderService;
 import cn.iocoder.yudao.module.temu.service.orderBatch.impl.TemuOrderBatchCategoryService;
 import cn.iocoder.yudao.module.temu.service.oss.TemuOssService;
-import cn.iocoder.yudao.module.temu.utils.pdf.PdfToImageUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +49,6 @@ import cn.iocoder.yudao.module.temu.service.pdf.AsyncPdfProcessService;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 
 import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN;
-import static cn.iocoder.yudao.framework.common.enums.UserTypeEnum.MEMBER;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser;
 import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.WALLET_NOT_FOUND;
@@ -82,6 +79,10 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.OrderSkuPageItemVO
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderShippingMapper;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderReturnDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderReturnMapper;
+import cn.iocoder.yudao.module.temu.dal.dataobject.TemuWorkerTaskDO;
+import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
 
 @Service
 @Slf4j
@@ -129,6 +130,18 @@ public class TemuOrderService implements ITemuOrderService {
 	
 	@Resource
 	private TemuOrderShippingMapper shippingInfoMapper;
+	
+	@Resource
+	private TemuOrderReturnMapper temuOrderReturnMapper;
+	
+	@Resource
+	private TemuWorkerTaskMapper temuWorkerTaskMapper;
+
+	@Resource
+	private TemuVipOrderPlacementRecordMapper temuVipOrderPlacementRecordMapper;
+
+	@Resource
+	private TemuVipProductCategoryMapper temuVipProductCategoryMapper;
 	
 	@Override
 	public PageResult<TemuOrderDetailDO> list(TemuOrderRequestVO temuOrderRequestVO) {
@@ -474,20 +487,65 @@ public class TemuOrderService implements ITemuOrderService {
 				// 用定制sku和订单号一起查询当前订单的isReturnOrder
 				TemuOrderDO currentOrderInDb = temuOrderMapper.selectByCustomSkuAndOrderNo(order.getCustomSku(), order.getOrderNo());
 				boolean alreadyReturn = currentOrderInDb != null && currentOrderInDb.getIsReturnOrder() != null && currentOrderInDb.getIsReturnOrder() == 1;
+				
+				// 如果是返单订单，插入返单记录表
+
 				if (CollUtil.isNotEmpty(existingOrders)) {
 					for (TemuOrderDO tempOrder : existingOrders) {
 						if (!tempOrder.getOrderNo().equals(order.getOrderNo())) {
 							// bookingTime更晚的订单，为返单
 							if (order.getBookingTime() != null && order.getBookingTime().isAfter(tempOrder.getBookingTime())) {
 								if (!alreadyReturn) {
+									
+										// 查询工人任务信息
+										String drawUserName = null;
+										String produceUserName = null;
+										String shipUserName = null;
+										// 使用customSku查询temu_worker_task表
+										LambdaQueryWrapperX<TemuWorkerTaskDO> queryWrapper = new LambdaQueryWrapperX<>();
+										queryWrapper.eq(TemuWorkerTaskDO::getCustomSku, order.getCustomSku());
+										List<TemuWorkerTaskDO> workerTasks = temuWorkerTaskMapper.selectList(queryWrapper);
+										if (workerTasks != null && !workerTasks.isEmpty()) {
+											for (TemuWorkerTaskDO workerTask : workerTasks) {
+												if (workerTask.getTaskType() != null) {
+													switch (workerTask.getTaskType()) {
+														case 1:
+															drawUserName = workerTask.getWorkerName();
+														case 2:
+															produceUserName = workerTask.getWorkerName();
+														case 3:
+															shipUserName = workerTask.getWorkerName();
+													}
+												}
+											}
+										}
+
+										// 创建返单记录
+										TemuOrderReturnDO returnOrder = new TemuOrderReturnDO();
+										returnOrder.setOrderNo(order.getOrderNo());
+										returnOrder.setCreatedAt(order.getBookingTime());
+										returnOrder.setShopId(order.getShopId());
+										returnOrder.setProductTitle(order.getProductTitle());
+										returnOrder.setSku(order.getSku());
+										returnOrder.setSkc(order.getSkc());
+										returnOrder.setCustomSku(order.getCustomSku());
+										returnOrder.setProductImgUrl(order.getProductImgUrl());
+										returnOrder.setProductProperties(order.getProductProperties());
+										returnOrder.setDrawUserName(drawUserName);
+										returnOrder.setProduceUserName(produceUserName);
+										returnOrder.setShipUserName(shipUserName);
+										returnOrder.setRepeatReason(1);
+										returnOrder.setAliasName(shopName);
+										// 插入返单记录
+										temuOrderReturnMapper.insert(returnOrder);
 									// 发送企业微信告警，提醒返单
-									String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s", 
-										order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
-										tempOrder.getBookingTime(), order.getBookingTime(), shopName);
+									 String message = String.format("警告：发现返单情况，请检查订单：\n定制SKU: %s\n原订单号: %s\n新订单号: %s\n原订单日期: %s\n新订单日期: %s\n店铺: %s",
+									 	order.getCustomSku(), tempOrder.getOrderNo(), order.getOrderNo(),
+									 	tempOrder.getBookingTime(), order.getBookingTime(), shopName);
 									TemuShopDO shop = temuShopMapper.selectByShopId(88888888L);
 									order.setIsReturnOrder(1);
 									if (shop != null && StrUtil.isNotEmpty(shop.getWebhook())) {
-										weiXinProducer.sendMessage(shop.getWebhook(), message);
+										 weiXinProducer.sendMessage(shop.getWebhook(), message);
 									}
 								}
 							}
@@ -1488,4 +1546,146 @@ public class TemuOrderService implements ITemuOrderService {
         }
         return updated;
     }
+
+	@Override
+	@Transactional
+	public int VipBatchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO) {
+		// 1. 获取所有订单ID
+		List<Long> orderIds = requestVO.stream()
+				.map(TemuOrderBatchOrderReqVO::getId)
+				.collect(Collectors.toList());
+
+		// 2. 批量查询订单，只获取id和categoryId字段
+		List<TemuOrderDO> orders = temuOrderMapper.selectBatchIds(orderIds);
+
+		// 3. 使用Map存储categoryId和对应的订单id列表
+		Map<String, List<Long>> categoryOrderMap = orders.stream()
+				.collect(Collectors.groupingBy(
+						TemuOrderDO::getCategoryId,
+						Collectors.mapping(TemuOrderDO::getId, Collectors.toList())));
+
+		ArrayList<TemuOrderDO> temuOrderDOList = new ArrayList<>();
+		int processCount = 0;
+		LoginUser loginUser = getLoginUser();
+		String operator = SecurityFrameworkUtils.getLoginUserNickname();
+		Long operatorId = loginUser != null ? loginUser.getId() : null;
+		LocalDateTime now = LocalDateTime.now();
+		for (TemuOrderBatchOrderReqVO temuOrderBatchOrderReqVO : requestVO) {
+			// 检查订单是否存在
+			TemuOrderDO temuOrderDO = temuOrderMapper.selectById(temuOrderBatchOrderReqVO.getId());
+			if (temuOrderDO == null) {
+				throw exception(ErrorCodeConstants.ORDER_NOT_EXISTS);
+			}
+			// 根据订单的关联分类id查询分类信息
+			TemuProductCategoryDO temuProductCategoryDO = temuProductCategoryMapper
+					.selectById(temuOrderDO.getCategoryId());
+			if (temuProductCategoryDO == null) {
+				throw exception(ErrorCodeConstants.CATEGORY_NOT_EXISTS);
+			}
+			// 检查订单状态
+			if (temuOrderDO.getOrderStatus() != TemuOrderStatusEnum.UNDELIVERED) {
+				throw exception(ErrorCodeConstants.ORDER_STATUS_ERROR);
+			}
+			// 更新数量
+			temuOrderDO.setQuantity(temuOrderBatchOrderReqVO.getQuantity());
+
+			// 判断是否为返单，返单直接设置价格为0，不进行价格计算
+			if (temuOrderDO.getIsReturnOrder() != null && temuOrderDO.getIsReturnOrder() == 1) {
+				// 返单订单：单价和总价都设为0
+				temuOrderDO.setUnitPrice(BigDecimal.ZERO);
+				temuOrderDO.setTotalPrice(BigDecimal.ZERO);
+				log.info("返单订单 {} 价格设置为0，不进行扣费", temuOrderDO.getOrderNo());
+			} else {
+				// 非返单订单：正常计算价格
+				BigDecimal unitPrice;
+				IPriceRule rule;
+				String discountStr = configApi.getConfigValueByKey("temu.order.discount");
+				BigDecimal discount = new BigDecimal(discountStr); // 例如 0.6
+
+				// 根据规则类型加载不同的对象
+				rule = PriceRuleFactory.createPriceRule(temuProductCategoryDO.getRuleType(),
+						temuProductCategoryDO.getUnitPrice());
+				unitPrice = rule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
+				temuOrderDO.setUnitPrice(unitPrice);
+				temuOrderDO
+						.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity())));
+				// 查询是否存在VIP特殊类目
+				TemuVipProductCategoryDO temuVipProductCategoryDO = temuVipProductCategoryMapper
+						.selectByCategoryId(Long.valueOf(temuOrderDO.getCategoryId()));
+
+				// 声明VIP价格变量
+				BigDecimal vipTotalPrice;
+				BigDecimal vipUnitPrice;
+
+				if (temuVipProductCategoryDO != null) {
+					// 存在特殊类目，使用特殊类目的价格规则
+					IPriceRule vipRule = PriceRuleFactory.createPriceRule(temuVipProductCategoryDO.getRuleType(),
+							temuVipProductCategoryDO.getUnitPrice());
+					vipUnitPrice = vipRule.calcUnitPrice(temuOrderBatchOrderReqVO.getQuantity());
+
+					// 计算VIP总价
+					vipTotalPrice = vipUnitPrice.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity()));
+					temuOrderDO.setVipunitPrice(vipUnitPrice);
+				} else {
+					// 计算VIP总价
+					vipTotalPrice = unitPrice
+							.multiply(BigDecimal.valueOf(temuOrderBatchOrderReqVO.getQuantity()))
+							.multiply(discount);
+					temuOrderDO.setVipunitPrice(unitPrice);
+				}
+
+				// 设置VIP价格信息
+				temuOrderDO.setViptotalPrice(vipTotalPrice);
+			}
+
+			// 修改订单状态
+			temuOrderDO.setOrderStatus(TemuOrderStatusEnum.ORDERED);
+			temuOrderDOList.add(temuOrderDO);
+			processCount++;
+
+			// 插入下单记录表
+			TemuVipOrderPlacementRecordDO record = new TemuVipOrderPlacementRecordDO();
+			record.setOrderNo(temuOrderDO.getOrderNo());
+			record.setShopId(temuOrderDO.getShopId());
+			TemuShopDO shop = temuShopMapper.selectByShopId(temuOrderDO.getShopId());
+			record.setShopName(shop != null ? shop.getShopName() : null);
+			record.setProductTitle(temuOrderDO.getProductTitle());
+			record.setProductProperties(temuOrderDO.getProductProperties());
+			if (temuOrderDO.getCategoryId() != null) {
+				try {
+					record.setCategoryId(Long.valueOf(temuOrderDO.getCategoryId()));
+				} catch (Exception ignore) {
+				}
+			}
+			record.setCategoryName(temuOrderDO.getCategoryName());
+			record.setOriginalQuantity(temuOrderDO.getOriginalQuantity());
+			record.setQuantity(temuOrderDO.getQuantity());
+			record.setUnitPrice(temuOrderDO.getVipunitPrice());
+			record.setTotalPrice(temuOrderDO.getViptotalPrice());
+			record.setSku(temuOrderDO.getSku());
+			record.setSkc(temuOrderDO.getSkc());
+			record.setCustomSku(temuOrderDO.getCustomSku());
+			record.setOperationTime(now);
+			record.setIsReturnOrder(temuOrderDO.getIsReturnOrder() != null && temuOrderDO.getIsReturnOrder() == 1);
+			record.setOperatorId(operatorId);
+			record.setOperator(operator);
+			temuVipOrderPlacementRecordMapper.insert(record);
+		}
+		// 批量更新订单
+		temuOrderMapper.updateBatch(temuOrderDOList);
+		// 批量支付订单
+		payOrderBatch(temuOrderDOList);
+
+		// 检查当前订单是否允许自动打批次
+		DictTypeDO dictTypeDO = dictTypeMapper.selectByType("temu_order_batch_category_status");
+		// 如果状态开启那么开始自动打批次
+		if (dictTypeDO.getStatus() == 0) {
+			// 获取batchCategoryId和订单id的映射
+			Map<String, List<Long>> batchCategoryOrderMap = temuOrderBatchCategoryService
+					.getBatchCategoryOrderMap(categoryOrderMap);
+			temuOrderBatchCategoryService.processBatchAndRelations(batchCategoryOrderMap);
+		}
+
+		return processCount;
+	}
 }

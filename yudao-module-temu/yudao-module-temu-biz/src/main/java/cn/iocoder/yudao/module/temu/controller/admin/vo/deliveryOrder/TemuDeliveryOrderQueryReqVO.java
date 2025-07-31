@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.temu.controller.admin.vo.deliveryOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.util.List;
+import java.util.Set;
 
 @Schema(description = "TemuApi - 发货列表 Request VO")
 @Data
@@ -17,7 +18,7 @@ public class TemuDeliveryOrderQueryReqVO {
     private List<String> subPurchaseOrderSnList;
 
     @Schema(description = "物流单号列表")
-    private List<String> expressDeliverySnList;
+    private Set<String> expressDeliverySnList;
 
     @Schema(description = "发货时间-开始")
     private Long deliverTimeFrom;

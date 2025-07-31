@@ -189,4 +189,14 @@ public class TemuOrderDO extends BaseDO {
 	 */
 	@TableField(value = "sender_id")
 	private Long senderId;
+
+	/**
+	 * Vip客户的该订单总价
+	 */
+	private BigDecimal viptotalPrice;
+
+	/*
+	 * 订单产品的单位成本
+	 */
+	private BigDecimal vipunitPrice;
 }

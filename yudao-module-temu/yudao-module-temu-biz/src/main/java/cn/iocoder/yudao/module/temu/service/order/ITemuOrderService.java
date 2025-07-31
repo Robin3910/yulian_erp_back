@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.temu.controller.admin.vo.order.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderDetailDO;
 
+import javax.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
@@ -101,4 +102,12 @@ public interface ITemuOrderService {
      * @return 是否成功
      */
     Boolean batchUpdateSenderIdBySortingSequence(List<String> sortingSequenceList, Long senderId, Boolean conditionFlag);
+
+	/**
+	 * Vip账号批量下单
+	 *
+	 * @param requestVO 批量下单请求
+	 * @return 批量下单结果
+	 */
+	int VipBatchSaveOrder(List<TemuOrderBatchOrderReqVO> requestVO);
 }

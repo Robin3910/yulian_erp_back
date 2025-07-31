@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.service.order.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -8,25 +9,26 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderListRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderNoListRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountReqVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingCountRespVO;
-import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderUrgentAlertReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.*;
 import cn.iocoder.yudao.module.temu.dal.dataobject.*;
 import cn.iocoder.yudao.module.temu.dal.mysql.*;
 import cn.iocoder.yudao.module.temu.mq.producer.weixin.WeiXinProducer;
 import cn.iocoder.yudao.module.temu.service.order.ITemuOrderShippingService;
+import cn.iocoder.yudao.module.temu.service.deliveryOrder.TemuDeliveryOrderConvertService;
 import com.aliyun.oss.ServiceException;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import cn.iocoder.yudao.module.temu.dal.event.TrackingNumberValidationEvent;
 
+import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -36,11 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import cn.hutool.core.collection.CollUtil;
-
 import java.util.Objects;
-
-import javax.annotation.Resource;
 
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuWorkerTaskDO;
 import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
@@ -53,11 +51,16 @@ import cn.iocoder.yudao.module.temu.dal.mysql.TemuWorkerTaskMapper;
 @RequiredArgsConstructor
 public class TemuOrderShippingService implements ITemuOrderShippingService {
 	
+	private final TemuDeliveryOrderConvertService temuDeliveryOrderConvertService;
 	private final TemuOrderShippingMapper shippingInfoMapper;
 	private final TemuOrderMapper orderMapper;
 	private final TemuShopMapper shopMapper;
 	private final TemuProductCategoryMapper categoryMapper;
 	private final TemuUserShopMapper userShopMapper;
+	private final ApplicationEventPublisher eventPublisher;
+
+	@Resource
+	private TemuOrderBatchCategoryMapper temuOrderBatchCategoryMapper;
 	
 	@Resource
 	private TemuShopMapper temuShopMapper;
@@ -842,7 +845,41 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					.append(" AND s.create_time <= '").append(endTimeStr).append("'");
 		}
 
-		// 处理类目条件
+		// 处理批次条件（order_no IN）
+		String isBatchNoQueryEnabled = configApi.getConfigValueByKey("temu.order-shipping.batchNo-query.enabled");
+		boolean batchNoQueryEnabled = false;
+		if (StringUtils.hasText(isBatchNoQueryEnabled)) {
+			try {
+				batchNoQueryEnabled = Boolean.parseBoolean(isBatchNoQueryEnabled);
+			} catch (Exception e) {}
+		}
+		if (batchNoQueryEnabled && StringUtils.hasText(pageVO.getBatchNo())) {
+			List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderBatchDO>()
+					.like(TemuOrderBatchDO::getBatchNo, pageVO.getBatchNo())
+			);
+			if (!batchList.isEmpty()) {
+				List<Long> batchIds = batchList.stream().map(TemuOrderBatchDO::getId).collect(Collectors.toList());
+				List<TemuOrderBatchRelationDO> relations = temuOrderBatchRelationMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderBatchRelationDO>()
+						.in(TemuOrderBatchRelationDO::getBatchId, batchIds)
+				);
+				if (!relations.isEmpty()) {
+					List<Long> orderIds = relations.stream().map(TemuOrderBatchRelationDO::getOrderId).collect(Collectors.toList());
+					if (!orderIds.isEmpty()) {
+						Set<String> batchOrderNos = orderMapper.selectBatchIds(orderIds)
+							.stream().map(TemuOrderDO::getOrderNo).collect(Collectors.toSet());
+						if (!batchOrderNos.isEmpty()) {
+							joinQuery.append(" AND o.order_no IN ('")
+								.append(String.join("','", batchOrderNos))
+								.append("')");
+						}
+					}
+				}
+			}
+		}
+
+		// 处理类目条件（category_id IN）
 		if (!CollectionUtils.isEmpty(pageVO.getCategoryIds())) {
 			joinQuery.append(" AND o.category_id IN ('")
 					.append(String.join("','", pageVO.getCategoryIds()))
@@ -1050,133 +1087,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	}
 
 	/**
-	 * 批量保存物流面单信息
-	 * @param saveRequestVOs
-	 * @return
-	 */
-	@Transactional(rollbackFor = Exception.class)
-	public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
-		if (CollectionUtils.isEmpty(saveRequestVOs)) {
-			return 0;
-		}
-		// 1. 参数校验（强制要求 trackingNumber 非空）
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			if (saveRequestVO == null) {
-				throw new IllegalArgumentException("待发货订单信息不能为空");
-			}
-			if (saveRequestVO.getOrderNo() == null) {
-				throw new IllegalArgumentException("订单编号不能为空");
-			}
-			if (saveRequestVO.getShopId() == null) {
-				throw new IllegalArgumentException("店铺ID不能为空");
-			}
-			if (saveRequestVO.getTrackingNumber() == null) {
-				throw new IllegalArgumentException("物流单号不能为空");
-			}
-
-			// 检查是否为加急订单，如果是则发送企业微信通知
-			if (Boolean.TRUE.equals(saveRequestVO.getIsUrgent())) {
-				// 查询数据库中该物流单号的is_urgent状态
-				Long urgentCount = shippingInfoMapper.selectCount(
-						new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-								.eq(TemuOrderShippingInfoDO::getTrackingNumber, saveRequestVO.getTrackingNumber())
-								.eq(TemuOrderShippingInfoDO::getIsUrgent, 1)
-				);
-				// 如果数据库中已经有加急记录，则不再发送告警
-				if (urgentCount == 0) {
-					// 获取shopId为88888888的店铺webhook地址
-					TemuShopDO shop = temuShopMapper.selectByShopId(77777777L);
-					if (shop != null && shop.getWebhook() != null) {
-						String shopName = temuShopMapper.selectByShopId(saveRequestVO.getShopId()) != null ?
-								temuShopMapper.selectByShopId(saveRequestVO.getShopId()).getShopName() : "未知店铺";
-
-						String message = String.format("⚠️ 加急订单提醒！\n订单号：%s\n店铺：%s\n物流单号：%s\n请及时处理！",
-								saveRequestVO.getOrderNo(), shopName, saveRequestVO.getTrackingNumber());
-
-						try {
-							weiXinProducer.sendMessage(shop.getWebhook(), message);
-							log.info("[batchSaveOrderShipping][发送加急订单通知成功，订单号：{}]", saveRequestVO.getOrderNo());
-						} catch (Exception e) {
-							log.error("[batchSaveOrderShipping][发送加急订单通知失败，订单号：{}]", saveRequestVO.getOrderNo(), e);
-						}
-					}
-				} else {
-					log.info("[batchSaveOrderShipping][该物流单号已存在加急记录，不再发送加急告警，trackingNumber={}]", saveRequestVO.getTrackingNumber());
-				}
-			}
-		}
-
-		// ================== 2. 生成物流序号映射 ==================
-		// Map<物流单号, Map<日期, 当天的序号>>
-		// 用于给相同物流单号在同一天创建的记录生成自增序号
-		Map<String, Map<LocalDate, Integer>> trackingNumberToSequence = getTrackingNumberSequences(saveRequestVOs);
-
-		// ================== 3. 清理历史记录 ==================
-		// 特殊场景处理：平台物流重新预约（相同shopId+orderNo使用新物流单号）
-		// 删除所有匹配的历史记录（包括已发货状态），确保数据最新
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			shippingInfoMapper.delete(
-					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
-							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
-			);
-		}
-
-		// ================== 4. 准备新数据 ==================
-		// 检查是否还有需要保存的记录
-		if (!saveRequestVOs.isEmpty()) {
-			// 转换VO为DO对象，sorting_sequence 先设为0
-			LocalDateTime now = LocalDateTime.now();
-			List<TemuOrderShippingInfoDO> toSaveList = saveRequestVOs.stream()
-					.map(vo -> {
-						// 创建实体对象
-						TemuOrderShippingInfoDO info = new TemuOrderShippingInfoDO();
-						// 设置基础字段
-						info.setOrderNo(vo.getOrderNo());
-						info.setTrackingNumber(vo.getTrackingNumber());
-						info.setExpressImageUrl(vo.getExpressImageUrl());
-						info.setExpressOutsideImageUrl(vo.getExpressOutsideImageUrl());
-						info.setExpressSkuImageUrl(vo.getExpressSkuImageUrl());
-						info.setShopId(vo.getShopId());
-						info.setShippingStatus(0); // 新保存的记录默认为未发货状态
-						info.setIsUrgent(vo.getIsUrgent()); // 设置是否加急
-
-						// 确定物流信息的创建时间： 优先使用VO中的发货时间 / 无发货时间则使用当前系统时间
-						LocalDateTime createTime;
-						if (vo.getShippingTime() != null) {
-							createTime = LocalDateTime.parse(vo.getShippingTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-						} else {
-							createTime = now;
-						}
-						info.setCreateTime(createTime);
-						info.setUpdateTime(now);
-
-						// ===== 设置物流单号的每日序号 =====
-						// 从映射中获取该物流单号对应的日期序号表
-						Map<LocalDate, Integer> dateSequenceMap = trackingNumberToSequence.get(vo.getTrackingNumber());
-						if (dateSequenceMap != null) {
-							// 设置当前物流单号的序号 key=日期，value=序号
-							info.setDailySequence(dateSequenceMap.get(createTime.toLocalDate()));
-						}
-
-						return info;
-					})
-					.collect(Collectors.toList());
-
-			// ================== 5. 批量保存 ==================
-			try {
-				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
-				log.info("批量保存成功，数量：{}", affectedRows);
-				return affectedRows;
-			} catch (Exception e) {
-				log.error("批量保存失败", e);
-				throw new ServiceException("批量保存失败：" + e.getMessage());
-			}
-		}
-		return 0;
-	}
-
-	/**
 	 * 获取物流单号在每日的序号映射
 	 * 1. 为每个物流单号在每天分配唯一递增的每日序号
 	 * 2. 序号分配规则：
@@ -1299,16 +1209,63 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 	}
 
 	/**
-	 * 测试方法
 	 * 批量保存物流面单信息
 	 * @param saveRequestVOs
 	 * @return
 	 */
 	@Transactional(rollbackFor = Exception.class)
-	public int batchSaveOrderShippingTest(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
+	public int batchSaveOrderShipping(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs) {
 		if (CollectionUtils.isEmpty(saveRequestVOs)) {
 			return 0;
 		}
+				
+		// ================== 1. 修正shopId ==================
+		// 检查是否启用shopId修正功能
+		String isShopIdCorrectionEnabled = configApi.getConfigValueByKey("temu.order-shipping.shopId-correction.enabled");
+		boolean shopIdCorrectionEnabled = false;
+		if (StringUtils.hasText(isShopIdCorrectionEnabled)) {
+			try {
+				shopIdCorrectionEnabled = Boolean.parseBoolean(isShopIdCorrectionEnabled);
+			} catch (Exception e) {
+				log.warn("[batchSaveOrderShipping] 解析shopId修正开关配置失败", e);
+			}
+		}
+		
+		if (shopIdCorrectionEnabled) {
+			log.info("[batchSaveOrderShipping] shopId修正功能已启用，开始修正shopId");
+			// 收集所有订单号
+			Set<String> orderNos = saveRequestVOs.stream()
+					.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getOrderNo)
+					.collect(Collectors.toSet());
+			
+			// 批量查询订单信息
+			List<TemuOrderDO> orders = orderMapper.selectList(
+					new LambdaQueryWrapperX<TemuOrderDO>()
+							.select(TemuOrderDO::getOrderNo, TemuOrderDO::getShopId)
+							.in(TemuOrderDO::getOrderNo, orderNos));
+			
+			// 构建订单号到shopId的映射
+			Map<String, Long> orderNoToShopId = orders.stream()
+					.collect(Collectors.toMap(TemuOrderDO::getOrderNo, TemuOrderDO::getShopId));
+			
+			// 更新saveRequestVOs中的shopId
+			for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
+				Long correctShopId = orderNoToShopId.get(vo.getOrderNo());
+				if (correctShopId != null) {
+					// 记录修改日志
+					if (!Objects.equals(vo.getShopId(), correctShopId)) {
+						log.info("[batchSaveOrderShipping] 修正shopId, orderNo={}, oldShopId={}, newShopId={}",
+								vo.getOrderNo(), vo.getShopId(), correctShopId);
+					}
+					vo.setShopId(correctShopId);
+				} else {
+					log.warn("[batchSaveOrderShipping] 未找到订单对应的shopId, orderNo={}", vo.getOrderNo());
+				}
+			}
+		} else {
+			log.info("[batchSaveOrderShipping] shopId修正功能未启用，跳过修正步骤");
+		}
+
 		// 1. 参数校验（强制要求 trackingNumber 非空）
 		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
 			if (saveRequestVO == null) {
@@ -1446,6 +1403,36 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 			try {
 				int affectedRows = shippingInfoMapper.insertBatch(toSaveList);
 				log.info("批量保存成功，数量：{}", affectedRows);
+
+				// 从配置中获取是否开启YPL物流信息校验功能
+				String isValidate = configApi.getConfigValueByKey("temu.is_validate");
+				log.info("是否开启YPL物流信息校验功能: {}", isValidate);
+				boolean flag = false; // 默认值
+				if (StrUtil.isNotEmpty(isValidate)) {
+					try {
+						flag = Boolean.parseBoolean(isValidate);
+					} catch (Exception e) {
+						log.warn("是否开启YPL物流信息校验功能的配置格式错误，使用默认值");
+					}
+				}
+				if(flag) {
+					// 收集所有的物流单号并按shopId分组
+					Map<String, Set<String>> shopTrackingNumbers = new HashMap<>();
+					for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
+						if (vo.getTrackingNumber() != null && StringUtils.hasText(vo.getTrackingNumber())) {
+							String shopId = String.valueOf(vo.getShopId());
+							shopTrackingNumbers.computeIfAbsent(shopId, k -> new HashSet<>())
+									.add(vo.getTrackingNumber());
+						}
+					}
+					// 物流单号不为空时发布校验事件
+					if (!shopTrackingNumbers.isEmpty()) {
+						// 发布物流单号校验事件（核心事件驱动机制）
+						// 注意：此处发布的事件是同步触发的，但实际处理可能异步执行
+						eventPublisher.publishEvent(new TrackingNumberValidationEvent(shopTrackingNumbers));
+						log.info("[batchSaveOrderShipping] 已发布物流单号校验事件，shopTrackingNumbers={}", shopTrackingNumbers);
+					}
+				}
 				return affectedRows;
 			} catch (Exception e) {
 				log.error("批量保存失败", e);
@@ -1477,8 +1464,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 				return false;
 			}
 
-			// 1. 获取shopId为77777777的店铺webhook地址
-			TemuShopDO webhookShop = temuShopMapper.selectByShopId(77777777L);
+			// 1. 获取shopId为66666666L的店铺webhook地址
+			TemuShopDO webhookShop = temuShopMapper.selectByShopId(66666666L);
 			if (webhookShop == null || webhookShop.getWebhook() == null) {
 				return false;
 			}
@@ -1506,4 +1493,95 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		}
 	}
 	
+	/**
+	 * 查询近三天的批次信息
+	 * 
+	 * @return 批次信息列表
+	 */
+	public List<TemuOrderBatchRespVO> getRecentBatches() {
+		// 计算三天前的时间
+		LocalDateTime threeDaysAgo = LocalDateTime.now().minusDays(3);
+		
+		// 查询近三天的批次信息
+		List<TemuOrderBatchDO> batchList = temuOrderBatchMapper.selectList(
+			new LambdaQueryWrapperX<TemuOrderBatchDO>()
+				.ge(TemuOrderBatchDO::getCreateTime, threeDaysAgo)
+				.eq(TemuOrderBatchDO::getDeleted, false)
+				.orderByDesc(TemuOrderBatchDO::getCreateTime)
+		);
+
+		if (CollUtil.isEmpty(batchList)) {
+			return new ArrayList<>();
+		}
+
+		// 获取所有批次类目ID
+		Set<String> batchCategoryIds = batchList.stream()
+				.map(TemuOrderBatchDO::getBatchCategoryId)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toSet());
+
+		// 查询批次类目信息
+		Map<String, List<String>> batchCategoryIdToCategories = new HashMap<>();
+		if (!batchCategoryIds.isEmpty()) {
+			// 查询所有相关的批次类目记录
+			List<TemuOrderBatchCategoryDO> categories = temuOrderBatchCategoryMapper.selectList(
+				new LambdaQueryWrapperX<TemuOrderBatchCategoryDO>()
+					.in(TemuOrderBatchCategoryDO::getBatchCategoryId, batchCategoryIds)
+			);
+			
+			// 按 batchCategoryId 分组
+			for (TemuOrderBatchCategoryDO category : categories) {
+				String batchCategoryId = category.getBatchCategoryId();
+				String categoryId = category.getCategoryId();
+				if (batchCategoryId != null && categoryId != null) {
+					batchCategoryIdToCategories.computeIfAbsent(
+						batchCategoryId, 
+						k -> new ArrayList<>()
+					).add(categoryId);
+				}
+			}
+		}
+
+		// 转换为 VO 对象，并设置 categoryIds
+		List<TemuOrderBatchRespVO> voList = new ArrayList<>(batchList.size());
+		for (TemuOrderBatchDO batch : batchList) {
+			TemuOrderBatchRespVO vo = BeanUtils.toBean(batch, TemuOrderBatchRespVO.class);
+			// 设置 categoryIds
+			if (batch.getBatchCategoryId() != null) {
+				vo.setCategoryIds(batchCategoryIdToCategories.getOrDefault(
+					batch.getBatchCategoryId(), new ArrayList<>()
+				));
+			} else {
+				vo.setCategoryIds(new ArrayList<>());
+			}
+			voList.add(vo);
+		}
+
+		return voList;
+	}
+
+	/**
+	 * 物流单号校验事件处理器 - 采用事务绑定的异步处理模式
+	 * @param event 包含待校验物流单号的包装事件
+	 */
+	@Async("taskExecutor")
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void handleTrackingNumberValidation(TrackingNumberValidationEvent event) {
+		try {
+			// 从事件中提取物流单号集合
+			Map<String, Set<String>> shopTrackingNumbers = event.getShopTrackingNumbers();
+			log.info("[handleTrackingNumberValidation] 开始异步校验物流单号，shopTrackingNumbers={}", shopTrackingNumbers);
+			
+			// 调用temuApi验证物流单号与erp是否一致
+			TemuOrderTrackingValidateRespVO validateResult = temuDeliveryOrderConvertService.validateTrackingNumber(shopTrackingNumbers);
+			if (!validateResult.getSuccess()) {
+				log.warn("[handleTrackingNumberValidation] 物流单号校验失败：{}", validateResult.getErrorMessage());
+			} else {
+				log.info("[handleTrackingNumberValidation] 物流单号校验成功");
+			}
+		} catch (Exception e) {
+			log.error("[handleTrackingNumberValidation] 物流单号校验异常", e);
+		}
+	}
+
 }

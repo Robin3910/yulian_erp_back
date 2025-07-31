@@ -20,6 +20,12 @@ public interface TemuOpenapiShopMapper {
     TemuOpenapiShopDO selectByShopId(String shopId);
 
     /**
+     * 检查店铺是否存在
+     */
+    @Select("SELECT shop_id FROM temu_openapi_shop WHERE shop_id = #{shopId} LIMIT 1")
+    TemuOpenapiShopDO checkShopExists(String shopId);
+
+    /**
      * 分页查询店铺列表
      */
     default PageResult<TemuOpenapiShopPageRespVO> selectPage(TemuOpenapiShopPageReqVO reqVO) {
@@ -57,4 +63,10 @@ public interface TemuOpenapiShopMapper {
             "WHERE (#{reqVO.shopName} IS NULL OR #{reqVO.shopName} = '' OR shop_name LIKE CONCAT('%', #{reqVO.shopName}, '%')) " +
             "AND (#{reqVO.platform} IS NULL OR #{reqVO.platform} = '' OR platform = #{reqVO.platform})")
     Long selectPageCount(@Param("reqVO") TemuOpenapiShopPageReqVO reqVO);
-} 
+
+    /**
+     * 根据ID查询店铺
+     */
+    @Select("SELECT app_key as appKey, app_secret as appSecret, token FROM temu_openapi_shop WHERE shop_id = #{shopId}")
+    TemuOpenapiShopDO selectById(Long shopId);
+}

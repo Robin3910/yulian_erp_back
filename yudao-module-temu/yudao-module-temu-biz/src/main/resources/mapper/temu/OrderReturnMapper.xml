@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.temu.dal.mysql.OrderReturnMapper">
+
+    <select id="selectPage" resultType="cn.iocoder.yudao.module.temu.controller.admin.vo.orderReturn.OrderReturnPageRespVO">
+        SELECT
+            id,
+            order_no,
+            sku,
+            skc,
+            custom_sku,
+            created_at,
+            shop_id,
+            alias_name,
+            product_title,
+            product_properties,
+            product_img_url,
+            draw_user_name,
+            produce_user_name,
+            ship_user_name,
+            repeat_reason
+        FROM
+            temu_order_return
+        <where>
+            <if test="reqVO.orderNo != null and reqVO.orderNo != ''">
+                AND order_no LIKE CONCAT('%', #{reqVO.orderNo}, '%')
+            </if>
+            <if test="reqVO.sku != null and reqVO.sku != ''">
+                AND sku LIKE CONCAT('%', #{reqVO.sku}, '%')
+            </if>
+            <if test="reqVO.skc != null and reqVO.skc != ''">
+                AND skc LIKE CONCAT('%', #{reqVO.skc}, '%')
+            </if>
+            <if test="reqVO.customSku != null and reqVO.customSku != ''">
+                AND custom_sku LIKE CONCAT('%', #{reqVO.customSku}, '%')
+            </if>
+            <if test="reqVO.repeatReason != null and reqVO.repeatReason != ''">
+                AND repeat_reason = #{reqVO.repeatReason}
+            </if>
+            <if test="reqVO.beginTime != null and reqVO.endTime != null">
+                AND created_at BETWEEN #{reqVO.beginTime} AND #{reqVO.endTime}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        LIMIT #{reqVO.pageSize} OFFSET #{reqVO.offset}
+    </select>
+
+    <select id="selectCount" resultType="long">
+        SELECT COUNT(1)
+        FROM temu_order_return
+        /*+ IGNORE_TENANT_LINE */
+        <where>
+            <if test="reqVO.orderNo != null and reqVO.orderNo != ''">
+                AND order_no LIKE CONCAT('%', #{reqVO.orderNo}, '%')
+            </if>
+            <if test="reqVO.sku != null and reqVO.sku != ''">
+                AND sku LIKE CONCAT('%', #{reqVO.sku}, '%')
+            </if>
+            <if test="reqVO.skc != null and reqVO.skc != ''">
+                AND skc LIKE CONCAT('%', #{reqVO.skc}, '%')
+            </if>
+            <if test="reqVO.customSku != null and reqVO.customSku != ''">
+                AND custom_sku LIKE CONCAT('%', #{reqVO.customSku}, '%')
+            </if>
+            <if test="reqVO.repeatReason != null and reqVO.repeatReason != ''">
+                AND repeat_reason = #{reqVO.repeatReason}
+            </if>
+            <if test="reqVO.beginTime != null and reqVO.endTime != null">
+                AND created_at BETWEEN #{reqVO.beginTime} AND #{reqVO.endTime}
+            </if>
+        </where>
+    </select>
+
+</mapper>

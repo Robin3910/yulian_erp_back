@@ -17,12 +17,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.stock.TemuStockPreparationPageReqVO;
+import cn.iocoder.yudao.module.temu.controller.admin.vo.stock.TemuStockPreparationVO;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import java.util.TreeMap;
+import cn.iocoder.yudao.module.temu.service.stock.TemuStockPreparationService;
 
 @Tag(name = "Temu管理 - 公共参数列表")
 @RestController
@@ -33,6 +40,8 @@ public class AdminCommonController {
 	private CommonService commonService;
 	@Resource
 	private PermissionService permissionService;
+	@Resource
+	private TemuStockPreparationService stockPreparationService;
 	
 	//	分类列表
 	@RequestMapping("/category/list")
@@ -43,13 +52,13 @@ public class AdminCommonController {
 	@RequestMapping("/shop/list")
 	public CommonResult<?> shopList() {
 		Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
-		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin");
-		return CommonResult.success(commonService.listShop());
-//		if (isAdmin) {
-//			return CommonResult.success(commonService.listShop());
-//		} else {
-//			return CommonResult.success(commonService.listShop(loginUserId));
-//		}
+		boolean isAdmin = permissionService.hasAnyRoles(loginUserId, "super_admin", "crm_admin", "art_staff", "production_staff", "运营人员");
+//		return CommonResult.success(commonService.listShop());
+		if (isAdmin) {
+			return CommonResult.success(commonService.listShop());
+		} else {
+			return CommonResult.success(commonService.listShop(loginUserId));
+		}
 	}
 	
 	//根据角色标识获取角色下所有用户
@@ -88,24 +97,13 @@ public class AdminCommonController {
 		return CommonResult.success(commonService.getTemuOpenapiShopPage(reqVO));
 	}
 
-	@RequestMapping("/temu-open-api/logistics/query")
-	@Operation(summary = "查询Temu平台物流信息")
-	public CommonResult<?> queryTemuLogistics() {
+	@PostMapping("/temu-open-api/stock-preparation/page")
+	@Operation(summary = "查询备货单列表")
+	public CommonResult<PageResult<TemuStockPreparationVO>> getStockPreparationPage(@Valid @RequestBody TemuStockPreparationPageReqVO reqVO) {
 		try {
-			// 直接new TemuOpenApiUtil并set参数
-			TemuOpenApiUtil openApiUtil = new TemuOpenApiUtil();
-			openApiUtil.setAppKey("0ce5328c2c804c13db86534799af62b6");
-			openApiUtil.setAppSecret("38453a5dfcead2fa62ab8a871906832c14129eb6");
-			openApiUtil.setAccessToken("iek0f3k2dovntbdqkl8uyo1rcjljqirabawbcbls88tpesu67bhxp2vw");
-			openApiUtil.setBaseUrl("https://openapi.kuajingmaihuo.com/openapi/router");
-
-			// 调用新的getShipOrderList方法
-			TreeMap<String, Object> params = new TreeMap<>();
-			String apiResult = openApiUtil.getShipOrderList(params);
-			
-			return CommonResult.success(apiResult);
+			return CommonResult.success(stockPreparationService.getStockPreparationPage(reqVO));
 		} catch (Exception e) {
-			return CommonResult.error(500, "物流查询失败: " + e.getMessage());
+			return CommonResult.error(500, "备货单查询失败: " + e.getMessage());
 		}
 	}
 

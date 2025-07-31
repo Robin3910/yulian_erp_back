@@ -114,4 +114,11 @@ public interface TemuOperationLogService {
      * @return 批量下单记录总金额统计
      */
     OrderPlacementAmountStatisticsRespVO getOrderPlacementAmountStatistics(OrderPlacementRecordPageReqVO pageReqVO);
+
+    // 大客户对接的账单
+    PageResult<OrderPlacementRecordRespVO> getOrderVipPlacementRecordPage(OrderPlacementRecordPageReqVO pageReqVO);
+
+    OrderPlacementAmountStatisticsRespVO getOrderVipPlacementAmountStatistics(OrderPlacementRecordPageReqVO pageReqVO);
+
+    List<OrderPlacementRecordRespVO> getOrderVipPlacementRecordList(OrderPlacementRecordPageReqVO pageReqVO);
 }
