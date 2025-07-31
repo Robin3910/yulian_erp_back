@@ -6,12 +6,11 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.temu.controller.admin.vo.orderShipping.TemuOrderShippingPageReqVO;
 import cn.iocoder.yudao.module.temu.dal.dataobject.TemuOrderShippingInfoDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -81,4 +80,12 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
                 .in(TemuOrderShippingInfoDO::getOrderNo, orderNos));
     }
 
+    /**
+     * 根据订单号和店铺ID物理删除物流信息
+     * @param orderNo 订单号
+     * @param shopId 店铺ID
+     * @return 删除的记录数
+     */
+    @Delete("DELETE FROM temu_order_shipping_info WHERE order_no = #{arg0} AND shop_id = #{arg1} LIMIT 1000")
+    int physicalDeleteByOrderNoAndShopId(String orderNo, Long shopId);
 }
