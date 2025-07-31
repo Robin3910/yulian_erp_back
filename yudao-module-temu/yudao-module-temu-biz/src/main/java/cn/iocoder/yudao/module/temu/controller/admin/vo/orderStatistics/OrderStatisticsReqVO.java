@@ -17,4 +17,7 @@ public class OrderStatisticsReqVO {
 
     @Schema(description = "统计粒度，day/week/month")
     private String granularity;
-} 
+
+    @Schema(description = "类目ID数组")
+    private List<String> categoryIds;
+}

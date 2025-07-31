@@ -14,12 +14,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
-public class orderStatisticsServiceImpl implements IOrderStatisticsService{
+public class orderStatisticsServiceImpl implements IOrderStatisticsService {
     @Autowired
     private OrderStatisticsMapper orderStatisticsMapper;
 
     /**
      * 订单统计主方法，根据统计粒度（日/周/月）返回统计结果
+     * 
      * @param reqVO 请求参数，包括店铺ID、起止日期、统计粒度
      * @return 统计结果，包含时间点、订单数量、汇总信息等
      */
@@ -28,19 +29,26 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         List<Map<String, Object>> dbResult;
         String granularity = reqVO.getGranularity();
         List<Long> shopIds = reqVO.getShopIds();
+        List<String> categoryIds = reqVO.getCategoryIds();
         String startDate = reqVO.getStartDate();
         String endDate = reqVO.getEndDate();
         // 兼容全选店铺逻辑：shopIds为null、空、或包含-1L时，统计所有店铺
-        if (shopIds == null || shopIds.isEmpty() || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
+        if (shopIds == null || shopIds.isEmpty()
+                || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
             shopIds = null; // 传null给Mapper，SQL里不加店铺条件
+        }
+        // 兼容全选类目逻辑：categoryIds为null、空、或包含-1L时，统计所有类目
+        if (categoryIds == null || categoryIds.isEmpty()
+                || (categoryIds.size() == 1 && (categoryIds.get(0) == null || categoryIds.get(0).equals("-1")))) {
+            categoryIds = null; // 传null给Mapper，SQL里不加类目条件
         }
         // 根据粒度调用不同SQL
         if ("day".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectOrderCountByDay(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectOrderCountByDay(shopIds, categoryIds, startDate, endDate);
         } else if ("week".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectOrderCountByWeek(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectOrderCountByWeek(shopIds, categoryIds, startDate, endDate);
         } else if ("month".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectOrderCountByMonth(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectOrderCountByMonth(shopIds, categoryIds, startDate, endDate);
         } else {
             return emptyResp(granularity);
         }
@@ -48,7 +56,7 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         Map<String, Integer> dataMap = new LinkedHashMap<>();
         for (Map<String, Object> row : dbResult) {
             String timePoint = String.valueOf(row.get("time_point"));
-            Integer count = ((Number)row.get("order_count")).intValue();
+            Integer count = ((Number) row.get("order_count")).intValue();
             dataMap.put(timePoint, count);
         }
         // 补全所有时间点（如某天无订单，补0）
@@ -61,7 +69,7 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         int total = values.stream().mapToInt(Integer::intValue).sum(); // 总订单数
         int max = values.stream().mapToInt(Integer::intValue).max().orElse(0); // 单日最大
         int min = values.stream().mapToInt(Integer::intValue).min().orElse(0); // 单日最小
-        double avg = values.isEmpty() ? 0 : (double)total / values.size(); // 日均订单
+        double avg = values.isEmpty() ? 0 : (double) total / values.size(); // 日均订单
         double roundedAvg = BigDecimal.valueOf(avg)
                 .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue();
@@ -81,6 +89,7 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
 
     /**
      * 返单统计方法，根据统计粒度（日/周/月）返回统计结果
+     * 
      * @param reqVO 请求参数，包括店铺ID、起止日期、统计粒度
      * @return 统计结果，包含时间点、订单数量、汇总信息等
      */
@@ -89,25 +98,32 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         List<Map<String, Object>> dbResult;
         String granularity = reqVO.getGranularity();
         List<Long> shopIds = reqVO.getShopIds();
+        List<String> categoryIds = reqVO.getCategoryIds();
         String startDate = reqVO.getStartDate();
         String endDate = reqVO.getEndDate();
         // 兼容全选店铺逻辑：shopIds为null、空、或包含-1L时，统计所有店铺
-        if (shopIds == null || shopIds.isEmpty() || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
+        if (shopIds == null || shopIds.isEmpty()
+                || (shopIds.size() == 1 && (shopIds.get(0) == null || shopIds.get(0) == -1L))) {
             shopIds = null;
         }
+        // 兼容全选类目逻辑：categoryIds为null、空、或包含-1L时，统计所有类目
+        if (categoryIds == null || categoryIds.isEmpty()
+                || (categoryIds.size() == 1 && (categoryIds.get(0) == null || categoryIds.get(0).equals("-1")))) {
+            categoryIds = null;
+        }
         if ("day".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectReturnOrderCountByDay(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByDay(shopIds, categoryIds, startDate, endDate);
         } else if ("week".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectReturnOrderCountByWeek(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByWeek(shopIds, categoryIds, startDate, endDate);
         } else if ("month".equals(granularity)) {
-            dbResult = orderStatisticsMapper.selectReturnOrderCountByMonth(shopIds, startDate, endDate);
+            dbResult = orderStatisticsMapper.selectReturnOrderCountByMonth(shopIds, categoryIds, startDate, endDate);
         } else {
             return emptyResp(granularity);
         }
         Map<String, Integer> dataMap = new LinkedHashMap<>();
         for (Map<String, Object> row : dbResult) {
             String timePoint = String.valueOf(row.get("time_point"));
-            Integer count = ((Number)row.get("order_count")).intValue();
+            Integer count = ((Number) row.get("order_count")).intValue();
             dataMap.put(timePoint, count);
         }
         List<String> timePoints = buildTimePoints(startDate, endDate, granularity);
@@ -118,7 +134,7 @@ public class orderStatisticsServiceImpl implements IOrderStatisticsService{
         int total = values.stream().mapToInt(Integer::intValue).sum();
         int max = values.stream().mapToInt(Integer::intValue).max().orElse(0);
         int min = values.stream().mapToInt(Integer::intValue).min().orElse(0);
-        double avg = values.isEmpty() ? 0 : (double)total / values.size();
+        double avg = values.isEmpty() ? 0 : (double) total / values.size();
         double roundedAvg = BigDecimal.valueOf(avg)
                 .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue();
