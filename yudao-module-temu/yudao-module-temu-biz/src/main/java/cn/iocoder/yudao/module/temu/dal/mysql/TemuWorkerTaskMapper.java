@@ -59,4 +59,10 @@ public interface TemuWorkerTaskMapper extends BaseMapperX<TemuWorkerTaskDO> {
     @Select("SELECT COUNT(1) FROM temu_worker_task WHERE worker_id = #{workerId} AND custom_sku = #{customSku}")
     boolean existsByWorkerIdAndCustomSku(@Param("workerId") Long workerId, @Param("customSku") String customSku);
 
+    /**
+     * 根据订单编号、定制SKU和任务类型查询最新的作图任务记录
+     */
+    @Select("SELECT * FROM temu_worker_task WHERE order_no = #{orderNo} AND custom_sku = #{customSku} AND task_type = #{taskType} ORDER BY create_time DESC LIMIT 1")
+    TemuWorkerTaskDO selectLatestDrawTaskByOrderNoAndCustomSku(@Param("orderNo") String orderNo, @Param("customSku") String customSku, @Param("taskType") Byte taskType);
+
 }
