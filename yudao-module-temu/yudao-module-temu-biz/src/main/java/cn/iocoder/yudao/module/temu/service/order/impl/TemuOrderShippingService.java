@@ -1438,13 +1438,24 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					}
 				}
 				if(flag) {
-					// 收集所有的物流单号并按shopId分组
+					// 收集所有的物流单号并按shopId分组（只收集最近5天内的记录）
 					Map<String, Set<String>> shopTrackingNumbers = new HashMap<>();
+					String fiveDaysAgo = LocalDateTime.now().minusDays(5)
+							.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+					
 					for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO vo : saveRequestVOs) {
 						if (vo.getTrackingNumber() != null && StringUtils.hasText(vo.getTrackingNumber())) {
-							String shopId = String.valueOf(vo.getShopId());
-							shopTrackingNumbers.computeIfAbsent(shopId, k -> new HashSet<>())
-									.add(vo.getTrackingNumber());
+							// 如果发货时间为空或者在5天内，则添加到校验列表
+							if (vo.getShippingTime() == null || vo.getShippingTime().compareTo(fiveDaysAgo) > 0) {
+								String shopId = String.valueOf(vo.getShopId());
+								shopTrackingNumbers.computeIfAbsent(shopId, k -> new HashSet<>())
+										.add(vo.getTrackingNumber());
+								log.info("[batchSaveOrderShipping] 添加物流单号到校验列表，订单号：{}，物流单号：{}，发货时间：{}", 
+										vo.getOrderNo(), vo.getTrackingNumber(), vo.getShippingTime());
+							} else {
+								log.info("[batchSaveOrderShipping] 跳过5天前的物流单号校验，订单号：{}，物流单号：{}，发货时间：{}", 
+										vo.getOrderNo(), vo.getTrackingNumber(), vo.getShippingTime());
+							}
 						}
 					}
 					// 物流单号不为空时发布校验事件
