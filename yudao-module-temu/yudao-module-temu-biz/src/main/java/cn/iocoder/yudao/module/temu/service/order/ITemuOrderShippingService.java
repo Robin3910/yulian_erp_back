@@ -63,4 +63,11 @@ public interface ITemuOrderShippingService {
      * @return 批次信息
      */
     List<TemuOrderBatchRespVO> getRecentBatches();
+
+    /**
+     * 批量保存发货面单信息V2
+     * @param saveRequestVOs
+     * @return
+     */
+    int batchSaveOrderShippingV2(List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs);
 }

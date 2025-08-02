@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.temu.controller.admin.controller;
 
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -16,6 +17,7 @@ import javax.validation.Valid;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.temu.dal.mysql.TemuOrderBatchMapper.log;
 
 @Tag(name = "Temu管理 - 待发货列表管理")
 @RestController
@@ -53,7 +55,22 @@ public class AdminTemuOrderShippingController {
         if (saveRequestVOs == null || saveRequestVOs.isEmpty()) {
             return success(0);
         }
-        return success(shippingService.batchSaveOrderShipping(saveRequestVOs));
+        // 从配置中获取是否使用 批量保存待发货订单V2版本
+        String isOrderShippingV2 = configApi.getConfigValueByKey("temu_order_shipping_v2");
+        log.info("批量保存待发货订单V2版本是否使用的配置值: {}", isOrderShippingV2);
+        boolean flag = false; // 默认值
+        if (StrUtil.isNotEmpty(isOrderShippingV2)) {
+            try {
+                flag = Boolean.parseBoolean(isOrderShippingV2);
+            } catch (Exception e) {
+                log.warn("批量保存待发货订单V2版本是否使用的配置值配置格式错误，使用默认值false");
+            }
+        }
+        if(flag){
+            return success(shippingService.batchSaveOrderShippingV2(saveRequestVOs));
+        }else{
+            return success(shippingService.batchSaveOrderShipping(saveRequestVOs));
+        }
     }
 
     @GetMapping("/page")
