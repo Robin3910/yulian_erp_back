@@ -89,11 +89,4 @@ public interface TemuOrderShippingMapper extends BaseMapperX<TemuOrderShippingIn
     @Delete("DELETE FROM temu_order_shipping_info WHERE order_no = #{arg0} AND shop_id = #{arg1} LIMIT 1000")
     int physicalDeleteByOrderNoAndShopId(String orderNo, Long shopId);
 
-    /**
-     * 根据物流单号物理删除物流信息
-     * @param trackingNumber 物流单号
-     * @return 删除的记录数
-     */
-    @Delete("DELETE FROM temu_order_shipping_info WHERE tracking_number = #{arg0} LIMIT 1000")
-    int physicalDeleteByTrackingNumber(String trackingNumber);
 }

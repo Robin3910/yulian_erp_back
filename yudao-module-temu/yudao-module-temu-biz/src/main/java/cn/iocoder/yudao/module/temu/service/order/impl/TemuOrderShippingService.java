@@ -1558,26 +1558,22 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 		// 用于给相同物流单号在同一天创建的记录生成自增序号
 		Map<String, Map<LocalDate, Integer>> trackingNumberToSequence = getTrackingNumberSequences(saveRequestVOs);
 
-		// 收集 原有的发货人id和已发货状态
-		Map<String, Long> shippedOperatorMap = new HashMap<>(); // key: orderNo + "_" + shopId, value: shippedOperatorId
-		// 收集 原有的加急单和面单URL
-		Map<String, String> originalExpressImageUrlMap = new HashMap<>(); // key: orderNo + "_" + shopId, value: expressImageUrl
-		Map<String, String> originalExpressOutsideImageUrlMap = new HashMap<>(); // key: orderNo + "_" + shopId, value: expressOutsideImageUrl
-
 		// ================== 3. 清理历史记录 ==================
-		// 先收集所有需要处理的物流单号
-		Set<String> allTrackingNumbers = saveRequestVOs.stream()
-				.map(TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO::getTrackingNumber)
-				.collect(Collectors.toSet());
+		// 先查询并保存所有相关记录的信息
+		Map<String, Long> shippedOperatorMap = new HashMap<>(); // key: orderNo + "_" + shopId + "_" + trackingNumber, value: shippedOperatorId
+		Map<String, String> originalExpressImageUrlMap = new HashMap<>(); // key: orderNo + "_" + shopId + "_" + trackingNumber, value: expressImageUrl
+		Map<String, String> originalExpressOutsideImageUrlMap = new HashMap<>(); // key: orderNo + "_" + shopId + "_" + trackingNumber, value: expressOutsideImageUrl
 
-		// 先查询所有相关记录并保存加急单和面单信息
-		for (String trackingNumber : allTrackingNumbers) {
-			List<TemuOrderShippingInfoDO> oldTrackingList = shippingInfoMapper.selectList(
+		int totalDeleteCount = 0; // 总删除记录数
+		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
+			// 先按orderNo和shopId查询旧记录
+			List<TemuOrderShippingInfoDO> oldList = shippingInfoMapper.selectList(
 					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-							.eq(TemuOrderShippingInfoDO::getTrackingNumber, trackingNumber)
+							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
+							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
 			);
-			if (oldTrackingList != null && !oldTrackingList.isEmpty()) {
-				for (TemuOrderShippingInfoDO old : oldTrackingList) {
+			if (oldList != null && !oldList.isEmpty()) {
+				for (TemuOrderShippingInfoDO old : oldList) {
 					if (old.getShippingStatus() != null && old.getShippingStatus() == 1) {
 						String key = old.getOrderNo() + "_" + old.getShopId() + "_" + old.getTrackingNumber();
 						shippedOperatorMap.put(key, old.getShippedOperatorId());
@@ -1592,57 +1588,8 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 					}
 				}
 			}
-		}
-
-		int totalDeleteCount = 0; // 总删除记录数
-		Set<String> processedOrderShops = new HashSet<>(); // 用于记录已处理的订单号和店铺ID组合
-		Set<String> processedTrackingNumbers = new HashSet<>(); // 用于记录已处理的物流单号
-
-		// 先查询并保存所有相关记录的信息
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			// 先按orderNo和shopId查询旧记录
-			List<TemuOrderShippingInfoDO> oldList = shippingInfoMapper.selectList(
-					new LambdaQueryWrapperX<TemuOrderShippingInfoDO>()
-							.eq(TemuOrderShippingInfoDO::getOrderNo, saveRequestVO.getOrderNo())
-							.eq(TemuOrderShippingInfoDO::getShopId, saveRequestVO.getShopId())
-			);
-			if (oldList != null && !oldList.isEmpty()) {
-				for (TemuOrderShippingInfoDO old : oldList) {
-					if (old.getShippingStatus() != null && old.getShippingStatus() == 1) {
-						String key = old.getOrderNo() + "_" + old.getShopId() + "_" + old.getTrackingNumber();
-						shippedOperatorMap.put(key, old.getShippedOperatorId());
-					}
-					// 收集原有的图片URL信息
-					String imageKey = old.getOrderNo() + "_" + old.getShopId() + "_" + old.getTrackingNumber();
-					if (old.getExpressImageUrl() != null) {
-						originalExpressImageUrlMap.put(imageKey, old.getExpressImageUrl());
-					}
-					if (old.getExpressOutsideImageUrl() != null) {
-						originalExpressOutsideImageUrlMap.put(imageKey, old.getExpressOutsideImageUrl());
-					}
-				}
-			}
-		}
-
-		// 执行删除操作
-		for (TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO : saveRequestVOs) {
-			String orderShopKey = saveRequestVO.getOrderNo() + "_" + saveRequestVO.getShopId();
-			int deleteCount = 0;
-
-			// 1. 如果订单号和店铺ID组合未处理过，执行删除
-			if (!processedOrderShops.contains(orderShopKey)) {
-				int count = shippingInfoMapper.physicalDeleteByOrderNoAndShopId(saveRequestVO.getOrderNo(), saveRequestVO.getShopId());
-				deleteCount += count;
-				processedOrderShops.add(orderShopKey);
-			}
-
-			// 2. 如果物流单号未处理过，执行删除
-			if (!processedTrackingNumbers.contains(saveRequestVO.getTrackingNumber())) {
-				int count = shippingInfoMapper.physicalDeleteByTrackingNumber(saveRequestVO.getTrackingNumber());
-				deleteCount += count;
-				processedTrackingNumbers.add(saveRequestVO.getTrackingNumber());
-			}
-
+			// 物理删除所有匹配的历史记录
+			int deleteCount = shippingInfoMapper.physicalDeleteByOrderNoAndShopId(saveRequestVO.getOrderNo(), saveRequestVO.getShopId());
 			totalDeleteCount += deleteCount;
 		}
 		log.info("[batchSaveOrderShippingV2][物理删除物流信息] 总删除记录数：{}", totalDeleteCount);
@@ -1737,11 +1684,6 @@ public class TemuOrderShippingService implements ITemuOrderShippingService {
 								String shopId = String.valueOf(vo.getShopId());
 								shopTrackingNumbers.computeIfAbsent(shopId, k -> new HashSet<>())
 										.add(vo.getTrackingNumber());
-								log.info("[batchSaveOrderShipping] 添加物流单号到校验列表，订单号：{}，物流单号：{}，发货时间：{}", 
-										vo.getOrderNo(), vo.getTrackingNumber(), vo.getShippingTime());
-							} else {
-								log.info("[batchSaveOrderShipping] 跳过5天前的物流单号校验，订单号：{}，物流单号：{}，发货时间：{}", 
-										vo.getOrderNo(), vo.getTrackingNumber(), vo.getShippingTime());
 							}
 						}
 					}
