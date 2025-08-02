@@ -79,7 +79,7 @@ public class TemuOrderShippingApiServiceImpl implements ITemuOrderShippingApiSer
                     // 即使同步失败，也等待5秒后再同步下一个店铺
                     try {
                         log.info("[syncShippingInfo] 同步失败，休眠5秒后继续同步下一个店铺");
-                        Thread.sleep(3000);
+                        Thread.sleep(5000);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.error("[syncShippingInfo] 休眠被中断", ie);
@@ -97,6 +97,9 @@ public class TemuOrderShippingApiServiceImpl implements ITemuOrderShippingApiSer
             final int pageSize = 50; // 将每页数量从100降到50，减轻数据库压力
             long total = 0;
             int totalSaved = 0;
+
+            // 用于收集所有分页数据
+            List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> allSaveRequestVOs = new ArrayList<>();
 
             do {
                 // 1. 构建查询参数
@@ -116,7 +119,6 @@ public class TemuOrderShippingApiServiceImpl implements ITemuOrderShippingApiSer
                 }
 
                 // 3. 准备批量保存的数据
-                List<TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO> saveRequestVOs = new ArrayList<>();
                 for (TemuDeliveryOrderSimpleVO vo : list) {
                     // 创建保存请求VO
                     TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO saveRequestVO = new TemuOrderShippingRespVO.TemuOrderShippingSaveRequestVO();
@@ -128,29 +130,29 @@ public class TemuOrderShippingApiServiceImpl implements ITemuOrderShippingApiSer
                     saveRequestVO.setTrackingNumber(vo.getExpressDeliverySn());
                     saveRequestVO.setShopId(Long.valueOf(shopId));
 
-                    saveRequestVOs.add(saveRequestVO);
+                    allSaveRequestVOs.add(saveRequestVO);
                 }
 
-                // 4. 批量保存到数据库
-                if (!saveRequestVOs.isEmpty()) {
-                    int savedCount = temuOrderShippingService.batchSaveOrderShippingV2(saveRequestVOs);
-                    totalSaved += savedCount;
-                    log.info("[syncShippingInfo][shopId: {}] 第{}页保存物流信息成功，本页保存数量: {}, 累计保存数量: {}, 总数据量: {}", 
-                            shopId, pageNo, savedCount, totalSaved, total);
-                    
-                    // 每页数据保存后休眠1秒，避免频繁写入
-                    try {
-                        Thread.sleep(3000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        log.error("[syncShippingInfo] 休眠被中断", e);
-                    }
-                }
+                log.info("[syncShippingInfo][shopId: {}] 第{}页获取物流信息成功，本页数量: {}, 累计获取数量: {}, 总数据量: {}",
+                        shopId, pageNo, list.size(), allSaveRequestVOs.size(), total);
 
                 pageNo++; // 下一页
-            } while (totalSaved < total); // 当已保存数量小于总数时继续循环
+            } while (allSaveRequestVOs.size() < total); // 当已获取数量小于总数时继续循环
 
-            log.info("[syncShippingInfo][shopId: {}] 同步完成，总共保存: {} 条记录", shopId, totalSaved);
+            // 4. 所有数据收集完成后，一次性批量保存到数据库
+            if (!allSaveRequestVOs.isEmpty()) {
+                totalSaved = temuOrderShippingService.batchSaveOrderShippingV2(allSaveRequestVOs);
+                log.info("[syncShippingInfo][shopId: {}] 同步完成，总共保存: {} 条记录", shopId, totalSaved);
+            }
+
+            // 每个店铺同步完成后休眠3秒，避免对数据库造成过大压力
+            try {
+                log.info("[syncShippingInfo] 休眠5秒后继续同步下一个店铺");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("[syncShippingInfo] 休眠被中断", e);
+            }
         } catch (Exception e) {
             log.error("[syncShippingInfo][shopId: {}] 同步物流信息失败", shopId, e);
             throw new RuntimeException("同步物流信息失败", e);
